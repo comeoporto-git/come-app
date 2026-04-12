@@ -6,7 +6,11 @@ export default auth((req) => {
   const session = req.auth;
 
   // Public routes
-  if (pathname.startsWith("/login") || pathname.startsWith("/api/auth") || pathname.startsWith("/preview")) {
+  if (
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/api/auth") ||
+    pathname.startsWith("/preview")
+  ) {
     return NextResponse.next();
   }
 
@@ -21,7 +25,11 @@ export default auth((req) => {
   if (pathname.startsWith("/guide") && role !== "Guide" && role !== "Admin") {
     return NextResponse.redirect(new URL("/unauthorized", req.url));
   }
-  if (pathname.startsWith("/accountant") && role !== "Accountant" && role !== "Admin") {
+  if (
+    pathname.startsWith("/accountant") &&
+    role !== "Accountant" &&
+    role !== "Admin"
+  ) {
     return NextResponse.redirect(new URL("/unauthorized", req.url));
   }
   if (pathname.startsWith("/admin") && role !== "Admin") {
