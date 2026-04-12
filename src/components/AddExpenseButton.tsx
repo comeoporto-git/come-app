@@ -1,0 +1,32 @@
+"use client";
+
+import { useState } from "react";
+import { AddExpenseModal } from "./AddExpenseModal";
+import type { Fornecedor } from "@/lib/notion";
+
+export function AddExpenseButton({
+  tourId,
+  fornecedores,
+}: {
+  tourId: string;
+  fornecedores: Fornecedor[];
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className="text-xs bg-[#32373c] text-white font-semibold px-3 py-1.5 rounded-full hover:bg-[#1e2226] active:scale-95 transition-all"
+      >
+        + Despesa
+      </button>
+      {open && (
+        <AddExpenseModal
+          tourId={tourId}
+          fornecedores={fornecedores}
+          onClose={() => setOpen(false)}
+        />
+      )}
+    </>
+  );
+}
