@@ -84,7 +84,7 @@ export default async function AdminPage() {
         {/* Quick links */}
         <section className="grid grid-cols-2 gap-3">
           {[
-            { label: "Guias", href: "/guide", icon: "🧭" },
+            { label: "Tours", href: "/admin/tours", icon: "🗓️" },
             { label: "Contabilidade", href: "/accountant", icon: "📊" },
           ].map((link) => (
             <a

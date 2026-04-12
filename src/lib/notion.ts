@@ -62,6 +62,21 @@ export type TeamMember = {
   role: "Admin" | "Guide" | "Accountant";
 };
 
+export async function getTeamMembers(): Promise<TeamMember[]> {
+  const res = await notion.databases.query({
+    database_id: TEAM_DB,
+    sorts: [{ property: "Name", direction: "ascending" }],
+    page_size: 100,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any);
+  return (res.results as PageObjectResponse[]).map((page) => ({
+    id: page.id,
+    name: text(getProp(page, "Name")),
+    email: text(getProp(page, "email")),
+    role: text(getProp(page, "Role")) as TeamMember["role"],
+  })).filter((m) => m.name);
+}
+
 export async function getTeamMemberByEmail(email: string): Promise<TeamMember | null> {
   const res = await notion.databases.query({
     database_id: TEAM_DB,
@@ -133,6 +148,23 @@ export async function getToursForGuide(email: string): Promise<Tour[]> {
     filter: {
       and: [
         { property: "Team", relation: { contains: member.id } },
+        { property: "Date", date: { on_or_after: today.toISOString() } },
+        { property: "Expenses Closed", checkbox: { equals: false } },
+      ],
+    },
+    sorts: [{ property: "Date", direction: "ascending" }],
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any);
+  return (res.results as PageObjectResponse[]).map(mapTour);
+}
+
+export async function getAllUpcomingTours(): Promise<Tour[]> {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const res = await notion.databases.query({
+    database_id: TOURS_DB,
+    filter: {
+      and: [
         { property: "Date", date: { on_or_after: today.toISOString() } },
         { property: "Expenses Closed", checkbox: { equals: false } },
       ],
