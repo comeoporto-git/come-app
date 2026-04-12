@@ -65,14 +65,14 @@ export type TeamMember = {
 export async function getTeamMemberByEmail(email: string): Promise<TeamMember | null> {
   const res = await notion.databases.query({
     database_id: TEAM_DB,
-    filter: { property: "Email", email: { equals: email } },
+    filter: { property: "email", email: { equals: email } },
   });
   if (!res.results.length) return null;
   const page = res.results[0] as PageObjectResponse;
   return {
     id: page.id,
     name: text(getProp(page, "Name")),
-    email: text(getProp(page, "Email")),
+    email: text(getProp(page, "email")),
     role: text(getProp(page, "Role")) as TeamMember["role"],
   };
 }
