@@ -17,16 +17,6 @@ function formatDate(iso: string | null): string {
   });
 }
 
-const RESTRICTION_COLORS: Record<string, string> = {
-  Vegetariano: "bg-green-100 text-green-700",
-  Vegan: "bg-emerald-100 text-emerald-700",
-  "Sem Glúten": "bg-yellow-100 text-yellow-700",
-  "Sem Lactose": "bg-blue-100 text-blue-700",
-  Halal: "bg-purple-100 text-purple-700",
-  Kosher: "bg-indigo-100 text-indigo-700",
-  "Alergia a Frutos do Mar": "bg-red-100 text-red-700",
-  "Alergia a Nozes": "bg-orange-100 text-orange-700",
-};
 
 export default async function TourDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -53,7 +43,7 @@ export default async function TourDetailPage({ params }: { params: Promise<{ id:
             ←
           </Link>
           <div className="flex-1 min-w-0">
-            <h1 className="text-base font-semibold text-gray-900 truncate">{tour.service}</h1>
+            <h1 className="text-base font-semibold text-gray-900 truncate">{tour.saleId}</h1>
             <p className="text-xs text-gray-500">{formatDate(tour.date)}</p>
           </div>
           {isClosed && (
@@ -71,24 +61,11 @@ export default async function TourDetailPage({ params }: { params: Promise<{ id:
             <h2 className="text-sm font-semibold text-gray-700">Informação do Grupo</h2>
           </div>
           <div className="px-4 py-3 space-y-2">
-            <Row label="Cliente" value={tour.client || "—"} />
-            <Row label="Nº de Pax" value={String(tour.numUsers || "—")} />
-            <Row label="ID de Venda" value={tour.saleId || "—"} />
-            {tour.phone && (
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-500">Telefone</span>
-                <a
-                  href={`tel:${tour.phone}`}
-                  className="text-sm font-medium text-[#7852ca] underline underline-offset-2"
-                >
-                  {tour.phone}
-                </a>
-              </div>
-            )}
-            {tour.guestNames && (
+            <Row label="Nº de Pax" value={tour.numGuests ? String(tour.numGuests) : "—"} />
+            {tour.names && (
               <div>
                 <p className="text-xs text-gray-500 mb-1">Nomes</p>
-                <p className="text-sm text-gray-800 whitespace-pre-line">{tour.guestNames}</p>
+                <p className="text-sm text-gray-800 whitespace-pre-line">{tour.names}</p>
               </div>
             )}
             {tour.notes && (
@@ -99,25 +76,6 @@ export default async function TourDetailPage({ params }: { params: Promise<{ id:
             )}
           </div>
         </section>
-
-        {/* Allergies / Restrictions */}
-        {tour.restrictions.length > 0 && (
-          <section className="bg-red-50 border border-red-200 rounded-2xl p-4">
-            <h2 className="text-sm font-bold text-red-700 mb-2">⚠️ Restrições Alimentares</h2>
-            <div className="flex flex-wrap gap-2">
-              {tour.restrictions.map((r) => (
-                <span
-                  key={r}
-                  className={`text-xs font-semibold px-3 py-1 rounded-full ${
-                    RESTRICTION_COLORS[r] ?? "bg-red-100 text-red-700"
-                  }`}
-                >
-                  {r}
-                </span>
-              ))}
-            </div>
-          </section>
-        )}
 
         {/* Expenses */}
         <section>

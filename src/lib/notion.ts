@@ -78,47 +78,61 @@ export async function getTeamMemberByEmail(email: string): Promise<TeamMember | 
 }
 
 // ── Tours (Sales DB) ──────────────────────────────────────────────────────────
+//
+// Property name mapping (our code → Notion Sales DB):
+//   saleId       → "ID"               (Title)
+//   service      → "Service"          (Relation → Services DB)
+//   date         → "Date"             (Date)
+//   client       → "Client"           (Relation → Client DB)
+//   numGuests    → "Number of Guests" (Number)
+//   names        → "Names"            (Text)
+//   notes        → "Notes"            (Text)
+//   teamId       → "Team"             (Relation → Team DB)
+//   expensesClosed → "Expenses Closed" (Checkbox)
 
 export type Tour = {
   id: string;
+  saleId: string;
   service: string;
   date: string | null;
-  saleId: string;
   client: string;
-  numUsers: number;
-  guestNames: string;
-  phone: string;
+  numGuests: number;
+  names: string;
   notes: string;
-  restrictions: string[];
-  assignedGuide: string;
+  teamId: string | null;
   expensesClosed: boolean;
 };
 
 function mapTour(page: PageObjectResponse): Tour {
+  const serviceIds = relation(getProp(page, "Service"));
+  const clientIds  = relation(getProp(page, "Client"));
+  const teamIds    = relation(getProp(page, "Team"));
   return {
-    id: page.id,
-    service: text(getProp(page, "Service")),
-    date: dateStr(getProp(page, "Date")),
-    saleId: text(getProp(page, "Sale ID")),
-    client: text(getProp(page, "Client")),
-    numUsers: num(getProp(page, "Number of users")),
-    guestNames: text(getProp(page, "Guest Names")),
-    phone: text(getProp(page, "Phone number")),
-    notes: text(getProp(page, "Notes")),
-    restrictions: multiSelect(getProp(page, "Restrictions")),
-    assignedGuide: text(getProp(page, "Assigned Guide")),
-    expensesClosed: bool(getProp(page, "Expenses Closed")),
+    id:              page.id,
+    saleId:          text(getProp(page, "ID")),
+    service:         serviceIds[0] ?? "",   // Relation ID; resolved to name in UI layer
+    date:            dateStr(getProp(page, "Date")),
+    client:          clientIds[0] ?? "",
+    numGuests:       num(getProp(page, "Number of Guests")),
+    names:           text(getProp(page, "Names")),
+    notes:           text(getProp(page, "Notes")),
+    teamId:          teamIds[0] ?? null,
+    expensesClosed:  bool(getProp(page, "Expenses Closed")),
   };
 }
 
 export async function getToursForGuide(email: string): Promise<Tour[]> {
+  // Team is a Relation — filter by the guide's Notion page ID
+  const member = await getTeamMemberByEmail(email);
+  if (!member) return [];
+
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const res = await notion.databases.query({
     database_id: TOURS_DB,
     filter: {
       and: [
-        { property: "Assigned Guide", email: { equals: email } },
+        { property: "Team", relation: { contains: member.id } },
         { property: "Date", date: { on_or_after: today.toISOString() } },
         { property: "Expenses Closed", checkbox: { equals: false } },
       ],

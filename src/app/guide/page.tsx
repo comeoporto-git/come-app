@@ -122,31 +122,23 @@ function TourCard({
         <div className="flex items-start justify-between">
           <div className="flex-1 min-w-0">
             <p className={`font-semibold text-sm ${highlight ? "text-white" : "text-[#32373c]"}`}>
-              {tour.service}
+              {tour.saleId}
             </p>
             <p className={`text-xs mt-0.5 ${highlight ? "text-white/60" : "text-gray-500"}`}>
               {formatDate(tour.date)}
             </p>
-            {tour.client && (
-              <p className={`text-xs mt-1 truncate ${highlight ? "text-white/60" : "text-gray-500"}`}>
-                {tour.client} · {tour.numUsers} pax
+            {tour.numGuests > 0 && (
+              <p className={`text-xs mt-1 ${highlight ? "text-white/60" : "text-gray-500"}`}>
+                {tour.numGuests} pax
               </p>
             )}
           </div>
           <div className="ml-3 flex flex-col items-end gap-1">
-            {tour.restrictions.length > 0 && (
-              <span className="text-xs bg-red-100 text-red-600 font-semibold px-2 py-0.5 rounded-full">
-                ⚠️ {tour.restrictions.length} restrição
-              </span>
-            )}
             {highlight && (
               <span className="text-xs bg-[#7852ca] text-white px-2 py-0.5 rounded-full font-semibold">
                 Hoje
               </span>
             )}
-            <span className={`text-xs ${highlight ? "text-white/40" : "text-gray-400"}`}>
-              {tour.saleId}
-            </span>
           </div>
         </div>
       </li>
