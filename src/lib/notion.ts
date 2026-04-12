@@ -103,7 +103,7 @@ export async function getTeamMemberByEmail(email: string): Promise<TeamMember | 
 //   names        → "Names"            (Text)
 //   notes        → "Notes"            (Text)
 //   teamId       → "Team"             (Relation → Team DB)
-//   expensesClosed → "Expenses Closed" (Checkbox)
+//   expensesClosed → "Expenses Closed" (Select — empty = open, any value = closed)
 
 export type Tour = {
   id: string;
@@ -132,7 +132,7 @@ function mapTour(page: PageObjectResponse): Tour {
     names:           text(getProp(page, "Names")),
     notes:           text(getProp(page, "Notes")),
     teamId:          teamIds[0] ?? null,
-    expensesClosed:  bool(getProp(page, "Expenses Closed")),
+    expensesClosed:  text(getProp(page, "Expenses Closed")) !== "",
   };
 }
 
@@ -149,7 +149,7 @@ export async function getToursForGuide(email: string): Promise<Tour[]> {
       and: [
         { property: "Team", relation: { contains: member.id } },
         { property: "Date", date: { on_or_after: today.toISOString() } },
-        { property: "Expenses Closed", checkbox: { equals: false } },
+        { property: "Expenses Closed", select: { is_empty: true } },
       ],
     },
     sorts: [{ property: "Date", direction: "ascending" }],
@@ -164,10 +164,9 @@ export async function getAllUpcomingTours(): Promise<Tour[]> {
   const res = await notion.databases.query({
     database_id: TOURS_DB,
     filter: {
-      and: [
-        { property: "Date", date: { on_or_after: today.toISOString() } },
-        { property: "Expenses Closed", checkbox: { equals: false } },
-      ],
+      // Admin sees all upcoming tours regardless of expenses status
+      property: "Date",
+      date: { on_or_after: today.toISOString() },
     },
     sorts: [{ property: "Date", direction: "ascending" }],
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -185,7 +184,7 @@ export async function getTourById(id: string): Promise<Tour | null> {
 export async function closeTour(tourId: string): Promise<void> {
   await notion.pages.update({
     page_id: tourId,
-    properties: { "Expenses Closed": { checkbox: true } },
+    properties: { "Expenses Closed": { select: { name: "Closed" } } },
   });
 }
 
