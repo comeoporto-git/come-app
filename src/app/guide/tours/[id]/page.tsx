@@ -33,13 +33,14 @@ export default async function TourDetailPage({ params }: { params: Promise<{ id:
 
   const totalSpent = transactions.reduce((s, t) => s + t.totalCost, 0);
   const isClosed = tour.expensesClosed;
+  const backHref = session.user.role === "Admin" ? "/admin/tours" : "/guide";
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
       {/* Header */}
       <header className="bg-white border-b border-gray-100 sticky top-0 z-10">
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center gap-3">
-          <Link href="/guide" className="text-gray-400 hover:text-gray-700">
+          <Link href={backHref} className="text-gray-400 hover:text-gray-700">
             ←
           </Link>
           <div className="flex-1 min-w-0">
