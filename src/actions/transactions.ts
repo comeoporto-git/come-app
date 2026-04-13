@@ -4,6 +4,7 @@ import {
   createTransaction,
   updateTransaction,
   verifyTransaction,
+  archiveTransaction,
   closeTour,
 } from "@/lib/notion";
 import type { Transaction } from "@/lib/notion";
@@ -117,4 +118,17 @@ export async function verifyTransactionAction(
   await verifyTransaction(transactionId, verified);
   revalidatePath("/accountant");
   if (tourId) revalidatePath(`/guide/tours/${tourId}`);
+}
+
+export async function deleteExpenseAction(
+  transactionId: string,
+  tourId: string,
+): Promise<void> {
+  const session = await requireAuth();
+  if (session.user.role !== "Guide" && session.user.role !== "Admin") {
+    throw new Error("Forbidden");
+  }
+  await archiveTransaction(transactionId);
+  revalidatePath(`/guide/tours/${tourId}`);
+  revalidatePath("/accountant");
 }

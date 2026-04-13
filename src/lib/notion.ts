@@ -396,6 +396,10 @@ export async function verifyTransaction(pageId: string, verified: boolean): Prom
   });
 }
 
+export async function archiveTransaction(pageId: string): Promise<void> {
+  await notion.pages.update({ page_id: pageId, archived: true });
+}
+
 // ── Fornecedores ──────────────────────────────────────────────────────────────
 
 export type Fornecedor = {
@@ -414,3 +418,4 @@ export async function getFornecedores(): Promise<Fornecedor[]> {
     .map((page) => ({ id: page.id, name: text(getProp(page, "Name")) }))
     .filter((f) => f.name);
 }
+

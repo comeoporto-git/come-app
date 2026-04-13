@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { editExpenseAction } from "@/actions/transactions";
+import { editExpenseAction, deleteExpenseAction } from "@/actions/transactions";
 import type { Transaction, Fornecedor } from "@/lib/notion";
 import { useRouter } from "next/navigation";
 
@@ -30,9 +30,12 @@ export function EditExpenseModal({
 }) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imageDataUrl, setImageDataUrl] = useState("");
+  const [lightboxSrc, setLightboxSrc] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState<FormState>({
@@ -73,6 +76,20 @@ export function EditExpenseModal({
     const reader = new FileReader();
     reader.onload = (ev) => setImageDataUrl(ev.target?.result as string);
     reader.readAsDataURL(file);
+  }
+
+  async function handleDelete() {
+    setDeleting(true);
+    try {
+      await deleteExpenseAction(transaction.id, tourId);
+      router.refresh();
+      onClose();
+    } catch {
+      setError("Erro ao eliminar. Tenta novamente.");
+    } finally {
+      setDeleting(false);
+      setConfirmDelete(false);
+    }
   }
 
   async function handleSave() {
@@ -127,7 +144,31 @@ export function EditExpenseModal({
         <div className="px-5 pb-8 pt-2">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-bold text-gray-900">Editar Despesa</h2>
-            <span className="text-xs text-gray-400">{transaction.supplier}</span>
+            {!confirmDelete ? (
+              <button
+                onClick={() => setConfirmDelete(true)}
+                className="text-xs text-red-400 hover:text-red-600 font-medium"
+              >
+                Eliminar
+              </button>
+            ) : (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-500">Tens a certeza?</span>
+                <button
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className="text-xs text-white bg-red-500 hover:bg-red-600 px-2 py-1 rounded-lg font-medium disabled:opacity-50"
+                >
+                  {deleting ? "…" : "Sim"}
+                </button>
+                <button
+                  onClick={() => setConfirmDelete(false)}
+                  className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1 rounded-lg border border-gray-200"
+                >
+                  Não
+                </button>
+              </div>
+            )}
           </div>
 
           {error && (
@@ -136,7 +177,27 @@ export function EditExpenseModal({
             </div>
           )}
 
+          {/* Lightbox */}
+          {lightboxSrc && (
+            <div
+              className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90"
+              onClick={() => setLightboxSrc("")}
+            >
+              <img src={lightboxSrc} alt="Fatura" className="max-w-full max-h-full object-contain" />
+            </div>
+          )}
+
           <div className="space-y-3">
+            {/* Existing invoice photo */}
+            {transaction.invoiceImageUrl && !imageDataUrl && (
+              <img
+                src={transaction.invoiceImageUrl}
+                alt="Fatura atual"
+                className="w-full max-h-48 object-contain rounded-xl border border-gray-200 cursor-zoom-in"
+                onClick={() => setLightboxSrc(transaction.invoiceImageUrl!)}
+              />
+            )}
+
             {/* Supplier */}
             <div>
               <label className="text-xs text-gray-500 mb-1 block">Fornecedor <span className="text-red-400">*</span></label>
@@ -217,7 +278,12 @@ export function EditExpenseModal({
               <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleImageChange} capture="environment" />
               {imageDataUrl ? (
                 <div className="relative">
-                  <img src={imageDataUrl} alt="Nova fatura" className="w-full max-h-32 object-contain rounded-xl border border-gray-200" />
+                  <img
+                    src={imageDataUrl}
+                    alt="Nova fatura"
+                    className="w-full max-h-48 object-contain rounded-xl border border-gray-200 cursor-zoom-in"
+                    onClick={() => setLightboxSrc(imageDataUrl)}
+                  />
                   <button onClick={() => { setImageDataUrl(""); setImageFile(null); }} className="absolute top-1 right-1 text-xs bg-white border rounded-full px-2 py-0.5 text-gray-500">✕</button>
                 </div>
               ) : (
