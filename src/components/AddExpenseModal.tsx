@@ -43,6 +43,7 @@ export function AddExpenseModal({
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [aiResult, setAiResult] = useState<InvoiceData | null>(null);
   const [form, setForm] = useState<InvoiceData>(EMPTY_FORM);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   async function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -270,11 +271,26 @@ export function AddExpenseModal({
           {(mode === "manual" || mode === "review") && (
             <div className="space-y-4">
               {mode === "review" && imageDataUrl && (
-                <img
-                  src={imageDataUrl}
-                  alt="Recibo"
-                  className="w-full max-h-40 object-contain rounded-xl border border-gray-200"
-                />
+                <>
+                  <img
+                    src={imageDataUrl}
+                    alt="Recibo"
+                    className="w-full max-h-40 object-contain rounded-xl border border-gray-200 cursor-zoom-in"
+                    onClick={() => setLightboxOpen(true)}
+                  />
+                  {lightboxOpen && (
+                    <div
+                      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90"
+                      onClick={() => setLightboxOpen(false)}
+                    >
+                      <img
+                        src={imageDataUrl}
+                        alt="Recibo"
+                        className="max-w-full max-h-full object-contain"
+                      />
+                    </div>
+                  )}
+                </>
               )}
 
               <InvoiceForm form={form} update={update} fornecedores={fornecedores} />
