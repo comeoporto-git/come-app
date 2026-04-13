@@ -204,7 +204,7 @@ export async function closeTour(tourId: string): Promise<void> {
 //   paymentMethod     → "Método de Pagamento" (Select)
 //   status            → "Status"             (Select)
 //   accountantVerified→ "Validado pela Contabilidade" (Checkbox)
-//   tourId            → "Sales"              (Relation)
+//   tourId            → "🎫 Sales"              (Relation)
 //   bankReference     → "ID do Banco"        (Text)
 
 export type Transaction = {
@@ -228,7 +228,7 @@ export type Transaction = {
 
 function mapTransaction(page: PageObjectResponse): Transaction {
   const fornecedorIds = relation(getProp(page, "👭 Fornecedores"));
-  const tourIds       = relation(getProp(page, "Sales"));
+  const tourIds       = relation(getProp(page, "🎫 Sales"));
 
   // Supplier display: prefer the title field, fall back to fornecedor relation ID
   const titleText = text(getProp(page, "ID")) || "";
@@ -256,7 +256,7 @@ function mapTransaction(page: PageObjectResponse): Transaction {
 export async function getTransactionsForTour(tourId: string): Promise<Transaction[]> {
   const res = await notion.databases.query({
     database_id: TRANSACTIONS_DB,
-    filter: { property: "Sales", relation: { contains: tourId } },
+    filter: { property: "🎫 Sales", relation: { contains: tourId } },
     sorts: [{ property: "Data", direction: "descending" }],
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any);
@@ -320,7 +320,7 @@ export async function createTransaction(
       "Método de Pagamento": { select: { name: data.paymentMethod } },
       Status:             { select: { name: data.status } },
       ...(data.tourId
-        ? { Sales: { relation: [{ id: data.tourId }] } }
+        ? { "🎫 Sales": { relation: [{ id: data.tourId }] } }
         : {}),
       ...(data.bankReference
         ? { "ID do Banco": { rich_text: [{ text: { content: data.bankReference } }] } }
@@ -357,7 +357,7 @@ export async function updateTransaction(
   if (data.accountantVerified !== undefined)
     props["Validado pela Contabilidade"] = { checkbox: data.accountantVerified };
   if (data.tourId !== undefined)
-    props.Sales = { relation: data.tourId ? [{ id: data.tourId }] : [] };
+    props["🎫 Sales"] = { relation: data.tourId ? [{ id: data.tourId }] : [] };
   if (data.bankReference !== undefined)
     props["ID do Banco"] = { rich_text: [{ text: { content: data.bankReference } }] };
 
