@@ -41,6 +41,6 @@ body {
   color: #9ca3af;
 }
 .input:focus {
-  box-shadow: 0 0 0 2px #7b8b8733;
-  border-color: #7b8b87;
+  box-shadow: 0 0 0 2px #66747033;
+  border-color: #667470;
 }

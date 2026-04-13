@@ -38,7 +38,7 @@ export default async function AdminToursPage() {
 
   return (
     <div className="min-h-screen bg-[#EDE6DA] text-[#32373c]">
-      <header className="bg-[#7b8b87] sticky top-0 z-10">
+      <header className="bg-[#667470] sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link href="/admin" className="text-white/40 hover:text-white transition-colors text-lg leading-none">
@@ -66,7 +66,7 @@ export default async function AdminToursPage() {
         {/* Today */}
         {todays.length > 0 && (
           <section>
-            <h2 className="text-xs font-bold uppercase tracking-widest text-[#7b8b87] mb-3">
+            <h2 className="text-xs font-bold uppercase tracking-widest text-[#667470] mb-3">
               Hoje · {todays.length} tour{todays.length !== 1 ? "s" : ""}
             </h2>
             <ul className="space-y-3">
@@ -140,7 +140,7 @@ function TourCard({
           </div>
           <div className="ml-3 flex flex-col items-end gap-1">
             {highlight && (
-              <span className="text-xs bg-[#7b8b87] text-white px-2 py-0.5 rounded-full font-semibold">
+              <span className="text-xs bg-[#667470] text-white px-2 py-0.5 rounded-full font-semibold">
                 Hoje
               </span>
             )}

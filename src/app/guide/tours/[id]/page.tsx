@@ -72,7 +72,7 @@ export default async function TourDetailPage({ params }: { params: Promise<{ id:
                 <p className="text-xs text-gray-500 mb-1">Contacto</p>
                 <a
                   href={`tel:${tour.phoneNumber}`}
-                  className="text-sm text-[#7b8b87] font-medium hover:underline"
+                  className="text-sm text-[#667470] font-medium hover:underline"
                 >
                   {tour.phoneNumber}
                 </a>
