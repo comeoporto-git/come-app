@@ -53,7 +53,7 @@ export default function PreviewGuidePage() {
   const upcoming = MOCK_TOURS.filter((t) => !t.highlight);
 
   return (
-    <div className="min-h-screen bg-[#f5f4f1]">
+    <div className="min-h-screen bg-[#EDE6DA]">
       {/* Header */}
       <header className="bg-[#32373c] sticky top-0 z-10">
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
@@ -75,7 +75,7 @@ export default function PreviewGuidePage() {
       <main className="max-w-lg mx-auto px-4 py-6 space-y-6">
         {/* Today */}
         <section>
-          <h2 className="text-xs font-bold uppercase tracking-widest text-[#7852ca] mb-3">
+          <h2 className="text-xs font-bold uppercase tracking-widest text-[#6B8878] mb-3">
             Hoje
           </h2>
           <ul className="space-y-3">
@@ -98,7 +98,7 @@ export default function PreviewGuidePage() {
                         ⚠️ {tour.restrictions.length} restrição
                       </span>
                     )}
-                    <span className="text-xs bg-[#7852ca] text-white px-2 py-0.5 rounded-full font-semibold">
+                    <span className="text-xs bg-[#6B8878] text-white px-2 py-0.5 rounded-full font-semibold">
                       Hoje
                     </span>
                     <span className="text-xs text-white/40">{tour.saleId}</span>
@@ -144,7 +144,7 @@ export default function PreviewGuidePage() {
       </main>
 
       {/* Preview banner */}
-      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-[#7852ca] text-white text-xs font-semibold px-4 py-2 rounded-full shadow-lg">
+      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-[#6B8878] text-white text-xs font-semibold px-4 py-2 rounded-full shadow-lg">
         Preview Mode — Guide Dashboard
       </div>
     </div>

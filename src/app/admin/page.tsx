@@ -13,7 +13,7 @@ export default async function AdminPage() {
   const items = await getPlaidItems();
 
   return (
-    <div className="min-h-screen bg-[#f5f4f1] text-[#32373c]">
+    <div className="min-h-screen bg-[#EDE6DA] text-[#32373c]">
       <header className="bg-[#32373c] sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
           <Image
@@ -90,7 +90,7 @@ export default async function AdminPage() {
             <a
               key={link.href}
               href={link.href}
-              className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-3 hover:border-[#7852ca]/30 transition-colors"
+              className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-3 hover:border-[#6B8878]/30 transition-colors"
             >
               <span className="text-2xl">{link.icon}</span>
               <span className="text-sm font-semibold text-[#32373c]">{link.label}</span>

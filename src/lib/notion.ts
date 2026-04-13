@@ -7,6 +7,8 @@ const TEAM_DB         = process.env.NOTION_TEAM_DB_ID!;
 const TOURS_DB        = process.env.NOTION_SALES_DB_ID!;
 const TRANSACTIONS_DB = process.env.NOTION_TRANSACTIONS_DB_ID!;
 const FORNECEDORES_DB = process.env.NOTION_FORNECEDORES_DB_ID!;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const SERVICES_DB = '32117fedf54b803baf90c2957bde0762';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -126,6 +128,7 @@ export type Tour = {
   id: string;
   saleId: string;
   service: string;
+  serviceName: string;
   type: string;
   date: string | null;
   client: string;
@@ -145,6 +148,7 @@ function mapTour(page: PageObjectResponse): Tour {
     id:              page.id,
     saleId:          text(getProp(page, "ID")),
     service:         serviceIds[0] ?? "",   // Relation ID; resolved to name in UI layer
+    serviceName:     "",
     type:            text(getProp(page, "Type")),
     date:            dateStr(getProp(page, "Date")),
     client:          clientIds[0] ?? "",
@@ -155,6 +159,21 @@ function mapTour(page: PageObjectResponse): Tour {
     teamId:          teamIds[0] ?? null,
     expensesClosed:  text(getProp(page, "Expenses Closed")) === "Closed",
   };
+}
+
+async function resolveServiceNames(tours: Tour[]): Promise<Tour[]> {
+  const ids = [...new Set(tours.map((t) => t.service).filter(Boolean))];
+  if (!ids.length) return tours;
+  const map: Record<string, string> = {};
+  await Promise.all(
+    ids.map(async (id) => {
+      try {
+        const page = (await notion.pages.retrieve({ page_id: id })) as PageObjectResponse;
+        map[id] = text(getProp(page, "Name"));
+      } catch { /* ignore */ }
+    })
+  );
+  return tours.map((t) => ({ ...t, serviceName: map[t.service] ?? "" }));
 }
 
 export async function getToursForGuide(email: string): Promise<Tour[]> {
@@ -176,7 +195,7 @@ export async function getToursForGuide(email: string): Promise<Tour[]> {
     sorts: [{ property: "Date", direction: "ascending" }],
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any);
-  return (res.results as PageObjectResponse[]).map(mapTour);
+  return resolveServiceNames((res.results as PageObjectResponse[]).map(mapTour));
 }
 
 export async function getAllUpcomingTours(): Promise<Tour[]> {
@@ -192,13 +211,15 @@ export async function getAllUpcomingTours(): Promise<Tour[]> {
     sorts: [{ property: "Date", direction: "ascending" }],
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any);
-  return (res.results as PageObjectResponse[]).map(mapTour);
+  return resolveServiceNames((res.results as PageObjectResponse[]).map(mapTour));
 }
 
 export async function getTourById(id: string): Promise<Tour | null> {
   try {
     const page = (await notion.pages.retrieve({ page_id: id })) as PageObjectResponse;
-    return mapTour(page);
+    const tour = mapTour(page);
+    const [resolved] = await resolveServiceNames([tour]);
+    return resolved;
   } catch { return null; }
 }
 

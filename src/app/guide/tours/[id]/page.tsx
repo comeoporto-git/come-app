@@ -64,7 +64,7 @@ export default async function TourDetailPage({ params }: { params: Promise<{ id:
             <h2 className="text-sm font-semibold text-gray-700">Informação do Grupo</h2>
           </div>
           <div className="px-4 py-3 space-y-3">
-            {tour.type && <InfoField label="Serviço" value={tour.type} />}
+            {(tour.serviceName || tour.type) && <InfoField label="Serviço" value={tour.serviceName || tour.type} />}
             <InfoField label="Nº de Pax" value={tour.numGuests ? String(tour.numGuests) : "—"} />
             {tour.names && <InfoField label="Nomes" value={tour.names} />}
             {tour.phoneNumber && (
@@ -72,7 +72,7 @@ export default async function TourDetailPage({ params }: { params: Promise<{ id:
                 <p className="text-xs text-gray-500 mb-1">Contacto</p>
                 <a
                   href={`tel:${tour.phoneNumber}`}
-                  className="text-sm text-[#7852ca] font-medium hover:underline"
+                  className="text-sm text-[#6B8878] font-medium hover:underline"
                 >
                   {tour.phoneNumber}
                 </a>
@@ -107,7 +107,7 @@ export default async function TourDetailPage({ params }: { params: Promise<{ id:
           >
             <button
               type="submit"
-              className="w-full bg-[#32373c] text-white font-semibold py-3.5 rounded-2xl text-sm hover:bg-[#1e2226] transition-colors active:scale-[0.98] tracking-wide"
+              className="w-full bg-[#32373c] text-white font-semibold py-3.5 rounded-2xl text-sm hover:bg-[#1a2018] transition-colors active:scale-[0.98] tracking-wide"
             >
               Fechar Tour e Despesas
             </button>

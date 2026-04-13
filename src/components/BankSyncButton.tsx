@@ -23,7 +23,7 @@ export function BankSyncButton() {
       <button
         onClick={handleSync}
         disabled={syncing}
-        className="w-full bg-[#7852ca] text-white font-semibold py-3 rounded-xl text-sm hover:bg-[#6642b8] disabled:opacity-50 transition-colors"
+        className="w-full bg-[#6B8878] text-white font-semibold py-3 rounded-xl text-sm hover:bg-[#597568] disabled:opacity-50 transition-colors"
       >
         {syncing ? "A sincronizar…" : "Sincronizar Agora"}
       </button>

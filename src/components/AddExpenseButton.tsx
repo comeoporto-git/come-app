@@ -16,7 +16,7 @@ export function AddExpenseButton({
     <>
       <button
         onClick={() => setOpen(true)}
-        className="text-xs bg-[#32373c] text-white font-semibold px-3 py-1.5 rounded-full hover:bg-[#1e2226] active:scale-95 transition-all"
+        className="text-xs bg-[#32373c] text-white font-semibold px-3 py-1.5 rounded-full hover:bg-[#1a2018] active:scale-95 transition-all"
       >
         + Despesa
       </button>

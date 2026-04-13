@@ -36,7 +36,7 @@ function PlaidLinkInner({
     <button
       onClick={() => open()}
       disabled={!ready || loading}
-      className="text-xs bg-[#32373c] text-white font-semibold px-3 py-1.5 rounded-full hover:bg-[#1e2226] disabled:opacity-50 transition-colors"
+      className="text-xs bg-[#32373c] text-white font-semibold px-3 py-1.5 rounded-full hover:bg-[#1a2018] disabled:opacity-50 transition-colors"
     >
       {loading ? "A ligar…" : "Ligar Conta"}
     </button>
@@ -63,7 +63,7 @@ export function PlaidConnectButton() {
     <button
       onClick={start}
       disabled={fetching}
-      className="text-xs bg-[#32373c] text-white font-semibold px-3 py-1.5 rounded-full hover:bg-[#1e2226] disabled:opacity-50 transition-colors"
+      className="text-xs bg-[#32373c] text-white font-semibold px-3 py-1.5 rounded-full hover:bg-[#1a2018] disabled:opacity-50 transition-colors"
     >
       {fetching ? "A carregar…" : "Ligar Conta"}
     </button>

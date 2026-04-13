@@ -47,7 +47,7 @@ export function ExportCSVButton({ transactions }: { transactions: Transaction[] 
   return (
     <button
       onClick={download}
-      className="text-xs bg-[#32373c] text-white font-semibold px-3 py-1.5 rounded-full hover:bg-[#1e2226] transition-colors"
+      className="text-xs bg-[#32373c] text-white font-semibold px-3 py-1.5 rounded-full hover:bg-[#1a2018] transition-colors"
     >
       ⬇ CSV
     </button>

@@ -16,7 +16,7 @@ const MOCK_FORNECEDORES = [
 
 export default function PreviewTourPage() {
   return (
-    <div className="min-h-screen bg-[#f5f4f1] pb-24">
+    <div className="min-h-screen bg-[#EDE6DA] pb-24">
       <header className="bg-[#32373c] sticky top-0 z-10">
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center gap-3">
           <span className="text-white/60 text-lg">←</span>
@@ -46,7 +46,7 @@ export default function PreviewTourPage() {
             ))}
             <div className="flex items-center justify-between">
               <span className="text-xs text-gray-500">Telefone</span>
-              <a href="tel:+351912345678" className="text-sm font-medium text-[#7852ca] underline underline-offset-2">
+              <a href="tel:+351912345678" className="text-sm font-medium text-[#6B8878] underline underline-offset-2">
                 +351 912 345 678
               </a>
             </div>
@@ -100,7 +100,7 @@ export default function PreviewTourPage() {
                 </div>
                 <div className="text-xs text-gray-400">IVA 13%: €{tx.iva13.toFixed(2)}</div>
                 {tx.status === "Pending Receipt" && (
-                  <button className="mt-1 text-xs text-[#7852ca] font-semibold hover:underline">
+                  <button className="mt-1 text-xs text-[#6B8878] font-semibold hover:underline">
                     + Adicionar Recibo
                   </button>
                 )}
@@ -115,7 +115,7 @@ export default function PreviewTourPage() {
         </button>
       </main>
 
-      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-[#7852ca] text-white text-xs font-semibold px-4 py-2 rounded-full shadow-lg">
+      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-[#6B8878] text-white text-xs font-semibold px-4 py-2 rounded-full shadow-lg">
         Preview Mode — Tour Detail
       </div>
     </div>
