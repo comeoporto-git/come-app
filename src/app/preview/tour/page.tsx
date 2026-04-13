@@ -17,7 +17,7 @@ const MOCK_FORNECEDORES = [
 export default function PreviewTourPage() {
   return (
     <div className="min-h-screen bg-[#EDE6DA] pb-24">
-      <header className="bg-[#32373c] sticky top-0 z-10">
+      <header className="bg-[#6B8878] sticky top-0 z-10">
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center gap-3">
           <span className="text-white/60 text-lg">←</span>
           <div className="flex-1 min-w-0">

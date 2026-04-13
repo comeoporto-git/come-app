@@ -38,7 +38,7 @@ export default async function AdminToursPage() {
 
   return (
     <div className="min-h-screen bg-[#EDE6DA] text-[#32373c]">
-      <header className="bg-[#32373c] sticky top-0 z-10">
+      <header className="bg-[#6B8878] sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link href="/admin" className="text-white/40 hover:text-white transition-colors text-lg leading-none">

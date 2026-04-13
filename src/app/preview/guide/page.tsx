@@ -55,7 +55,7 @@ export default function PreviewGuidePage() {
   return (
     <div className="min-h-screen bg-[#EDE6DA]">
       {/* Header */}
-      <header className="bg-[#32373c] sticky top-0 z-10">
+      <header className="bg-[#6B8878] sticky top-0 z-10">
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
           <Image
             src="https://comeoporto.com/wp-content/uploads/2023/08/cropped-COME-Porto-Food-Tours-Logo-Black-.png"
