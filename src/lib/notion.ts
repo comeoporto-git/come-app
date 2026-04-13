@@ -53,6 +53,16 @@ function relation(prop: unknown): string[] {
   return items?.map((i) => i.id) ?? [];
 }
 
+function fileUrl(prop: unknown): string | null {
+  if (!prop || typeof prop !== "object") return null;
+  const files = (prop as Record<string, unknown>).files as Array<{
+    type: string; external?: { url: string }; file?: { url: string };
+  }>;
+  if (!files?.length) return null;
+  const f = files[0];
+  return f.external?.url ?? f.file?.url ?? null;
+}
+
 // ── Team ─────────────────────────────────────────────────────────────────────
 
 export type TeamMember = {
@@ -251,6 +261,7 @@ function mapTransaction(page: PageObjectResponse): Transaction {
     accountantVerified: bool(getProp(page, "Validado pela Contabilidade")),
     tourId:             tourIds[0] ?? null,
     bankReference:      text(getProp(page, "ID do Banco")),
+    invoiceImageUrl:    fileUrl(getProp(page, "Fatura")) ?? undefined,
   };
 }
 
