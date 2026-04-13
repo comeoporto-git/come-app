@@ -65,6 +65,7 @@ export default async function TourDetailPage({ params }: { params: Promise<{ id:
           </div>
           <div className="px-4 py-3 space-y-3">
             {(tour.serviceName || tour.type) && <InfoField label="Serviço" value={tour.serviceName || tour.type} />}
+            {tour.clientName && <InfoField label="Cliente" value={tour.clientName} />}
             <InfoField label="Nº de Pax" value={tour.numGuests ? String(tour.numGuests) : "—"} />
             {tour.names && <InfoField label="Nomes" value={tour.names} />}
             {tour.phoneNumber && (

@@ -136,6 +136,7 @@ export type Tour = {
   type: string;
   date: string | null;
   client: string;
+  clientName: string;
   numGuests: number;
   names: string;
   phoneNumber: string;
@@ -156,6 +157,7 @@ function mapTour(page: PageObjectResponse): Tour {
     type:            text(getProp(page, "Type")),
     date:            dateStr(getProp(page, "Date")),
     client:          clientIds[0] ?? "",
+    clientName:      "",
     numGuests:       num(getProp(page, "Number of Guests")),
     names:           text(getProp(page, "Names")),
     phoneNumber:     text(getProp(page, "Phone Number")),
@@ -165,19 +167,26 @@ function mapTour(page: PageObjectResponse): Tour {
   };
 }
 
-async function resolveServiceNames(tours: Tour[]): Promise<Tour[]> {
-  const ids = [...new Set(tours.map((t) => t.service).filter(Boolean))];
-  if (!ids.length) return tours;
+async function resolveRelationNames(tours: Tour[]): Promise<Tour[]> {
+  const allIds = [...new Set([
+    ...tours.map((t) => t.service),
+    ...tours.map((t) => t.client),
+  ].filter(Boolean))];
+  if (!allIds.length) return tours;
   const map: Record<string, string> = {};
   await Promise.all(
-    ids.map(async (id) => {
+    allIds.map(async (id) => {
       try {
         const page = (await notion.pages.retrieve({ page_id: id })) as PageObjectResponse;
         map[id] = text(getProp(page, "Name"));
       } catch { /* ignore */ }
     })
   );
-  return tours.map((t) => ({ ...t, serviceName: map[t.service] ?? "" }));
+  return tours.map((t) => ({
+    ...t,
+    serviceName: map[t.service] ?? "",
+    clientName:  map[t.client]  ?? "",
+  }));
 }
 
 export async function getToursForGuide(email: string): Promise<Tour[]> {
@@ -199,7 +208,7 @@ export async function getToursForGuide(email: string): Promise<Tour[]> {
     sorts: [{ property: "Date", direction: "ascending" }],
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any);
-  return resolveServiceNames((res.results as PageObjectResponse[]).map(mapTour));
+  return resolveRelationNames((res.results as PageObjectResponse[]).map(mapTour));
 }
 
 export async function getAllUpcomingTours(): Promise<Tour[]> {
@@ -215,14 +224,14 @@ export async function getAllUpcomingTours(): Promise<Tour[]> {
     sorts: [{ property: "Date", direction: "ascending" }],
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any);
-  return resolveServiceNames((res.results as PageObjectResponse[]).map(mapTour));
+  return resolveRelationNames((res.results as PageObjectResponse[]).map(mapTour));
 }
 
 export async function getTourById(id: string): Promise<Tour | null> {
   try {
     const page = (await notion.pages.retrieve({ page_id: id })) as PageObjectResponse;
     const tour = mapTour(page);
-    const [resolved] = await resolveServiceNames([tour]);
+    const [resolved] = await resolveRelationNames([tour]);
     return resolved;
   } catch { return null; }
 }
