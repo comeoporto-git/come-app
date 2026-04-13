@@ -141,6 +141,7 @@ export type Tour = {
   names: string;
   phoneNumber: string;
   notes: string;
+  status: string;
   teamId: string | null;
   expensesClosed: boolean;
 };
@@ -162,6 +163,7 @@ function mapTour(page: PageObjectResponse): Tour {
     names:           text(getProp(page, "Names")),
     phoneNumber:     text(getProp(page, "Phone Number")),
     notes:           text(getProp(page, "Notes")),
+    status:          text(getProp(page, "Status")),
     teamId:          teamIds[0] ?? null,
     expensesClosed:  text(getProp(page, "Expenses Closed")) === "Closed",
   };

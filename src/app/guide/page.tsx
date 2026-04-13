@@ -71,7 +71,7 @@ export default async function GuideDashboard() {
             <h2 className="text-xs font-bold uppercase tracking-widest text-white/80 mb-3">
               Hoje
             </h2>
-            <ul className="space-y-4">
+            <ul className="space-y-5">
               {todays.map((tour) => (
                 <TourCard key={tour.id} tour={tour} highlight />
               ))}
@@ -92,7 +92,7 @@ export default async function GuideDashboard() {
           ) : upcoming.length === 0 ? (
             <p className="text-sm text-white/50">Sem tours futuros</p>
           ) : (
-            <ul className="space-y-4">
+            <ul className="space-y-5">
               {upcoming.map((tour) => (
                 <TourCard key={tour.id} tour={tour} />
               ))}
@@ -103,6 +103,12 @@ export default async function GuideDashboard() {
     </div>
   );
 }
+
+const STATUS_COLORS: Record<string, string> = {
+  Confirmed:  "bg-green-100 text-green-700",
+  Pending:    "bg-yellow-100 text-yellow-700",
+  Cancelled:  "bg-red-100 text-red-700",
+};
 
 function TourCard({
   tour,
@@ -120,29 +126,34 @@ function TourCard({
             : "bg-white border-gray-100 text-[#32373c]"
         }`}
       >
-        <div className="flex items-start justify-between">
-          <div className="flex-1 min-w-0">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1 min-w-0 space-y-1">
             <p className={`font-semibold text-sm ${highlight ? "text-white" : "text-[#32373c]"}`}>
               {tour.saleId}
             </p>
-            <p className={`text-xs mt-0.5 ${highlight ? "text-white/60" : "text-gray-500"}`}>
+            <p className={`text-xs ${highlight ? "text-white/60" : "text-gray-500"}`}>
               {formatDate(tour.date)}
             </p>
             {tour.serviceName && (
-              <p className={`text-xs mt-0.5 ${highlight ? "text-white/50" : "text-gray-400"}`}>
+              <p className={`text-xs ${highlight ? "text-white/60" : "text-gray-600"}`}>
                 {tour.serviceName}
               </p>
             )}
             {tour.numGuests > 0 && (
-              <p className={`text-xs mt-1 ${highlight ? "text-white/60" : "text-gray-500"}`}>
+              <p className={`text-xs ${highlight ? "text-white/50" : "text-gray-400"}`}>
                 {tour.numGuests} pax
               </p>
             )}
           </div>
-          <div className="ml-3 flex flex-col items-end gap-1">
+          <div className="flex flex-col items-end gap-2 shrink-0">
             {highlight && (
               <span className="text-xs bg-[#7b8b87] text-white px-2 py-0.5 rounded-full font-semibold">
                 Hoje
+              </span>
+            )}
+            {tour.status && (
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[tour.status] ?? "bg-gray-100 text-gray-500"}`}>
+                {tour.status}
               </span>
             )}
           </div>

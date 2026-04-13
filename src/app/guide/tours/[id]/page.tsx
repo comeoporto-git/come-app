@@ -65,6 +65,17 @@ export default async function TourDetailPage({ params }: { params: Promise<{ id:
             <h2 className="text-sm font-semibold text-gray-700">Informação do Grupo</h2>
           </div>
           <div className="px-4 py-3 space-y-3">
+            {tour.status && (
+              <div>
+                <p className="text-xs text-gray-500 mb-1">Estado</p>
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                  tour.status === "Confirmed" ? "bg-green-100 text-green-700" :
+                  tour.status === "Pending"   ? "bg-yellow-100 text-yellow-700" :
+                  tour.status === "Cancelled" ? "bg-red-100 text-red-700" :
+                  "bg-gray-100 text-gray-500"
+                }`}>{tour.status}</span>
+              </div>
+            )}
             {(tour.serviceName || tour.type) && <InfoField label="Serviço" value={tour.serviceName || tour.type} />}
             {tour.clientName && <InfoField label="Cliente" value={tour.clientName} />}
             <InfoField label="Nº de Pax" value={tour.numGuests ? String(tour.numGuests) : "—"} />
