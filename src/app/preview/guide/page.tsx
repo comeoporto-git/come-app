@@ -78,11 +78,11 @@ export default function PreviewGuidePage() {
           <h2 className="text-xs font-bold uppercase tracking-widest text-white/80 mb-3">
             Hoje
           </h2>
-          <ul className="space-y-3">
+          <ul className="space-y-4">
             {todays.map((tour) => (
               <li
                 key={tour.id}
-                className="rounded-2xl p-4 shadow-sm border bg-[#32373c] text-white border-[#32373c] transition-all cursor-pointer"
+                className="rounded-2xl p-5 shadow-sm border bg-[#32373c] text-white border-[#32373c] transition-all cursor-pointer"
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1 min-w-0">
@@ -114,11 +114,11 @@ export default function PreviewGuidePage() {
           <h2 className="text-xs font-bold uppercase tracking-widest text-white/50 mb-3">
             Próximos
           </h2>
-          <ul className="space-y-3">
+          <ul className="space-y-4">
             {upcoming.map((tour) => (
               <li
                 key={tour.id}
-                className="rounded-2xl p-4 shadow-sm border bg-white border-gray-100 text-[#32373c] transition-all cursor-pointer"
+                className="rounded-2xl p-5 shadow-sm border bg-white border-gray-100 text-[#32373c] transition-all cursor-pointer"
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1 min-w-0">

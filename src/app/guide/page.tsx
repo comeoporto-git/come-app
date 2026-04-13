@@ -70,7 +70,7 @@ export default async function GuideDashboard() {
             <h2 className="text-xs font-bold uppercase tracking-widest text-white/80 mb-3">
               Hoje
             </h2>
-            <ul className="space-y-3">
+            <ul className="space-y-4">
               {todays.map((tour) => (
                 <TourCard key={tour.id} tour={tour} highlight />
               ))}
@@ -91,7 +91,7 @@ export default async function GuideDashboard() {
           ) : upcoming.length === 0 ? (
             <p className="text-sm text-white/50">Sem tours futuros</p>
           ) : (
-            <ul className="space-y-3">
+            <ul className="space-y-4">
               {upcoming.map((tour) => (
                 <TourCard key={tour.id} tour={tour} />
               ))}
@@ -113,7 +113,7 @@ function TourCard({
   return (
     <Link href={`/guide/tours/${tour.id}`}>
       <li
-        className={`rounded-2xl p-4 shadow-sm border transition-all active:scale-[0.98] cursor-pointer ${
+        className={`rounded-2xl p-5 shadow-sm border transition-all active:scale-[0.98] cursor-pointer ${
           highlight
             ? "bg-[#32373c] text-white border-[#32373c]"
             : "bg-white border-gray-100 text-[#32373c]"
