@@ -89,7 +89,7 @@ export default async function TourDetailPage({ params }: { params: Promise<{ id:
             </h2>
             {!isClosed && <AddExpenseButton tourId={id} fornecedores={fornecedores} />}
           </div>
-          <ExpenseList transactions={transactions} tourId={id} isClosed={isClosed} />
+          <ExpenseList transactions={transactions} tourId={id} isClosed={isClosed} fornecedores={fornecedores} />
         </section>
 
         {/* Close Tour */}

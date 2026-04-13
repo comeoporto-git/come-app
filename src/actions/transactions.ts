@@ -56,6 +56,45 @@ export async function finishPendingExpenseAction(
   revalidatePath(`/guide/tours/${tourId}`);
 }
 
+export async function editExpenseAction(
+  transactionId: string,
+  tourId: string,
+  data: {
+    supplier: string;
+    fornecedorId: string | null;
+    date: string;
+    invoiceId: string;
+    taxFree: number;
+    iva6: number;
+    iva13: number;
+    iva23: number;
+    totalCost: number;
+    whoPaid: string;
+    paymentMethod: string;
+    invoiceImageUrl?: string;
+  }
+): Promise<void> {
+  const session = await requireAuth();
+  if (session.user.role !== "Guide" && session.user.role !== "Admin") {
+    throw new Error("Forbidden");
+  }
+  await updateTransaction(transactionId, {
+    supplier: data.supplier,
+    fornecedorId: data.fornecedorId,
+    date: data.date,
+    invoiceId: data.invoiceId,
+    taxFree: data.taxFree,
+    iva6: data.iva6,
+    iva13: data.iva13,
+    iva23: data.iva23,
+    totalCost: data.totalCost,
+    whoPaid: data.whoPaid,
+    paymentMethod: data.paymentMethod,
+    ...(data.invoiceImageUrl ? { invoiceImageUrl: data.invoiceImageUrl } : {}),
+  });
+  revalidatePath(`/guide/tours/${tourId}`);
+}
+
 export async function closeTourAction(tourId: string): Promise<void> {
   const session = await requireAuth();
   if (session.user.role !== "Guide" && session.user.role !== "Admin") {

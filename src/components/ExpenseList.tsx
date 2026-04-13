@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import type { Transaction } from "@/lib/notion";
+import type { Transaction, Fornecedor } from "@/lib/notion";
 import { AddExpenseModal } from "./AddExpenseModal";
+import { EditExpenseModal } from "./EditExpenseModal";
 
 const STATUS_COLORS: Record<string, string> = {
   Paid: "bg-green-100 text-green-700",
@@ -17,12 +18,15 @@ export function ExpenseList({
   transactions,
   tourId,
   isClosed,
+  fornecedores = [],
 }: {
   transactions: Transaction[];
   tourId: string;
   isClosed: boolean;
+  fornecedores?: Fornecedor[];
 }) {
   const [pendingToFinish, setPendingToFinish] = useState<Transaction | null>(null);
+  const [editing, setEditing] = useState<Transaction | null>(null);
 
   if (transactions.length === 0) {
     return (
@@ -38,7 +42,10 @@ export function ExpenseList({
         {transactions.map((tx) => (
           <li
             key={tx.id}
-            className="bg-white rounded-xl border border-gray-100 shadow-sm p-3 space-y-1"
+            onClick={() => !isClosed && setEditing(tx)}
+            className={`bg-white rounded-xl border border-gray-100 shadow-sm p-3 space-y-1 transition-colors ${
+              !isClosed ? "cursor-pointer hover:border-[#7852ca]/30 active:scale-[0.99]" : ""
+            }`}
           >
             <div className="flex items-start justify-between gap-2">
               <div className="flex-1 min-w-0">
@@ -69,7 +76,7 @@ export function ExpenseList({
             {/* Finish pending */}
             {tx.status === "Pending Receipt" && !isClosed && (
               <button
-                onClick={() => setPendingToFinish(tx)}
+                onClick={(e) => { e.stopPropagation(); setPendingToFinish(tx); }}
                 className="mt-1 text-xs text-[#7852ca] font-semibold hover:underline"
               >
                 + Adicionar Recibo
@@ -79,6 +86,10 @@ export function ExpenseList({
             {tx.accountantVerified && (
               <p className="text-xs text-green-600 font-medium">✓ Verificado pelo contabilista</p>
             )}
+
+            {!isClosed && (
+              <p className="text-xs text-gray-300 text-right">toque para editar</p>
+            )}
           </li>
         ))}
       </ul>
@@ -87,7 +98,17 @@ export function ExpenseList({
         <AddExpenseModal
           tourId={tourId}
           pendingTransaction={pendingToFinish}
+          fornecedores={fornecedores}
           onClose={() => setPendingToFinish(null)}
+        />
+      )}
+
+      {editing && (
+        <EditExpenseModal
+          transaction={editing}
+          tourId={tourId}
+          fornecedores={fornecedores}
+          onClose={() => setEditing(null)}
         />
       )}
     </>
