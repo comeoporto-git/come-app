@@ -102,7 +102,7 @@ export async function getTeamMemberByEmail(email: string): Promise<TeamMember | 
 //   numGuests    → "Number of Guests" (Number)
 //   names        → "Names"            (Text)
 //   notes        → "Notes"            (Text)
-//   teamId       → "Team"             (Relation → Team DB)
+//   teamId       → "🧑🏼‍🍳 Team"             (Relation → Team DB)
 //   expensesClosed → "Expenses Closed" (Select — empty = open, any value = closed)
 
 export type Tour = {
@@ -121,7 +121,7 @@ export type Tour = {
 function mapTour(page: PageObjectResponse): Tour {
   const serviceIds = relation(getProp(page, "Service"));
   const clientIds  = relation(getProp(page, "Client"));
-  const teamIds    = relation(getProp(page, "Team"));
+  const teamIds    = relation(getProp(page, "🧑🏼‍🍳 Team"));
   return {
     id:              page.id,
     saleId:          text(getProp(page, "ID")),
@@ -147,7 +147,7 @@ export async function getToursForGuide(email: string): Promise<Tour[]> {
     database_id: TOURS_DB,
     filter: {
       and: [
-        { property: "Team", relation: { contains: member.id } },
+        { property: "🧑🏼‍🍳 Team", relation: { contains: member.id } },
         { property: "Date", date: { on_or_after: today.toISOString() } },
         { property: "Expenses Closed", select: { does_not_equal: "Closed" } },
       ],
@@ -316,7 +316,7 @@ export async function createTransaction(
       "IVA 13%":          { number: data.iva13 },
       "IVA 23%":          { number: data.iva23 },
       Valor:              { number: data.totalCost },
-      "Pago Por":         { rich_text: [{ text: { content: data.whoPaid } }] },
+      "Pago Por":         { select: { name: data.whoPaid } },
       "Método de Pagamento": { select: { name: data.paymentMethod } },
       Status:             { select: { name: data.status } },
       ...(data.tourId
@@ -349,7 +349,7 @@ export async function updateTransaction(
   if (data.iva23 !== undefined)       props["IVA 23%"] = { number: data.iva23 };
   if (data.totalCost !== undefined)   props.Valor = { number: data.totalCost };
   if (data.whoPaid !== undefined)
-    props["Pago Por"] = { rich_text: [{ text: { content: data.whoPaid } }] };
+    props["Pago Por"] = { select: { name: data.whoPaid } };
   if (data.paymentMethod !== undefined)
     props["Método de Pagamento"] = { select: { name: data.paymentMethod } };
   if (data.status !== undefined)
