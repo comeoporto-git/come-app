@@ -257,16 +257,13 @@ function mapTransaction(page: PageObjectResponse): Transaction {
 export async function getTransactionsForTour(tourId: string): Promise<Transaction[]> {
   const res = await notion.databases.query({
     database_id: TRANSACTIONS_DB,
-    filter: {
-      and: [
-        { property: "🎫 Sales", relation: { contains: tourId } },
-        { property: "ID", title: { does_not_start_with: "IN -" } },
-      ],
-    },
+    filter: { property: "🎫 Sales", relation: { contains: tourId } },
     sorts: [{ property: "Data", direction: "descending" }],
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any);
-  return (res.results as PageObjectResponse[]).map(mapTransaction);
+  return (res.results as PageObjectResponse[])
+    .map(mapTransaction)
+    .filter((t) => !t.supplier.startsWith("IN -"));
 }
 
 export async function getTransactionsForMatching(): Promise<Transaction[]> {
