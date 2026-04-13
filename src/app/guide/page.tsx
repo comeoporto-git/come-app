@@ -35,9 +35,9 @@ export default async function GuideDashboard() {
   const upcoming = tours.filter((t) => !isToday(t.date));
 
   return (
-    <div className="min-h-screen bg-[#EDE6DA] text-[#32373c]">
+    <div className="min-h-screen bg-[#667470] text-[#32373c]">
       {/* Header */}
-      <header className="bg-[#667470] sticky top-0 z-10">
+      <header className="bg-[#7b8b87] sticky top-0 z-10">
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
           <Image
             src="https://comeoporto.com/wp-content/uploads/2023/08/cropped-COME-Porto-Food-Tours-Logo-Black-.png"
@@ -67,7 +67,7 @@ export default async function GuideDashboard() {
         {/* Today */}
         {todays.length > 0 && (
           <section>
-            <h2 className="text-xs font-bold uppercase tracking-widest text-[#667470] mb-3">
+            <h2 className="text-xs font-bold uppercase tracking-widest text-white/80 mb-3">
               Hoje
             </h2>
             <ul className="space-y-3">
@@ -80,16 +80,16 @@ export default async function GuideDashboard() {
 
         {/* Upcoming */}
         <section>
-          <h2 className="text-xs font-bold uppercase tracking-widest text-[#32373c]/40 mb-3">
+          <h2 className="text-xs font-bold uppercase tracking-widest text-white/50 mb-3">
             Próximos
           </h2>
           {upcoming.length === 0 && todays.length === 0 ? (
-            <div className="text-center py-12 text-[#32373c]/40">
+            <div className="text-center py-12 text-white/50">
               <div className="text-4xl mb-2">🗓️</div>
               <p className="text-sm">Sem tours agendados</p>
             </div>
           ) : upcoming.length === 0 ? (
-            <p className="text-sm text-[#32373c]/40">Sem tours futuros</p>
+            <p className="text-sm text-white/50">Sem tours futuros</p>
           ) : (
             <ul className="space-y-3">
               {upcoming.map((tour) => (
@@ -140,7 +140,7 @@ function TourCard({
           </div>
           <div className="ml-3 flex flex-col items-end gap-1">
             {highlight && (
-              <span className="text-xs bg-[#667470] text-white px-2 py-0.5 rounded-full font-semibold">
+              <span className="text-xs bg-[#7b8b87] text-white px-2 py-0.5 rounded-full font-semibold">
                 Hoje
               </span>
             )}
