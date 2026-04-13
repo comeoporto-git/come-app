@@ -132,7 +132,7 @@ function mapTour(page: PageObjectResponse): Tour {
     names:           text(getProp(page, "Names")),
     notes:           text(getProp(page, "Notes")),
     teamId:          teamIds[0] ?? null,
-    expensesClosed:  text(getProp(page, "Expenses Closed")) !== "",
+    expensesClosed:  text(getProp(page, "Expenses Closed")) === "Closed",
   };
 }
 
@@ -149,7 +149,7 @@ export async function getToursForGuide(email: string): Promise<Tour[]> {
       and: [
         { property: "Team", relation: { contains: member.id } },
         { property: "Date", date: { on_or_after: today.toISOString() } },
-        { property: "Expenses Closed", select: { is_empty: true } },
+        { property: "Expenses Closed", select: { does_not_equal: "Closed" } },
       ],
     },
     sorts: [{ property: "Date", direction: "ascending" }],
