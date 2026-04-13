@@ -267,37 +267,29 @@ export async function getTransactionsForTour(tourId: string): Promise<Transactio
 }
 
 export async function getTransactionsForMatching(): Promise<Transaction[]> {
+  // Fetch Cartão Comum transactions; filter non-IN- entries in code
+  // to avoid errors from select options that may not exist yet in Notion
   const res = await notion.databases.query({
     database_id: TRANSACTIONS_DB,
-    filter: {
-      and: [
-        { property: "Método de Pagamento", select: { equals: "Cartão Comum" } },
-        {
-          or: [
-            { property: "Status", select: { equals: "Paid" } },
-            { property: "Status", select: { equals: "Pending Receipt" } },
-          ],
-        },
-      ],
-    },
+    filter: { property: "Método de Pagamento", select: { equals: "Cartão Comum" } },
+    page_size: 100,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any);
-  return (res.results as PageObjectResponse[]).map(mapTransaction);
+  return (res.results as PageObjectResponse[])
+    .map(mapTransaction)
+    .filter((t) => !t.supplier.startsWith("IN -"));
 }
 
 export async function getAccountantTransactions(): Promise<Transaction[]> {
   const res = await notion.databases.query({
     database_id: TRANSACTIONS_DB,
-    filter: {
-      or: [
-        { property: "Status", select: { equals: "Paid" } },
-        { property: "Status", select: { equals: "Reimbursed" } },
-      ],
-    },
     sorts: [{ property: "Data", direction: "descending" }],
+    page_size: 100,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any);
-  return (res.results as PageObjectResponse[]).map(mapTransaction);
+  return (res.results as PageObjectResponse[])
+    .map(mapTransaction)
+    .filter((t) => !t.supplier.startsWith("IN -"));
 }
 
 export async function createTransaction(
