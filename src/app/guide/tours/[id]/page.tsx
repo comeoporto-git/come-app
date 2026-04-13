@@ -1,5 +1,5 @@
 import { auth } from "@/lib/auth";
-import { getTourById, getTransactionsForTour, getFornecedores } from "@/lib/notion";
+import { getTourById, getTransactionsForTour, getFornecedores, getTeamMemberById } from "@/lib/notion";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { closeTourAction } from "@/actions/transactions";
@@ -28,6 +28,8 @@ export default async function TourDetailPage({ params }: { params: Promise<{ id:
     getTransactionsForTour(id),
     getFornecedores(),
   ]);
+
+  const teamMember = tour?.teamId ? await getTeamMemberById(tour.teamId) : null;
 
   if (!tour) notFound();
 
@@ -63,6 +65,20 @@ export default async function TourDetailPage({ params }: { params: Promise<{ id:
           </div>
           <div className="px-4 py-3 space-y-2">
             <Row label="Nº de Pax" value={tour.numGuests ? String(tour.numGuests) : "—"} />
+            {teamMember && (
+              <Row label="Team" value={teamMember.name} />
+            )}
+            {teamMember?.phone && (
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-gray-500">Telefone</span>
+                <a
+                  href={`tel:${teamMember.phone}`}
+                  className="text-sm text-[#7852ca] font-medium hover:underline"
+                >
+                  {teamMember.phone}
+                </a>
+              </div>
+            )}
             {tour.names && (
               <div>
                 <p className="text-xs text-gray-500 mb-1">Nomes</p>

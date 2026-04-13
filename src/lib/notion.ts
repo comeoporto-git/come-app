@@ -69,8 +69,19 @@ export type TeamMember = {
   id: string;
   name: string;
   email: string;
+  phone: string;
   role: "Admin" | "Guide" | "Accountant";
 };
+
+function mapTeamMember(page: PageObjectResponse): TeamMember {
+  return {
+    id: page.id,
+    name: text(getProp(page, "Name")),
+    email: text(getProp(page, "email")),
+    phone: text(getProp(page, "Phone")),
+    role: text(getProp(page, "Role")) as TeamMember["role"],
+  };
+}
 
 export async function getTeamMembers(): Promise<TeamMember[]> {
   const res = await notion.databases.query({
@@ -79,12 +90,7 @@ export async function getTeamMembers(): Promise<TeamMember[]> {
     page_size: 100,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any);
-  return (res.results as PageObjectResponse[]).map((page) => ({
-    id: page.id,
-    name: text(getProp(page, "Name")),
-    email: text(getProp(page, "email")),
-    role: text(getProp(page, "Role")) as TeamMember["role"],
-  })).filter((m) => m.name);
+  return (res.results as PageObjectResponse[]).map(mapTeamMember).filter((m) => m.name);
 }
 
 export async function getTeamMemberByEmail(email: string): Promise<TeamMember | null> {
@@ -93,13 +99,14 @@ export async function getTeamMemberByEmail(email: string): Promise<TeamMember | 
     filter: { property: "email", email: { equals: email } },
   });
   if (!res.results.length) return null;
-  const page = res.results[0] as PageObjectResponse;
-  return {
-    id: page.id,
-    name: text(getProp(page, "Name")),
-    email: text(getProp(page, "email")),
-    role: text(getProp(page, "Role")) as TeamMember["role"],
-  };
+  return mapTeamMember(res.results[0] as PageObjectResponse);
+}
+
+export async function getTeamMemberById(id: string): Promise<TeamMember | null> {
+  try {
+    const page = (await notion.pages.retrieve({ page_id: id })) as PageObjectResponse;
+    return mapTeamMember(page);
+  } catch { return null; }
 }
 
 // ── Tours (Sales DB) ──────────────────────────────────────────────────────────
