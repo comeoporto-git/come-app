@@ -55,14 +55,18 @@ function relation(prop: unknown): string[] {
   return items?.map((i) => i.id) ?? [];
 }
 
-function fileUrl(prop: unknown): string | null {
+function fileUrl(prop: unknown, pageId?: string): string | null {
   if (!prop || typeof prop !== "object") return null;
   const files = (prop as Record<string, unknown>).files as Array<{
     type: string; external?: { url: string }; file?: { url: string };
   }>;
   if (!files?.length) return null;
   const f = files[0];
-  return f.external?.url ?? f.file?.url ?? null;
+  // External (Vercel Blob) URLs are permanent — use directly.
+  if (f.type === "external" && f.external?.url) return f.external.url;
+  // Notion-hosted files have expiring signed URLs — proxy through our API.
+  if (f.type === "file" && pageId) return `/api/invoice-image/${pageId}`;
+  return f.file?.url ?? null;
 }
 
 // ── Team ─────────────────────────────────────────────────────────────────────
@@ -293,7 +297,7 @@ function mapTransaction(page: PageObjectResponse): Transaction {
     accountantVerified: bool(getProp(page, "Validado pela Contabilidade")),
     tourId:             tourIds[0] ?? null,
     bankReference:      text(getProp(page, "ID do Banco")),
-    invoiceImageUrl:    fileUrl(getProp(page, "Fatura")) ?? undefined,
+    invoiceImageUrl:    fileUrl(getProp(page, "Fatura"), page.id) ?? undefined,
   };
 }
 
