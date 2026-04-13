@@ -12,6 +12,7 @@
     "@anthropic-ai/sdk": "^0.88.0",
     "@neondatabase/serverless": "^1.0.2",
     "@notionhq/client": "^2.2.15",
+    "@vercel/blob": "^2.3.3",
     "next": "16.2.3",
     "next-auth": "^5.0.0-beta.30",
     "plaid": "^41.4.0",

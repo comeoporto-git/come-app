@@ -40,6 +40,7 @@ export function AddExpenseModal({
   // AI flow state
   const [imageBase64, setImageBase64] = useState("");
   const [imageDataUrl, setImageDataUrl] = useState("");
+  const [imageFile, setImageFile] = useState<File | null>(null);
   const [aiResult, setAiResult] = useState<InvoiceData | null>(null);
   const [form, setForm] = useState<InvoiceData>(EMPTY_FORM);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -47,6 +48,7 @@ export function AddExpenseModal({
   async function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    setImageFile(file);
     const reader = new FileReader();
     reader.onload = async (ev) => {
       const dataUrl = ev.target?.result as string;
@@ -90,6 +92,18 @@ export function AddExpenseModal({
     setSaving(true);
     setError("");
     try {
+      // Upload invoice image to Vercel Blob if we have one
+      let invoiceImageUrl: string | undefined;
+      if (imageFile) {
+        const fd = new FormData();
+        fd.append("file", imageFile);
+        const res = await fetch("/api/upload", { method: "POST", body: fd });
+        if (res.ok) {
+          const json = await res.json();
+          invoiceImageUrl = json.url;
+        }
+      }
+
       // Save AI correction if user reviewed AI output
       if (aiResult && mode === "review") {
         await submitAiCorrection(imageDataUrl, aiResult, form);
@@ -105,7 +119,8 @@ export function AddExpenseModal({
           form.iva13,
           form.iva23,
           form.totalCost,
-          tourId
+          tourId,
+          invoiceImageUrl,
         );
       } else {
         // Find the Fornecedor ID by matching the selected name
@@ -127,6 +142,7 @@ export function AddExpenseModal({
           status: form.invoiceId ? "Paid" : "Pending Receipt",
           tourId,
           bankReference: "",
+          invoiceImageUrl,
         });
       }
       router.refresh();

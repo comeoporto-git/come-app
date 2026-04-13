@@ -224,6 +224,7 @@ export type Transaction = {
   accountantVerified: boolean;
   tourId: string | null;
   bankReference: string;
+  invoiceImageUrl?: string;
 };
 
 function mapTransaction(page: PageObjectResponse): Transaction {
@@ -322,6 +323,9 @@ export async function createTransaction(
       ...(data.tourId
         ? { "🎫 Sales": { relation: [{ id: data.tourId }] } }
         : {}),
+      ...(data.invoiceImageUrl
+        ? { "Fatura": { files: [{ type: "external", name: "invoice", external: { url: data.invoiceImageUrl } }] } }
+        : {}),
       ...(data.bankReference
         ? { "ID do Banco": { rich_text: [{ text: { content: data.bankReference } }] } }
         : {}),
@@ -360,6 +364,8 @@ export async function updateTransaction(
     props["🎫 Sales"] = { relation: data.tourId ? [{ id: data.tourId }] : [] };
   if (data.bankReference !== undefined)
     props["ID do Banco"] = { rich_text: [{ text: { content: data.bankReference } }] };
+  if (data.invoiceImageUrl)
+    props["Fatura"] = { files: [{ type: "external", name: "invoice", external: { url: data.invoiceImageUrl } }] };
 
   await notion.pages.update({
     page_id: pageId,

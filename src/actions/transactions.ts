@@ -36,7 +36,8 @@ export async function finishPendingExpenseAction(
   iva13: number,
   iva23: number,
   totalCost: number,
-  tourId: string
+  tourId: string,
+  invoiceImageUrl?: string,
 ): Promise<void> {
   const session = await requireAuth();
   if (session.user.role !== "Guide" && session.user.role !== "Admin") {
@@ -50,6 +51,7 @@ export async function finishPendingExpenseAction(
     iva23,
     totalCost,
     status: "Paid",
+    ...(invoiceImageUrl ? { invoiceImageUrl } : {}),
   });
   revalidatePath(`/guide/tours/${tourId}`);
 }
