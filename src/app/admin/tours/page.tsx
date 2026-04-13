@@ -63,14 +63,14 @@ export default async function AdminToursPage() {
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-4 py-6 space-y-6">
+      <main className="max-w-2xl mx-auto px-4 py-8 space-y-8">
         {/* Today */}
         {todays.length > 0 && (
           <section>
             <h2 className="text-xs font-bold uppercase tracking-widest text-white/80 mb-3">
               Hoje · {todays.length} tour{todays.length !== 1 ? "s" : ""}
             </h2>
-            <ul className="space-y-5">
+            <ul className="flex flex-col gap-6">
               {todays.map((tour) => (
                 <TourCard key={tour.id} tour={tour} guideName={teamMap[tour.teamId ?? ""] ?? "—"} highlight />
               ))}
@@ -91,7 +91,7 @@ export default async function AdminToursPage() {
           ) : upcoming.length === 0 ? (
             <p className="text-sm text-white/50">Sem tours futuros</p>
           ) : (
-            <ul className="space-y-5">
+            <ul className="flex flex-col gap-6">
               {upcoming.map((tour) => (
                 <TourCard key={tour.id} tour={tour} guideName={teamMap[tour.teamId ?? ""] ?? "—"} />
               ))}
