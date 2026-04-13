@@ -37,7 +37,7 @@ export default async function AdminToursPage() {
   const upcoming = tours.filter((t) => !isToday(t.date));
 
   return (
-    <div className="min-h-screen bg-[#f5f4f1]">
+    <div className="min-h-screen bg-[#f5f4f1] text-[#32373c]">
       <header className="bg-[#32373c] sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">

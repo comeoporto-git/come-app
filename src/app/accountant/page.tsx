@@ -19,7 +19,7 @@ export default async function AccountantPage() {
   const total = transactions.reduce((s, t) => s + t.totalCost, 0);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 text-[#32373c]">
       <header className="bg-white border-b border-gray-100 sticky top-0 z-10">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
           <div>
@@ -72,14 +72,14 @@ export default async function AccountantPage() {
                       <span className="text-gray-200 text-lg">📄</span>
                     )}
                   </td>
-                  <td className="px-3 py-2.5 text-gray-600 whitespace-nowrap">{tx.date ?? "—"}</td>
-                  <td className="px-3 py-2.5 font-medium text-gray-900">{tx.supplier}</td>
-                  <td className="px-3 py-2.5 text-gray-500">{tx.invoiceId || "—"}</td>
-                  <td className="px-3 py-2.5 text-right">{fmt(tx.taxFree)}</td>
-                  <td className="px-3 py-2.5 text-right">{tx.iva6 ? fmt(tx.iva6) : "—"}</td>
-                  <td className="px-3 py-2.5 text-right">{tx.iva13 ? fmt(tx.iva13) : "—"}</td>
-                  <td className="px-3 py-2.5 text-right">{tx.iva23 ? fmt(tx.iva23) : "—"}</td>
-                  <td className="px-3 py-2.5 text-right font-semibold">{fmt(tx.totalCost)}</td>
+                  <td className="px-3 py-2.5 text-[#32373c] whitespace-nowrap">{tx.date ?? "—"}</td>
+                  <td className="px-3 py-2.5 font-medium text-[#32373c]">{tx.supplier}</td>
+                  <td className="px-3 py-2.5 text-[#32373c]">{tx.invoiceId || "—"}</td>
+                  <td className="px-3 py-2.5 text-right text-[#32373c]">{fmt(tx.taxFree)}</td>
+                  <td className="px-3 py-2.5 text-right text-[#32373c]">{tx.iva6 ? fmt(tx.iva6) : "—"}</td>
+                  <td className="px-3 py-2.5 text-right text-[#32373c]">{tx.iva13 ? fmt(tx.iva13) : "—"}</td>
+                  <td className="px-3 py-2.5 text-right text-[#32373c]">{tx.iva23 ? fmt(tx.iva23) : "—"}</td>
+                  <td className="px-3 py-2.5 text-right font-semibold text-[#32373c]">{fmt(tx.totalCost)}</td>
                   <td className="px-3 py-2.5">
                     <span
                       className={`text-xs px-2 py-0.5 rounded-full font-medium ${
@@ -91,7 +91,7 @@ export default async function AccountantPage() {
                       {tx.status}
                     </span>
                   </td>
-                  <td className="px-3 py-2.5 text-gray-500 text-xs">{tx.paymentMethod}</td>
+                  <td className="px-3 py-2.5 text-[#32373c] text-xs">{tx.paymentMethod}</td>
                   <td className="px-3 py-2.5">
                     <VerifyButton
                       transactionId={tx.id}
