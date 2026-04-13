@@ -63,34 +63,23 @@ export default async function TourDetailPage({ params }: { params: Promise<{ id:
           <div className="px-4 py-3 border-b border-gray-50">
             <h2 className="text-sm font-semibold text-gray-700">Informação do Grupo</h2>
           </div>
-          <div className="px-4 py-3 space-y-2">
-            <Row label="Nº de Pax" value={tour.numGuests ? String(tour.numGuests) : "—"} />
-            {teamMember && (
-              <Row label="Team" value={teamMember.name} />
-            )}
-            {teamMember?.phone && (
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-500">Telefone</span>
+          <div className="px-4 py-3 space-y-3">
+            {tour.type && <InfoField label="Serviço" value={tour.type} />}
+            <InfoField label="Nº de Pax" value={tour.numGuests ? String(tour.numGuests) : "—"} />
+            {tour.names && <InfoField label="Nomes" value={tour.names} />}
+            {tour.phoneNumber && (
+              <div>
+                <p className="text-xs text-gray-500 mb-1">Contacto</p>
                 <a
-                  href={`tel:${teamMember.phone}`}
+                  href={`tel:${tour.phoneNumber}`}
                   className="text-sm text-[#7852ca] font-medium hover:underline"
                 >
-                  {teamMember.phone}
+                  {tour.phoneNumber}
                 </a>
               </div>
             )}
-            {tour.names && (
-              <div>
-                <p className="text-xs text-gray-500 mb-1">Nomes</p>
-                <p className="text-sm text-gray-800 whitespace-pre-line">{tour.names}</p>
-              </div>
-            )}
-            {tour.notes && (
-              <div>
-                <p className="text-xs text-gray-500 mb-1">Notas</p>
-                <p className="text-sm text-gray-800 whitespace-pre-line">{tour.notes}</p>
-              </div>
-            )}
+            {tour.notes && <InfoField label="Notas" value={tour.notes} />}
+            {teamMember && <InfoField label="Team" value={teamMember.name} />}
           </div>
         </section>
 
@@ -129,11 +118,11 @@ export default async function TourDetailPage({ params }: { params: Promise<{ id:
   );
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+function InfoField({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between">
-      <span className="text-xs text-gray-500">{label}</span>
-      <span className="text-sm text-gray-800 font-medium">{value}</span>
+    <div>
+      <p className="text-xs text-gray-500 mb-1">{label}</p>
+      <p className="text-sm text-gray-800 font-medium whitespace-pre-line">{value}</p>
     </div>
   );
 }

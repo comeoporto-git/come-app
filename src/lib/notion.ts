@@ -78,7 +78,7 @@ function mapTeamMember(page: PageObjectResponse): TeamMember {
     id: page.id,
     name: text(getProp(page, "Name")),
     email: text(getProp(page, "email")),
-    phone: text(getProp(page, "Phone")),
+    phone: text(getProp(page, "Contact")),
     role: text(getProp(page, "Role")) as TeamMember["role"],
   };
 }
@@ -126,10 +126,12 @@ export type Tour = {
   id: string;
   saleId: string;
   service: string;
+  type: string;
   date: string | null;
   client: string;
   numGuests: number;
   names: string;
+  phoneNumber: string;
   notes: string;
   teamId: string | null;
   expensesClosed: boolean;
@@ -143,10 +145,12 @@ function mapTour(page: PageObjectResponse): Tour {
     id:              page.id,
     saleId:          text(getProp(page, "ID")),
     service:         serviceIds[0] ?? "",   // Relation ID; resolved to name in UI layer
+    type:            text(getProp(page, "Type")),
     date:            dateStr(getProp(page, "Date")),
     client:          clientIds[0] ?? "",
     numGuests:       num(getProp(page, "Number of Guests")),
     names:           text(getProp(page, "Names")),
+    phoneNumber:     text(getProp(page, "Phone Number")),
     notes:           text(getProp(page, "Notes")),
     teamId:          teamIds[0] ?? null,
     expensesClosed:  text(getProp(page, "Expenses Closed")) === "Closed",
