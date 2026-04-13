@@ -14,6 +14,7 @@ function formatDate(iso: string | null): string {
     month: "short",
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: "Europe/Lisbon",
   });
 }
 
