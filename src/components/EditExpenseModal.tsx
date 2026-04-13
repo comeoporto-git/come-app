@@ -218,7 +218,7 @@ export function EditExpenseModal({
                         <button
                           type="button"
                           onMouseDown={() => { update("supplier", f.name); setQuery(f.name); setShowList(false); }}
-                          className="w-full text-left px-3 py-2.5 text-sm text-[#32373c] hover:bg-[#6B8878]/10 first:rounded-t-xl last:rounded-b-xl"
+                          className="w-full text-left px-3 py-2.5 text-sm text-[#32373c] hover:bg-[#7b8b87]/10 first:rounded-t-xl last:rounded-b-xl"
                         >
                           {f.name}
                         </button>

@@ -215,10 +215,10 @@ export function AddExpenseModal({
             <div className="grid grid-cols-2 gap-3">
               <button
                 onClick={() => setMode("scan")}
-                className="flex flex-col items-center justify-center gap-2 p-5 rounded-2xl border-2 border-[#6B8878]/30 bg-[#6B8878]/5 hover:bg-[#6B8878]/10 transition-colors"
+                className="flex flex-col items-center justify-center gap-2 p-5 rounded-2xl border-2 border-[#7b8b87]/30 bg-[#7b8b87]/5 hover:bg-[#7b8b87]/10 transition-colors"
               >
                 <span className="text-3xl">📷</span>
-                <span className="text-sm font-semibold text-[#6B8878] font-bold">Escanear Recibo</span>
+                <span className="text-sm font-semibold text-[#7b8b87] font-bold">Escanear Recibo</span>
               </button>
               <button
                 onClick={() => setMode("manual")}
@@ -235,12 +235,12 @@ export function AddExpenseModal({
             <div className="space-y-4">
               {scanning ? (
                 <div className="flex flex-col items-center py-10 gap-3">
-                  <div className="animate-spin rounded-full h-10 w-10 border-4 border-[#6B8878]/20 border-t-[#6B8878]" />
+                  <div className="animate-spin rounded-full h-10 w-10 border-4 border-[#7b8b87]/20 border-t-[#7b8b87]" />
                   <p className="text-sm text-gray-500">A analisar com IA…</p>
                 </div>
               ) : (
                 <div
-                  className="border-2 border-dashed border-[#6B8878]/30 rounded-2xl p-8 text-center cursor-pointer hover:bg-[#6B8878]/5 transition-colors"
+                  className="border-2 border-dashed border-[#7b8b87]/30 rounded-2xl p-8 text-center cursor-pointer hover:bg-[#7b8b87]/5 transition-colors"
                   onClick={() => fileRef.current?.click()}
                 >
                   <input
@@ -252,7 +252,7 @@ export function AddExpenseModal({
                     capture="environment"
                   />
                   <div className="text-4xl mb-2">📸</div>
-                  <p className="text-sm font-semibold text-[#6B8878] font-semibold">Tirar Foto / Escolher Imagem</p>
+                  <p className="text-sm font-semibold text-[#7b8b87] font-semibold">Tirar Foto / Escolher Imagem</p>
                   <p className="text-xs text-gray-400 mt-1">JPEG, PNG ou WebP</p>
                 </div>
               )}
@@ -398,7 +398,7 @@ function InvoiceForm({
                   <button
                     type="button"
                     onMouseDown={() => selectFornecedor(f.name)}
-                    className="w-full text-left px-3 py-2.5 text-sm text-[#32373c] hover:bg-[#6B8878]/10 transition-colors first:rounded-t-xl last:rounded-b-xl"
+                    className="w-full text-left px-3 py-2.5 text-sm text-[#32373c] hover:bg-[#7b8b87]/10 transition-colors first:rounded-t-xl last:rounded-b-xl"
                   >
                     {f.name}
                   </button>

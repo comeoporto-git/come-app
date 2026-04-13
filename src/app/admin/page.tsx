@@ -14,7 +14,7 @@ export default async function AdminPage() {
 
   return (
     <div className="min-h-screen bg-[#EDE6DA] text-[#32373c]">
-      <header className="bg-[#6B8878] sticky top-0 z-10">
+      <header className="bg-[#7b8b87] sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
           <Image
             src="https://comeoporto.com/wp-content/uploads/2023/08/cropped-COME-Porto-Food-Tours-Logo-Black-.png"
@@ -90,7 +90,7 @@ export default async function AdminPage() {
             <a
               key={link.href}
               href={link.href}
-              className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-3 hover:border-[#6B8878]/30 transition-colors"
+              className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-3 hover:border-[#7b8b87]/30 transition-colors"
             >
               <span className="text-2xl">{link.icon}</span>
               <span className="text-sm font-semibold text-[#32373c]">{link.label}</span>

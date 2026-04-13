@@ -44,7 +44,7 @@ export function ExpenseList({
             key={tx.id}
             onClick={() => !isClosed && setEditing(tx)}
             className={`bg-white rounded-xl border border-gray-100 shadow-sm p-3 space-y-1 transition-colors ${
-              !isClosed ? "cursor-pointer hover:border-[#6B8878]/30 active:scale-[0.99]" : ""
+              !isClosed ? "cursor-pointer hover:border-[#7b8b87]/30 active:scale-[0.99]" : ""
             }`}
           >
             <div className="flex items-start justify-between gap-2">
@@ -77,7 +77,7 @@ export function ExpenseList({
             {tx.status === "Pending Receipt" && !isClosed && (
               <button
                 onClick={(e) => { e.stopPropagation(); setPendingToFinish(tx); }}
-                className="mt-1 text-xs text-[#6B8878] font-semibold hover:underline"
+                className="mt-1 text-xs text-[#7b8b87] font-semibold hover:underline"
               >
                 + Adicionar Recibo
               </button>
