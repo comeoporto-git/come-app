@@ -79,9 +79,9 @@ export function ReconciliationPanel({
       {tab === "flagged" && (
         <div className="space-y-3">
           <p className="text-xs text-gray-500 px-1">
-            Estas faturas foram registadas como pagas com o Cartão COME mas o banco
-            não tem um débito correspondente após 3 dias. Verifica e marca como OK se
-            o banco processou de forma diferente.
+            Faturas com Cartão COME sem débito bancário após 3 dias, ou despesas
+            Pelo Guia sem transferência de reembolso após 7 dias. Marca como OK
+            se o banco processou de forma diferente.
           </p>
 
           {flagged.length === 0 ? (
@@ -213,7 +213,9 @@ function FlaggedCard({
 
       <div className="px-4 pb-3 flex items-center gap-2">
         <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full font-medium flex-1">
-          Débito bancário não encontrado
+          {t.status === "Flag: Missing Reimbursement"
+            ? "Reembolso ao guia não encontrado"
+            : "Débito bancário não encontrado"}
         </span>
         <button
           onClick={handleClear}

@@ -3,6 +3,7 @@
 import { plaidClient, getPlaidItems, updateCursor, removePlaidItem } from "@/lib/plaid";
 import {
   getTransactionsForMatching,
+  getPeloGuiaTransactionsForMatching,
   createTransaction,
   updateTransaction,
   archiveTransaction,
@@ -11,8 +12,11 @@ import { revalidatePath } from "next/cache";
 import { Transaction as PlaidTransaction } from "plaid";
 import { auth } from "@/lib/auth";
 
-const MATCH_WINDOW_MS = 3 * 24 * 60 * 60 * 1000; // ±3 days
-const AMOUNT_TOLERANCE = 0.02; // 2 cents rounding tolerance
+// Cartão COME card purchases settle within 3 days
+const CARD_MATCH_WINDOW_MS        = 3 * 24 * 60 * 60 * 1000;
+// Pelo Guia reimbursements are wire transfers — allow a full week
+const REIMBURSEMENT_MATCH_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+const AMOUNT_TOLERANCE            = 0.02; // 2 cents for rounding
 
 async function requireAdmin() {
   const session = await auth();
@@ -43,7 +47,7 @@ export async function syncBankTransactions(): Promise<{
       hasMore = has_more;
       cursor = next_cursor;
 
-      // Process new + modified bank transactions (Plaid: positive = debit/outflow)
+      // Plaid: positive amount = debit/outflow from the account
       const bankTxns = [...added, ...modified].filter(
         (t: PlaidTransaction) => t.amount > 0
       );
@@ -58,7 +62,6 @@ export async function syncBankTransactions(): Promise<{
     await updateCursor(item.item_id, cursor!);
   }
 
-  // Flag invoices with no bank entry after 3 days
   flagged += await flagMissingBankEntries();
 
   revalidatePath("/admin");
@@ -67,45 +70,59 @@ export async function syncBankTransactions(): Promise<{
   return { matched, unmatched, flagged };
 }
 
-// ── Matching logic ────────────────────────────────────────────────────────────
+// ── Two-pass matching ─────────────────────────────────────────────────────────
 
 async function matchTransaction(
   bankTxn: PlaidTransaction
 ): Promise<"matched" | "unmatched"> {
-  const bankDate = new Date(bankTxn.date);
+  const bankDate   = new Date(bankTxn.date);
   const bankAmount = Math.abs(bankTxn.amount);
-  const bankRef = bankTxn.transaction_id;
+  const bankRef    = bankTxn.transaction_id;
 
-  const invoices = await getTransactionsForMatching();
+  // ── Pass 1: Cartão COME expenses (card purchase, ±3 days) ────────────────
+  const comeExpenses = await getTransactionsForMatching();
+  for (const expense of comeExpenses) {
+    if (!expense.date || !expense.totalCost || expense.bankReference) continue;
 
-  for (const invoice of invoices) {
-    if (!invoice.date || !invoice.totalCost) continue;
+    const dateDiff   = Math.abs(new Date(expense.date).getTime() - bankDate.getTime());
+    const amountDiff = Math.abs(expense.totalCost - bankAmount);
 
-    const invoiceDate = new Date(invoice.date);
-    const dateDiff = Math.abs(bankDate.getTime() - invoiceDate.getTime());
-    const amountDiff = Math.abs(invoice.totalCost - bankAmount);
-
-    if (dateDiff <= MATCH_WINDOW_MS && amountDiff <= AMOUNT_TOLERANCE) {
-      await updateTransaction(invoice.id, { status: "Paid", bankReference: bankRef });
+    if (dateDiff <= CARD_MATCH_WINDOW_MS && amountDiff <= AMOUNT_TOLERANCE) {
+      await updateTransaction(expense.id, { status: "Paid", bankReference: bankRef });
       return "matched";
     }
   }
 
-  // No invoice match — create placeholder
+  // ── Pass 2: Pelo Guia expenses (wire transfer reimbursement, ±7 days) ────
+  const guiaExpenses = await getPeloGuiaTransactionsForMatching();
+  for (const expense of guiaExpenses) {
+    if (!expense.date || !expense.totalCost) continue;
+
+    const dateDiff   = Math.abs(new Date(expense.date).getTime() - bankDate.getTime());
+    const amountDiff = Math.abs(expense.totalCost - bankAmount);
+
+    if (dateDiff <= REIMBURSEMENT_MATCH_WINDOW_MS && amountDiff <= AMOUNT_TOLERANCE) {
+      // Keep status as "Paid" (guide already paid) — just record the bank reference
+      await updateTransaction(expense.id, { bankReference: bankRef });
+      return "matched";
+    }
+  }
+
+  // ── No match — create an unmatched placeholder for reconciliation ─────────
   await createTransaction({
-    supplier: bankTxn.merchant_name ?? bankTxn.name ?? "Desconhecido",
-    fornecedorId: null,
-    date: bankTxn.date,
-    invoiceId: "",
-    taxFree: bankAmount,
-    iva6: 0,
-    iva13: 0,
-    iva23: 0,
-    totalCost: bankAmount,
-    whoPaid: "Company",
+    supplier:      bankTxn.merchant_name ?? bankTxn.name ?? "Desconhecido",
+    fornecedorId:  null,
+    date:          bankTxn.date,
+    invoiceId:     "",
+    taxFree:       bankAmount,
+    iva6:          0,
+    iva13:         0,
+    iva23:         0,
+    totalCost:     bankAmount,
+    whoPaid:       "Company",
     paymentMethod: "Cartão COME",
-    status: "Unmatched Bank Entry",
-    tourId: null,
+    status:        "Unmatched Bank Entry",
+    tourId:        null,
     bankReference: bankRef,
   });
   return "unmatched";
@@ -114,24 +131,37 @@ async function matchTransaction(
 // ── Flag missing bank entries ─────────────────────────────────────────────────
 
 async function flagMissingBankEntries(): Promise<number> {
-  const invoices = await getTransactionsForMatching();
-  const cutoff = new Date(Date.now() - MATCH_WINDOW_MS);
+  const [comeExpenses, guiaExpenses] = await Promise.all([
+    getTransactionsForMatching(),
+    getPeloGuiaTransactionsForMatching(),
+  ]);
+
+  const cardCutoff = new Date(Date.now() - CARD_MATCH_WINDOW_MS);
+  const reimbCutoff = new Date(Date.now() - REIMBURSEMENT_MATCH_WINDOW_MS);
   let count = 0;
 
-  for (const invoice of invoices) {
-    if (!invoice.date) continue;
-    const invoiceDate = new Date(invoice.date);
-
+  // Flag old Cartão COME invoices with no bank debit
+  for (const expense of comeExpenses) {
+    if (!expense.date) continue;
     if (
-      invoice.paymentMethod === "Cartão COME" &&
-      invoice.status === "Paid" &&
-      !invoice.bankReference &&
-      invoiceDate < cutoff
+      expense.status === "Paid" &&
+      !expense.bankReference &&
+      new Date(expense.date) < cardCutoff
     ) {
-      await updateTransaction(invoice.id, { status: "Flag: Missing Bank Entry" });
+      await updateTransaction(expense.id, { status: "Flag: Missing Bank Entry" });
       count++;
     }
   }
+
+  // Flag old Pelo Guia expenses with no reimbursement transfer
+  for (const expense of guiaExpenses) {
+    if (!expense.date) continue;
+    if (new Date(expense.date) < reimbCutoff) {
+      await updateTransaction(expense.id, { status: "Flag: Missing Reimbursement" });
+      count++;
+    }
+  }
+
   return count;
 }
 
@@ -152,7 +182,7 @@ export async function dismissUnmatchedAction(transactionId: string): Promise<voi
   revalidatePath("/admin/reconciliation");
 }
 
-/** Clear a "Flag: Missing Bank Entry" — set back to Paid (bank processed differently) */
+/** Clear a flag — set back to Paid */
 export async function clearFlagAction(transactionId: string): Promise<void> {
   await requireAdmin();
   await updateTransaction(transactionId, { status: "Paid" });
@@ -166,9 +196,7 @@ export async function manualMatchAction(
   bankReference: string,
 ): Promise<void> {
   await requireAdmin();
-  // Mark the invoice as matched
   await updateTransaction(invoiceId, { status: "Paid", bankReference });
-  // Archive the unmatched placeholder
   await archiveTransaction(bankTransactionId);
   revalidatePath("/admin/reconciliation");
 }

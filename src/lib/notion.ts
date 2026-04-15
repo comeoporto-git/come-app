@@ -461,6 +461,26 @@ export async function getTransactionsNeedingInvoice(): Promise<Transaction[]> {
   return resolveTourNamesForTransactions(transactions);
 }
 
+export async function getPeloGuiaTransactionsForMatching(): Promise<Transaction[]> {
+  try {
+    const res = await notion.databases.query({
+      database_id: TRANSACTIONS_DB,
+      filter: {
+        and: [
+          { property: "Método de Pagamento", select: { equals: "Pelo Guia" } },
+          { property: "Status", select: { equals: "Paid" } },
+        ],
+      },
+      sorts: [{ property: "Data", direction: "descending" }],
+      page_size: 200,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
+    return (res.results as PageObjectResponse[])
+      .map(mapTransaction)
+      .filter((t) => !t.bankReference); // exclude already-reimbursed ones
+  } catch { return []; }
+}
+
 export async function getUnmatchedBankTransactions(): Promise<Transaction[]> {
   try {
     const res = await notion.databases.query({
@@ -476,9 +496,16 @@ export async function getUnmatchedBankTransactions(): Promise<Transaction[]> {
 
 export async function getFlaggedTransactions(): Promise<Transaction[]> {
   try {
+    // Fetch both "Flag: Missing Bank Entry" (Cartão COME) and
+    // "Flag: Missing Reimbursement" (Pelo Guia) in one query
     const res = await notion.databases.query({
       database_id: TRANSACTIONS_DB,
-      filter: { property: "Status", select: { equals: "Flag: Missing Bank Entry" } },
+      filter: {
+        or: [
+          { property: "Status", select: { equals: "Flag: Missing Bank Entry" } },
+          { property: "Status", select: { equals: "Flag: Missing Reimbursement" } },
+        ],
+      },
       sorts: [{ property: "Data", direction: "descending" }],
       page_size: 100,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
