@@ -26,12 +26,34 @@ create table if not exists supplier_mappings (
 create index if not exists supplier_mappings_count_idx
   on supplier_mappings (confirmed_count desc);
 
--- Plaid connected bank accounts
-create table if not exists plaid_items (
-  id               uuid primary key default gen_random_uuid(),
-  access_token     text not null,
-  item_id          text not null unique,
-  institution_name text not null default 'Crédito Agrícola',
-  cursor           text,
+-- Enable Banking connected sessions
+create table if not exists enablebanking_sessions (
+  id               serial primary key,
+  session_id       text not null unique,
+  institution_name text not null,
+  account_ids      text not null default '[]',
+  valid_until      text,
+  last_fetched_at  timestamptz,
   created_at       timestamptz not null default now()
 );
+
+-- Raw bank transactions fetched from Enable Banking
+-- Populated during sync; read by the transactions page to avoid rate limits
+create table if not exists bank_transactions (
+  id               serial primary key,
+  transaction_id   text not null unique,
+  account_uid      text not null,
+  institution_name text not null,
+  amount           numeric(12,2) not null,
+  currency         text not null default 'EUR',
+  credit_debit     text not null,           -- 'CRDT' | 'DBIT'
+  transaction_date date not null,
+  booking_date     date,
+  merchant_name    text,
+  remittance_info  text,
+  raw              jsonb,
+  created_at       timestamptz not null default now()
+);
+
+create index if not exists bank_transactions_date_idx
+  on bank_transactions (transaction_date desc);

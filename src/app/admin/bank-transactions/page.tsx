@@ -1,24 +1,7 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { getEBSessions, getAccountTransactions, type EBTransaction } from "@/lib/enablebanking";
+import { getStoredTransactions } from "@/lib/enablebanking";
 import Link from "next/link";
-
-function formatDate(d: Date) {
-  return d.toISOString().slice(0, 10);
-}
-
-function formatAmount(txn: EBTransaction) {
-  const amount = parseFloat(txn.transaction_amount.amount);
-  const sign = txn.credit_debit_indicator === "DBIT" ? "-" : "+";
-  return `${sign}${amount.toFixed(2)} ${txn.transaction_amount.currency}`;
-}
-
-function merchantName(txn: EBTransaction) {
-  if (txn.credit_debit_indicator === "DBIT") {
-    return txn.creditor?.name ?? txn.remittance_information ?? "—";
-  }
-  return txn.debtor?.name ?? txn.remittance_information ?? "—";
-}
 
 export default async function BankTransactionsPage({
   searchParams,
@@ -31,46 +14,12 @@ export default async function BankTransactionsPage({
   const { days: daysParam } = await searchParams;
   const days = Math.min(parseInt(daysParam ?? "30", 10) || 30, 90);
 
-  const dateTo   = formatDate(new Date());
-  const dateFrom = formatDate(new Date(Date.now() - days * 86_400_000));
+  const txns = await getStoredTransactions(days);
 
-  const sessions = await getEBSessions();
-
-  const allTxns: (EBTransaction & { accountId: string; institution: string })[] = [];
-
-  const errors: string[] = [];
-
-  console.log("[BankTxns] sessions:", sessions.map(s => ({ id: s.session_id, accounts: s.accountIds })));
-
-  await Promise.all(
-    sessions.flatMap((s) => {
-      if (s.accountIds.length === 0) {
-        errors.push(`Session ${s.session_id} has no account IDs`);
-        return [];
-      }
-      return s.accountIds.map(async (accountId) => {
-            try {
-              const txns = await getAccountTransactions(accountId, dateFrom, dateTo);
-              console.log(`[BankTxns] account ${accountId}: ${txns.length} txns`);
-              txns.forEach((t) => allTxns.push({ ...t, accountId, institution: s.institution_name }));
-            } catch (err) {
-              const msg = err instanceof Error ? err.message : String(err);
-              console.error(`[BankTxns] account ${accountId} error:`, msg);
-              errors.push(`${accountId}: ${msg}`);
-            }
-          });
-    })
-  );
-
-  // Sort newest first
-  allTxns.sort((a, b) =>
-    new Date(b.transaction_date).getTime() - new Date(a.transaction_date).getTime()
-  );
-
-  const debits  = allTxns.filter((t) => t.credit_debit_indicator === "DBIT");
-  const credits = allTxns.filter((t) => t.credit_debit_indicator === "CRDT");
-  const totalOut = debits.reduce((s, t) => s + parseFloat(t.transaction_amount.amount), 0);
-  const totalIn  = credits.reduce((s, t) => s + parseFloat(t.transaction_amount.amount), 0);
+  const debits  = txns.filter((t) => t.credit_debit === "DBIT");
+  const credits = txns.filter((t) => t.credit_debit === "CRDT");
+  const totalOut = debits.reduce((s, t) => s + Number(t.amount), 0);
+  const totalIn  = credits.reduce((s, t) => s + Number(t.amount), 0);
 
   return (
     <div className="min-h-screen bg-[#667470] text-[#32373c]">
@@ -107,7 +56,7 @@ export default async function BankTransactionsPage({
         <div className="grid grid-cols-3 gap-3">
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
             <p className="text-xs text-gray-400 mb-1">Transações</p>
-            <p className="text-xl font-bold text-[#32373c]">{allTxns.length}</p>
+            <p className="text-xl font-bold text-[#32373c]">{txns.length}</p>
           </div>
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
             <p className="text-xs text-gray-400 mb-1">Saídas</p>
@@ -119,74 +68,49 @@ export default async function BankTransactionsPage({
           </div>
         </div>
 
-        {errors.length > 0 && (
-          <div className="bg-red-50 border border-red-200 rounded-2xl px-5 py-3 space-y-1">
-            {errors.map((e, i) => (
-              <p key={i} className="text-xs text-red-600 font-mono">{e}</p>
-            ))}
-          </div>
-        )}
-
-        {sessions.length === 0 ? (
+        {txns.length === 0 ? (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-5 py-12 text-center text-gray-400">
             <div className="text-3xl mb-2">🏦</div>
-            <p className="text-sm">Nenhuma conta bancária ligada</p>
-            <Link href="/admin" className="text-xs text-[#667470] underline mt-2 inline-block">
-              Ligar conta
-            </Link>
-          </div>
-        ) : sessions.every((s) => s.accountIds.length === 0) ? (
-          <div className="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4 text-sm text-amber-700">
-            ⚠️ Conta ligada mas sem IDs de conta guardados. Desliga e volta a ligar a conta no{" "}
-            <Link href="/admin" className="underline">Admin</Link>.
-          </div>
-        ) : allTxns.length === 0 && errors.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-5 py-12 text-center text-gray-400">
-            <p className="text-sm">Sem movimentos nos últimos {days} dias</p>
+            <p className="text-sm font-medium">Sem movimentos nos últimos {days} dias</p>
+            <p className="text-xs mt-1">
+              Clica em{" "}
+              <Link href="/admin" className="underline text-[#667470]">
+                Sincronizar Agora
+              </Link>{" "}
+              para importar transações do banco.
+            </p>
           </div>
         ) : (
           <section className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-            <div className="px-5 py-3 border-b border-gray-50 flex items-center justify-between">
+            <div className="px-5 py-3 border-b border-gray-50">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest">
-                {allTxns.length} movimentos · últimos {days} dias
+                {txns.length} movimentos · últimos {days} dias
               </p>
-              <p className="text-xs text-gray-400">{sessions[0].institution_name}</p>
             </div>
             <ul className="divide-y divide-gray-50">
-              {allTxns.map((txn) => {
-                const isDebit = txn.credit_debit_indicator === "DBIT";
-                const amount  = parseFloat(txn.transaction_amount.amount);
+              {txns.map((txn) => {
+                const isDebit = txn.credit_debit === "DBIT";
+                const label = txn.merchant_name ?? txn.remittance_info ?? "—";
                 return (
                   <li key={txn.transaction_id} className="px-5 py-3 flex items-center gap-3">
-                    {/* Icon */}
                     <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center text-sm flex-shrink-0 ${
+                      className={`w-8 h-8 rounded-full flex items-center justify-center text-sm flex-shrink-0 font-bold ${
                         isDebit ? "bg-red-50 text-red-500" : "bg-green-50 text-green-600"
                       }`}
                     >
                       {isDebit ? "↑" : "↓"}
                     </div>
-
-                    {/* Details */}
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-[#32373c] truncate">
-                        {merchantName(txn)}
-                      </p>
+                      <p className="text-sm font-medium text-[#32373c] truncate">{label}</p>
                       <p className="text-xs text-gray-400">
                         {new Date(txn.transaction_date).toLocaleDateString("pt-PT")}
-                        {txn.remittance_information && (
-                          <span className="ml-2 truncate">{txn.remittance_information}</span>
+                        {txn.institution_name && (
+                          <span className="ml-2 text-gray-300">{txn.institution_name}</span>
                         )}
                       </p>
                     </div>
-
-                    {/* Amount */}
-                    <p
-                      className={`text-sm font-semibold flex-shrink-0 ${
-                        isDebit ? "text-red-600" : "text-green-600"
-                      }`}
-                    >
-                      {isDebit ? "-" : "+"}{amount.toFixed(2)}€
+                    <p className={`text-sm font-semibold flex-shrink-0 ${isDebit ? "text-red-600" : "text-green-600"}`}>
+                      {isDebit ? "-" : "+"}{Number(txn.amount).toFixed(2)}€
                     </p>
                   </li>
                 );

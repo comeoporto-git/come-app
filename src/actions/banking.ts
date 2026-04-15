@@ -3,6 +3,7 @@
 import {
   getEBSessions,
   getAccountTransactions,
+  upsertBankTransactions,
   updateEBLastFetched,
   removeEBSession,
   revokeSession,
@@ -61,6 +62,9 @@ export async function syncBankTransactions(): Promise<{
         console.error(`[BankSync] failed to fetch account ${accountId}:`, err);
         continue;
       }
+
+      // Persist all transactions to DB (avoids re-fetching & rate limits)
+      await upsertBankTransactions(txns, accountId, session.institution_name);
 
       // Only process debits (money leaving the account)
       const debits = txns.filter((t) => t.credit_debit_indicator === "DBIT");

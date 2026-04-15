@@ -231,3 +231,74 @@ export async function removeEBSession(sessionId: string): Promise<void> {
   const sql = getDb();
   await sql`DELETE FROM enablebanking_sessions WHERE session_id = ${sessionId}`;
 }
+
+// ── Stored transactions ───────────────────────────────────────────────────────
+
+export type StoredTransaction = {
+  id: number;
+  transaction_id: string;
+  account_uid: string;
+  institution_name: string;
+  amount: number;
+  currency: string;
+  credit_debit: "CRDT" | "DBIT";
+  transaction_date: string;
+  booking_date: string | null;
+  merchant_name: string | null;
+  remittance_info: string | null;
+  created_at: string;
+};
+
+/** Upsert a batch of raw transactions fetched from Enable Banking */
+export async function upsertBankTransactions(
+  txns: EBTransaction[],
+  accountUid: string,
+  institutionName: string,
+): Promise<void> {
+  const sql = getDb();
+  for (const t of txns) {
+    const merchantName =
+      t.credit_debit_indicator === "DBIT"
+        ? (t.creditor?.name ?? t.remittance_information ?? null)
+        : (t.debtor?.name ?? t.remittance_information ?? null);
+
+    await sql`
+      INSERT INTO bank_transactions
+        (transaction_id, account_uid, institution_name, amount, currency,
+         credit_debit, transaction_date, booking_date, merchant_name,
+         remittance_info, raw)
+      VALUES (
+        ${t.transaction_id},
+        ${accountUid},
+        ${institutionName},
+        ${parseFloat(t.transaction_amount.amount)},
+        ${t.transaction_amount.currency},
+        ${t.credit_debit_indicator},
+        ${t.transaction_date},
+        ${t.booking_date ?? null},
+        ${merchantName},
+        ${t.remittance_information ?? null},
+        ${JSON.stringify(t)}
+      )
+      ON CONFLICT (transaction_id) DO NOTHING
+    `;
+  }
+}
+
+/** Read stored transactions (newest first, up to limit) */
+export async function getStoredTransactions(
+  days = 30,
+  limit = 500,
+): Promise<StoredTransaction[]> {
+  const sql = getDb();
+  const dateFrom = new Date(Date.now() - days * 86_400_000)
+    .toISOString()
+    .slice(0, 10);
+  const rows = await sql`
+    SELECT * FROM bank_transactions
+    WHERE transaction_date >= ${dateFrom}
+    ORDER BY transaction_date DESC, id DESC
+    LIMIT ${limit}
+  `;
+  return rows as StoredTransaction[];
+}
