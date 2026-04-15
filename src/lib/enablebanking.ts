@@ -11,9 +11,28 @@ export const EB_REDIRECT_URL =
 
 // ── JWT ───────────────────────────────────────────────────────────────────────
 
+/** Normalise a PEM key that may have been mangled by env-var storage */
+function normalisePem(raw: string): string {
+  // 1. Replace literal \n (Vercel / dotenv single-line storage)
+  let pem = raw.replace(/\\n/g, "\n").trim();
+
+  // 2. If the base64 body ended up on one line (no internal newlines),
+  //    re-wrap it at 64 chars so OpenSSL can decode it.
+  const m = pem.match(/^(-----BEGIN [^-]+-----)([\s\S]*?)(-----END [^-]+-----)$/);
+  if (m) {
+    const header = m[1];
+    const body   = m[2].replace(/\s+/g, ""); // strip ALL whitespace from body
+    const footer = m[3];
+    if (body.length > 0) {
+      const wrapped = body.match(/.{1,64}/g)!.join("\n");
+      pem = `${header}\n${wrapped}\n${footer}`;
+    }
+  }
+  return pem;
+}
+
 async function jwt(): Promise<string> {
-  // Vercel stores env vars with literal \n — restore real newlines for PEM parsing
-  const pem = PRIVATE_KEY.replace(/\\n/g, "\n");
+  const pem = normalisePem(PRIVATE_KEY);
   // createPrivateKey accepts both PKCS#1 (BEGIN RSA PRIVATE KEY) and
   // PKCS#8 (BEGIN PRIVATE KEY) — no need to pre-convert the downloaded key
   const key = createPrivateKey(pem);
