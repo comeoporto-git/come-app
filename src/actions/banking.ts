@@ -100,7 +100,7 @@ async function matchTransaction(
     iva23: 0,
     totalCost: bankAmount,
     whoPaid: "Company",
-    paymentMethod: "Cartão Comum",
+    paymentMethod: "Cartão COME",
     status: "Unmatched Bank Entry",
     tourId: null,
     bankReference: bankRef,
@@ -121,7 +121,7 @@ async function flagMissingBankEntries(): Promise<number> {
 
     // Scenario 3: Cartão Comum invoice older than 3 days with no bank match
     if (
-      invoice.paymentMethod === "Cartão Comum" &&
+      invoice.paymentMethod === "Cartão COME" &&
       invoice.status === "Paid" &&
       !invoice.bankReference &&
       invoiceDate < cutoff

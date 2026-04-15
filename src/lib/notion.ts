@@ -424,11 +424,11 @@ export async function getTransactionsForTour(tourId: string): Promise<Transactio
 }
 
 export async function getTransactionsForMatching(): Promise<Transaction[]> {
-  // Fetch Cartão Comum transactions; filter non-IN- entries in code
+  // Fetch Cartão COME transactions; filter non-IN- entries in code
   // to avoid errors from select options that may not exist yet in Notion
   const res = await notion.databases.query({
     database_id: TRANSACTIONS_DB,
-    filter: { property: "Método de Pagamento", select: { equals: "Cartão Comum" } },
+    filter: { property: "Método de Pagamento", select: { equals: "Cartão COME" } },
     page_size: 100,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any);
