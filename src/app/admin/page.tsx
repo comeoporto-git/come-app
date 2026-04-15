@@ -1,20 +1,26 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { signOut } from "@/lib/auth";
-import { getPlaidItems } from "@/lib/plaid";
+import { getEBSessions } from "@/lib/enablebanking";
 import { getUnmatchedBankTransactions, getFlaggedTransactions } from "@/lib/notion";
-import { PlaidConnectButton } from "@/components/PlaidConnectButton";
+import { EnableBankingConnectButton } from "@/components/EnableBankingConnectButton";
+import { DisconnectEnableBankingButton } from "@/components/DisconnectEnableBankingButton";
 import { BankSyncButton } from "@/components/BankSyncButton";
-import { DisconnectBankButton } from "@/components/DisconnectBankButton";
 import Image from "next/image";
 import Link from "next/link";
 
-export default async function AdminPage() {
+export default async function AdminPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ bank_connected?: string; bank_error?: string }>;
+}) {
   const session = await auth();
   if (!session || session.user.role !== "Admin") redirect("/");
 
-  const [items, unmatched, flagged] = await Promise.all([
-    getPlaidItems(),
+  const params = await searchParams;
+
+  const [ebSessions, unmatched, flagged] = await Promise.all([
+    getEBSessions(),
     getUnmatchedBankTransactions(),
     getFlaggedTransactions(),
   ]);
@@ -43,40 +49,63 @@ export default async function AdminPage() {
       </header>
 
       <main className="max-w-2xl mx-auto px-4 py-8 space-y-6">
+
+        {/* Status banners */}
+        {params.bank_connected && (
+          <div className="bg-green-50 border border-green-200 rounded-2xl px-5 py-3 text-sm text-green-700 font-medium">
+            ✅ Conta bancária ligada com sucesso!
+          </div>
+        )}
+        {params.bank_error && (
+          <div className="bg-red-50 border border-red-200 rounded-2xl px-5 py-3 text-sm text-red-600">
+            ❌ Erro ao ligar conta: {params.bank_error}
+          </div>
+        )}
+
         {/* Bank Connections */}
         <section className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="px-5 py-4 border-b border-gray-50 flex items-center justify-between">
             <div>
               <h2 className="text-sm font-semibold text-[#32373c]">Contas Bancárias</h2>
-              <p className="text-xs text-gray-400 mt-0.5">Sincronização PSD2 via Plaid</p>
+              <p className="text-xs text-gray-400 mt-0.5">Open Banking via Enable Banking · PSD2</p>
             </div>
-            <PlaidConnectButton />
+            <EnableBankingConnectButton />
           </div>
 
-          {items.length === 0 ? (
+          {ebSessions.length === 0 ? (
             <div className="px-5 py-8 text-center text-gray-400">
               <div className="text-3xl mb-2">🏦</div>
               <p className="text-sm">Nenhuma conta ligada ainda</p>
-              <p className="text-xs mt-1">Clica em &quot;Ligar Conta&quot; para conectar o banco</p>
+              <p className="text-xs mt-1">Clica em &quot;+ Ligar Conta&quot; para conectar o Crédito Agrícola</p>
             </div>
           ) : (
             <ul className="divide-y divide-gray-50">
-              {items.map((item) => (
-                <li key={item.id} className="px-5 py-3 flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-600 text-sm flex-shrink-0">
+              {ebSessions.map((s) => (
+                <li key={s.session_id} className="px-5 py-3 flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-sm flex-shrink-0">
                     🏦
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-[#32373c]">{item.institution_name}</p>
+                    <p className="text-sm font-medium text-[#32373c]">{s.institution_name}</p>
                     <p className="text-xs text-gray-400">
-                      {item.cursor ? "Sincronizado" : "Aguarda primeira sincronização"}
+                      {s.last_fetched_at
+                        ? `Último sync: ${new Date(s.last_fetched_at).toLocaleDateString("pt-PT")}`
+                        : "Aguarda primeira sincronização"}
+                      {s.valid_until && (
+                        <span className="ml-2">
+                          · Válido até {new Date(s.valid_until).toLocaleDateString("pt-PT")}
+                        </span>
+                      )}
                     </p>
                   </div>
                   <div className="flex items-center gap-3 flex-shrink-0">
                     <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium">
                       Ligado
                     </span>
-                    <DisconnectBankButton itemId={item.item_id} name={item.institution_name} />
+                    <DisconnectEnableBankingButton
+                      sessionId={s.session_id}
+                      name={s.institution_name}
+                    />
                   </div>
                 </li>
               ))}
@@ -85,7 +114,7 @@ export default async function AdminPage() {
         </section>
 
         {/* Manual Sync */}
-        {items.length > 0 && (
+        {ebSessions.length > 0 && (
           <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3">
             <div>
               <h2 className="text-sm font-semibold text-[#32373c]">Sincronização Manual</h2>
@@ -113,7 +142,7 @@ export default async function AdminPage() {
             <Link
               key={link.href}
               href={link.href}
-              className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-3 hover:border-[#667470]/30 transition-colors relative"
+              className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-3 hover:border-[#667470]/30 transition-colors"
             >
               <span className="text-2xl">{link.icon}</span>
               <span className="text-sm font-semibold text-[#32373c]">{link.label}</span>
