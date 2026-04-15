@@ -213,6 +213,27 @@ export async function getToursForGuide(email: string): Promise<Tour[]> {
   return resolveRelationNames((res.results as PageObjectResponse[]).map(mapTour));
 }
 
+export async function getPastToursForGuide(email: string): Promise<Tour[]> {
+  const member = await getTeamMemberByEmail(email);
+  if (!member) return [];
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const res = await notion.databases.query({
+    database_id: TOURS_DB,
+    filter: {
+      and: [
+        { property: "🧑🏼‍🍳 Team", relation: { contains: member.id } },
+        { property: "Date", date: { before: today.toISOString() } },
+      ],
+    },
+    sorts: [{ property: "Date", direction: "descending" }],
+    page_size: 30,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any);
+  return resolveRelationNames((res.results as PageObjectResponse[]).map(mapTour));
+}
+
 export async function getAllUpcomingTours(): Promise<Tour[]> {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -224,6 +245,22 @@ export async function getAllUpcomingTours(): Promise<Tour[]> {
       date: { on_or_after: today.toISOString() },
     },
     sorts: [{ property: "Date", direction: "ascending" }],
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any);
+  return resolveRelationNames((res.results as PageObjectResponse[]).map(mapTour));
+}
+
+export async function getAllPastTours(): Promise<Tour[]> {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const res = await notion.databases.query({
+    database_id: TOURS_DB,
+    filter: {
+      property: "Date",
+      date: { before: today.toISOString() },
+    },
+    sorts: [{ property: "Date", direction: "descending" }],
+    page_size: 50,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any);
   return resolveRelationNames((res.results as PageObjectResponse[]).map(mapTour));

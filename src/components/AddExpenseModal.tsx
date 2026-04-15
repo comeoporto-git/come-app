@@ -51,6 +51,16 @@ export function AddExpenseModal({
     const file = e.target.files?.[0];
     if (!file) return;
     setImageFile(file);
+
+    // PDFs can't be analysed by the vision model — skip AI and go straight to manual
+    if (file.type === "application/pdf") {
+      setImageDataUrl(""); // no preview for PDFs
+      setImageBase64("");
+      setError("");
+      setMode("manual");
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = async (ev) => {
       const dataUrl = ev.target?.result as string;
@@ -289,6 +299,23 @@ export function AddExpenseModal({
           {/* MANUAL / REVIEW MODE */}
           {(mode === "manual" || mode === "review") && (
             <div className="space-y-4">
+              {/* PDF attached indicator */}
+              {imageFile?.type === "application/pdf" && (
+                <div className="flex items-center gap-3 p-3 rounded-xl border border-gray-200 bg-gray-50">
+                  <span className="text-2xl">📄</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-700 truncate">{imageFile.name}</p>
+                    <p className="text-xs text-gray-400">PDF anexado</p>
+                  </div>
+                  <button
+                    onClick={() => setImageFile(null)}
+                    className="text-xs text-gray-400 hover:text-gray-600"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+
               {mode === "review" && imageDataUrl && (
                 <>
                   <img

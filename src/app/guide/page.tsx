@@ -1,5 +1,5 @@
 import { auth } from "@/lib/auth";
-import { getToursForGuide } from "@/lib/notion";
+import { getToursForGuide, getPastToursForGuide } from "@/lib/notion";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { signOut } from "@/lib/auth";
@@ -30,7 +30,10 @@ export default async function GuideDashboard() {
   if (!session) redirect("/login");
 
   const email = session.user?.email ?? "";
-  const tours = await getToursForGuide(email);
+  const [tours, pastTours] = await Promise.all([
+    getToursForGuide(email),
+    getPastToursForGuide(email),
+  ]);
 
   const todays = tours.filter((t) => isToday(t.date));
   const upcoming = tours.filter((t) => !isToday(t.date));
@@ -99,6 +102,20 @@ export default async function GuideDashboard() {
             </ul>
           )}
         </section>
+
+        {/* Past */}
+        {pastTours.length > 0 && (
+          <section>
+            <h2 className="text-xs font-bold uppercase tracking-widest text-white/30 mb-3">
+              Anteriores · {pastTours.length}
+            </h2>
+            <ul className="flex flex-col gap-4">
+              {pastTours.map((tour) => (
+                <TourCard key={tour.id} tour={tour} past />
+              ))}
+            </ul>
+          </section>
+        )}
       </main>
     </div>
   );
@@ -113,9 +130,11 @@ const STATUS_COLORS: Record<string, string> = {
 function TourCard({
   tour,
   highlight,
+  past,
 }: {
   tour: Awaited<ReturnType<typeof getToursForGuide>>[0];
   highlight?: boolean;
+  past?: boolean;
 }) {
   return (
     <Link href={`/guide/tours/${tour.id}`}>
@@ -123,12 +142,14 @@ function TourCard({
         className={`rounded-2xl p-5 shadow-sm border transition-all active:scale-[0.98] cursor-pointer ${
           highlight
             ? "bg-[#32373c] text-white border-[#32373c]"
+            : past
+            ? "bg-white/60 border-white/20 text-[#32373c]"
             : "bg-white border-gray-100 text-[#32373c]"
         }`}
       >
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0 space-y-1">
-            <p className={`font-semibold text-sm ${highlight ? "text-white" : "text-[#32373c]"}`}>
+            <p className={`font-semibold text-sm ${highlight ? "text-white" : past ? "text-[#32373c]/70" : "text-[#32373c]"}`}>
               {tour.saleId}
             </p>
             <p className={`text-xs ${highlight ? "text-white/60" : "text-gray-500"}`}>

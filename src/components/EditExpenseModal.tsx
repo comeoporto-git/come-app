@@ -74,6 +74,11 @@ export function EditExpenseModal({
     const file = e.target.files?.[0];
     if (!file) return;
     setImageFile(file);
+    // PDFs have no visual preview — just track the file
+    if (file.type === "application/pdf") {
+      setImageDataUrl("pdf");
+      return;
+    }
     const reader = new FileReader();
     reader.onload = (ev) => setImageDataUrl(ev.target?.result as string);
     reader.readAsDataURL(file);
@@ -179,7 +184,7 @@ export function EditExpenseModal({
           )}
 
           {/* Lightbox */}
-          {lightboxSrc && (
+          {lightboxSrc && lightboxSrc !== "pdf" && (
             <div
               className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90"
               onClick={() => setLightboxSrc("")}
@@ -293,7 +298,21 @@ export function EditExpenseModal({
                 className="hidden"
                 onChange={handleImageChange}
               />
-              {imageDataUrl ? (
+              {imageDataUrl === "pdf" ? (
+                <div className="flex items-center gap-3 p-3 rounded-xl border border-gray-200 bg-gray-50">
+                  <span className="text-2xl">📄</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-700 truncate">{imageFile?.name}</p>
+                    <p className="text-xs text-gray-400">PDF anexado</p>
+                  </div>
+                  <button
+                    onClick={() => { setImageDataUrl(""); setImageFile(null); }}
+                    className="text-xs text-gray-400 hover:text-gray-600"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ) : imageDataUrl ? (
                 <div className="relative">
                   <img
                     src={imageDataUrl}

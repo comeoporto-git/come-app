@@ -10,7 +10,10 @@ export async function POST(req: Request) {
   const file = form.get("file") as File | null;
   if (!file) return NextResponse.json({ error: "No file" }, { status: 400 });
 
-  const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
+  const ext =
+    file.type === "image/png" ? "png" :
+    file.type === "image/webp" ? "webp" :
+    file.type === "application/pdf" ? "pdf" : "jpg";
   const filename = `invoices/${Date.now()}.${ext}`;
 
   const blob = await put(filename, file, {
