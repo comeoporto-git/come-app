@@ -28,10 +28,12 @@ function TourCard({
   tour,
   past,
   guideName,
+  isMyTour,
 }: {
   tour: Tour;
   past?: boolean;
   guideName?: string;
+  isMyTour?: boolean;
 }) {
   return (
     <Link href={`/guide/tours/${tour.id}`}>
@@ -52,7 +54,7 @@ function TourCard({
               <p className="text-xs text-gray-600">{tour.serviceName}</p>
             )}
             {guideName && guideName !== "—" ? (
-              <p className="text-xs text-gray-400">
+              <p className={`text-xs ${isMyTour ? "text-[#32373c] font-bold" : "text-gray-400"}`}>
                 🧭 {guideName}{tour.numGuests > 0 ? ` · ${tour.numGuests} pax` : ""}
               </p>
             ) : tour.numGuests > 0 ? (
@@ -80,10 +82,12 @@ export function TourTabs({
   upcoming,
   past,
   teamMap,
+  currentUserId,
 }: {
   upcoming: Tour[];
   past: Tour[];
   teamMap?: Record<string, string>;
+  currentUserId?: string;
 }) {
   const [tab, setTab] = useState<Tab>("upcoming");
 
@@ -124,6 +128,7 @@ export function TourTabs({
                 key={tour.id}
                 tour={tour}
                 guideName={teamMap?.[tour.teamId ?? ""]}
+                isMyTour={!!currentUserId && tour.teamId === currentUserId}
               />
             ))}
           </ul>
@@ -138,6 +143,7 @@ export function TourTabs({
               tour={tour}
               past
               guideName={teamMap?.[tour.teamId ?? ""]}
+              isMyTour={!!currentUserId && tour.teamId === currentUserId}
             />
           ))}
         </ul>

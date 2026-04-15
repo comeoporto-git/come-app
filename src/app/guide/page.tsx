@@ -1,5 +1,11 @@
 import { auth } from "@/lib/auth";
-import { getToursForGuide, getPastToursForGuide } from "@/lib/notion";
+import {
+  getToursForGuide,
+  getPastToursForGuide,
+  getAllUpcomingTours,
+  getAllPastTours,
+  getTeamMembers,
+} from "@/lib/notion";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { signOut } from "@/lib/auth";
@@ -8,9 +14,7 @@ import { TourTabs } from "@/components/TourTabs";
 
 function isToday(iso: string | null): boolean {
   if (!iso) return false;
-  const d = new Date(iso);
-  const t = new Date();
-  return d.toDateString() === t.toDateString();
+  return new Date(iso).toDateString() === new Date().toDateString();
 }
 
 function formatDate(iso: string | null): string {
@@ -35,11 +39,18 @@ export default async function GuideDashboard() {
   const session = await auth();
   if (!session) redirect("/login");
 
+  const isSuperGuide = session.user.role === "Super Guide";
   const email = session.user?.email ?? "";
-  const [tours, pastTours] = await Promise.all([
-    getToursForGuide(email),
-    getPastToursForGuide(email),
+  const currentNotionId = session.user?.notionId ?? "";
+
+  // Super Guide sees all tours; regular Guide sees only their own
+  const [tours, pastTours, teamMembers] = await Promise.all([
+    isSuperGuide ? getAllUpcomingTours() : getToursForGuide(email),
+    isSuperGuide ? getAllPastTours()     : getPastToursForGuide(email),
+    isSuperGuide ? getTeamMembers()      : Promise.resolve([]),
   ]);
+
+  const teamMap = Object.fromEntries(teamMembers.map((m) => [m.id, m.name]));
 
   const todays   = tours.filter((t) => isToday(t.date));
   const upcoming = tours.filter((t) => !isToday(t.date));
@@ -49,6 +60,11 @@ export default async function GuideDashboard() {
       {/* Header */}
       <header className="bg-[#7b8b87] sticky top-0 z-10">
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
+          {isSuperGuide && (
+            <Link href="/super-guide" className="text-white/40 hover:text-white transition-colors text-lg leading-none mr-2">
+              ←
+            </Link>
+          )}
           <Image
             src="https://comeoporto.com/wp-content/uploads/2023/08/cropped-COME-Porto-Food-Tours-Logo-Black-.png"
             alt="COME"
@@ -57,7 +73,7 @@ export default async function GuideDashboard() {
             className="object-contain invert"
             unoptimized
           />
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 ml-auto">
             <span className="text-sm text-white/70 font-medium">{session.user?.name?.split(" ")[0]}</span>
             <form
               action={async () => {
@@ -74,48 +90,62 @@ export default async function GuideDashboard() {
       </header>
 
       <main className="max-w-lg mx-auto px-4 py-8 space-y-8">
-        {/* Today — always shown as a highlighted block above the tabs */}
+        {/* Today */}
         {todays.length > 0 && (
           <section>
             <h2 className="text-xs font-bold uppercase tracking-widest text-white/80 mb-3">
               Hoje · {todays.length}
             </h2>
             <ul className="flex flex-col gap-4">
-              {todays.map((tour) => (
-                <Link key={tour.id} href={`/guide/tours/${tour.id}`}>
-                  <li className="rounded-2xl p-5 shadow-sm border bg-[#32373c] border-[#32373c] text-white transition-all active:scale-[0.98] cursor-pointer space-y-1">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0 space-y-1">
-                        <p className="font-semibold text-sm text-white">{tour.saleId}</p>
-                        <p className="text-xs text-white/60">{formatDate(tour.date)}</p>
-                        {tour.serviceName && (
-                          <p className="text-xs text-white/60">{tour.serviceName}</p>
-                        )}
-                        {tour.numGuests > 0 && (
-                          <p className="text-xs text-white/50">{tour.numGuests} pax</p>
-                        )}
-                      </div>
-                      <div className="flex flex-col items-end gap-2 shrink-0">
-                        <span className="text-xs bg-[#7b8b87] text-white px-2 py-0.5 rounded-full font-semibold">
-                          Hoje
-                        </span>
-                        {tour.status && (
-                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[tour.status] ?? "bg-gray-100 text-gray-500"}`}>
-                            {tour.status}
+              {todays.map((tour) => {
+                const guideName = teamMap[tour.teamId ?? ""];
+                const isMyTour = tour.teamId === currentNotionId;
+                return (
+                  <Link key={tour.id} href={`/guide/tours/${tour.id}`}>
+                    <li className="rounded-2xl p-5 shadow-sm border bg-[#32373c] border-[#32373c] text-white transition-all active:scale-[0.98] cursor-pointer">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0 space-y-1">
+                          <p className="font-semibold text-sm text-white">{tour.saleId}</p>
+                          <p className="text-xs text-white/60">{formatDate(tour.date)}</p>
+                          {tour.serviceName && (
+                            <p className="text-xs text-white/60">{tour.serviceName}</p>
+                          )}
+                          {guideName && (
+                            <p className={`text-xs ${isMyTour ? "text-white font-bold" : "text-white/50"}`}>
+                              🧭 {guideName}{tour.numGuests > 0 ? ` · ${tour.numGuests} pax` : ""}
+                            </p>
+                          )}
+                          {!guideName && tour.numGuests > 0 && (
+                            <p className="text-xs text-white/50">{tour.numGuests} pax</p>
+                          )}
+                        </div>
+                        <div className="flex flex-col items-end gap-2 shrink-0">
+                          <span className="text-xs bg-[#7b8b87] text-white px-2 py-0.5 rounded-full font-semibold">
+                            Hoje
                           </span>
-                        )}
+                          {tour.status && (
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[tour.status] ?? "bg-gray-100 text-gray-500"}`}>
+                              {tour.status}
+                            </span>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  </li>
-                </Link>
-              ))}
+                    </li>
+                  </Link>
+                );
+              })}
             </ul>
           </section>
         )}
 
         {/* Tabs: Próximas / Anteriores */}
         <section>
-          <TourTabs upcoming={upcoming} past={pastTours} />
+          <TourTabs
+            upcoming={upcoming}
+            past={pastTours}
+            teamMap={isSuperGuide ? teamMap : undefined}
+            currentUserId={isSuperGuide ? currentNotionId : undefined}
+          />
         </section>
       </main>
     </div>
