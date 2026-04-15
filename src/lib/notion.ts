@@ -118,15 +118,17 @@ export async function getTeamMemberById(id: string): Promise<TeamMember | null> 
 // ── Tours (Sales DB) ──────────────────────────────────────────────────────────
 //
 // Property name mapping (our code → Notion Sales DB):
-//   saleId       → "ID"               (Title)
-//   service      → "Service"          (Relation → Services DB)
-//   date         → "Date"             (Date)
-//   client       → "Client"           (Relation → Client DB)
-//   numGuests    → "Number of Guests" (Number)
-//   names        → "Names"            (Text)
-//   notes        → "Notes"            (Text)
-//   teamId       → "🧑🏼‍🍳 Team"             (Relation → Team DB)
-//   expensesClosed → "Expenses Closed" (Select — empty = open, any value = closed)
+//   saleId         → "ID"               (Title)
+//   service        → "Service"          (Relation → Services DB)
+//   date           → "Date"             (Date)
+//   client         → "Client"           (Relation → Client DB)
+//   numGuests      → "Number of Guests" (Number)
+//   names          → "Names"            (Text)
+//   notes          → "Notes"            (Text)
+//   guideId        → "Guia"             (Relation → Team DB)
+//   chefId         → "Chef"             (Relation → Team DB)
+//   driverId       → "Driver"           (Relation → Team DB)
+//   expensesClosed → "Expenses Closed"  (Select — empty = open, any value = closed)
 
 export type Tour = {
   id: string;
@@ -142,6 +144,14 @@ export type Tour = {
   phoneNumber: string;
   notes: string;
   status: string;
+  // Team
+  guideId: string | null;
+  guideName: string;
+  chefId: string | null;
+  chefName: string;
+  driverId: string | null;
+  driverName: string;
+  // kept for backward-compat with guide-filter queries
   teamId: string | null;
   expensesClosed: boolean;
 };
@@ -149,11 +159,13 @@ export type Tour = {
 function mapTour(page: PageObjectResponse): Tour {
   const serviceIds = relation(getProp(page, "Service"));
   const clientIds  = relation(getProp(page, "Client"));
-  const teamIds    = relation(getProp(page, "🧑🏼‍🍳 Team"));
+  const guideIds   = relation(getProp(page, "Guia"));
+  const chefIds    = relation(getProp(page, "Chef"));
+  const driverIds  = relation(getProp(page, "Driver"));
   return {
     id:              page.id,
     saleId:          text(getProp(page, "ID")),
-    service:         serviceIds[0] ?? "",   // Relation ID; resolved to name in UI layer
+    service:         serviceIds[0] ?? "",
     serviceName:     "",
     type:            text(getProp(page, "Type")),
     date:            dateStr(getProp(page, "Date")),
@@ -164,7 +176,13 @@ function mapTour(page: PageObjectResponse): Tour {
     phoneNumber:     text(getProp(page, "Phone Number")),
     notes:           text(getProp(page, "Notes")),
     status:          text(getProp(page, "Status")),
-    teamId:          teamIds[0] ?? null,
+    guideId:         guideIds[0]  ?? null,
+    guideName:       "",
+    chefId:          chefIds[0]   ?? null,
+    chefName:        "",
+    driverId:        driverIds[0] ?? null,
+    driverName:      "",
+    teamId:          guideIds[0]  ?? null, // backward-compat
     expensesClosed:  text(getProp(page, "Expenses Closed")) === "Closed",
   };
 }
@@ -173,7 +191,10 @@ async function resolveRelationNames(tours: Tour[]): Promise<Tour[]> {
   const allIds = [...new Set([
     ...tours.map((t) => t.service),
     ...tours.map((t) => t.client),
-  ].filter(Boolean))];
+    ...tours.map((t) => t.guideId),
+    ...tours.map((t) => t.chefId),
+    ...tours.map((t) => t.driverId),
+  ].filter(Boolean) as string[])];
   if (!allIds.length) return tours;
   const map: Record<string, string> = {};
   await Promise.all(
@@ -186,9 +207,28 @@ async function resolveRelationNames(tours: Tour[]): Promise<Tour[]> {
   );
   return tours.map((t) => ({
     ...t,
-    serviceName: map[t.service] ?? "",
-    clientName:  map[t.client]  ?? "",
+    serviceName: map[t.service]   ?? "",
+    clientName:  map[t.client]    ?? "",
+    guideName:   map[t.guideId!]  ?? "",
+    chefName:    map[t.chefId!]   ?? "",
+    driverName:  map[t.driverId!] ?? "",
   }));
+}
+
+export async function updateTourTeam(
+  tourId: string,
+  guideId: string | null,
+  chefId: string | null,
+  driverId: string | null,
+): Promise<void> {
+  await notion.pages.update({
+    page_id: tourId,
+    properties: {
+      Guia:   { relation: guideId  ? [{ id: guideId  }] : [] },
+      Chef:   { relation: chefId   ? [{ id: chefId   }] : [] },
+      Driver: { relation: driverId ? [{ id: driverId }] : [] },
+    } as Parameters<typeof notion.pages.update>[0]["properties"],
+  });
 }
 
 export async function getToursForGuide(email: string): Promise<Tour[]> {
@@ -202,7 +242,7 @@ export async function getToursForGuide(email: string): Promise<Tour[]> {
     database_id: TOURS_DB,
     filter: {
       and: [
-        { property: "🧑🏼‍🍳 Team", relation: { contains: member.id } },
+        { property: "Guia", relation: { contains: member.id } },
         { property: "Date", date: { on_or_after: today.toISOString() } },
         { property: "Expenses Closed", select: { does_not_equal: "Closed" } },
       ],
@@ -223,7 +263,7 @@ export async function getPastToursForGuide(email: string): Promise<Tour[]> {
     database_id: TOURS_DB,
     filter: {
       and: [
-        { property: "🧑🏼‍🍳 Team", relation: { contains: member.id } },
+        { property: "Guia", relation: { contains: member.id } },
         { property: "Date", date: { before: today.toISOString() } },
       ],
     },

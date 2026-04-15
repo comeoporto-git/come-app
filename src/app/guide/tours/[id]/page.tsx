@@ -1,10 +1,11 @@
 import { auth } from "@/lib/auth";
-import { getTourById, getTransactionsForTour, getFornecedores, getTeamMemberById } from "@/lib/notion";
+import { getTourById, getTransactionsForTour, getFornecedores, getTeamMembers } from "@/lib/notion";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { closeTourAction } from "@/actions/transactions";
 import { ExpenseList } from "@/components/ExpenseList";
 import { AddExpenseButton } from "@/components/AddExpenseButton";
+import { TeamPicker } from "@/components/TeamPicker";
 
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
@@ -18,25 +19,26 @@ function formatDate(iso: string | null): string {
   });
 }
 
-
 export default async function TourDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
   if (!session) redirect("/login");
 
   const { id } = await params;
-  const [tour, transactions, fornecedores] = await Promise.all([
+  const canEditTeam = session.user.role === "Super Guide" || session.user.role === "Admin";
+
+  const [tour, transactions, fornecedores, teamMembers] = await Promise.all([
     getTourById(id),
     getTransactionsForTour(id),
     getFornecedores(),
+    canEditTeam ? getTeamMembers() : Promise.resolve([]),
   ]);
-
-  const teamMember = tour?.teamId ? await getTeamMemberById(tour.teamId) : null;
 
   if (!tour) notFound();
 
   const totalSpent = transactions.reduce((s, t) => s + t.totalCost, 0);
   const isClosed = tour.expensesClosed;
-  const backHref = session.user.role === "Admin" ? "/admin/tours" : "/guide";
+  const backHref =
+    session.user.role === "Admin" ? "/admin/tours" : "/guide";
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
@@ -59,7 +61,7 @@ export default async function TourDetailPage({ params }: { params: Promise<{ id:
       </header>
 
       <main className="max-w-lg mx-auto px-4 py-5 space-y-5">
-        {/* Guest Info */}
+        {/* Group Info */}
         <section className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="px-4 py-3 border-b border-gray-50">
             <h2 className="text-sm font-semibold text-gray-700">Informação do Grupo</h2>
@@ -80,26 +82,16 @@ export default async function TourDetailPage({ params }: { params: Promise<{ id:
               )}
             </div>
 
-            {/* Serviço */}
-            <InfoField label="Serviço" value={(tour.serviceName || tour.type) ?? "—"} />
-
-            {/* Cliente */}
-            <InfoField label="Cliente" value={tour.clientName ?? "—"} />
-
-            {/* Nº de Pax */}
+            <InfoField label="Serviço" value={(tour.serviceName || tour.type) || "—"} />
+            <InfoField label="Cliente"  value={tour.clientName || "—"} />
             <InfoField label="Nº de Pax" value={tour.numGuests ? String(tour.numGuests) : "—"} />
-
-            {/* Nomes */}
-            <InfoField label="Nomes" value={tour.names ?? "—"} />
+            <InfoField label="Nomes"    value={tour.names || "—"} />
 
             {/* Contacto */}
             <div>
               <p className="text-xs text-gray-500 mb-1">Contacto</p>
               {tour.phoneNumber ? (
-                <a
-                  href={`tel:${tour.phoneNumber}`}
-                  className="text-sm text-[#667470] font-medium hover:underline"
-                >
+                <a href={`tel:${tour.phoneNumber}`} className="text-sm text-[#667470] font-medium hover:underline">
                   {tour.phoneNumber}
                 </a>
               ) : (
@@ -107,11 +99,34 @@ export default async function TourDetailPage({ params }: { params: Promise<{ id:
               )}
             </div>
 
-            {/* Notas */}
-            <InfoField label="Notas" value={tour.notes ?? "—"} />
+            <InfoField label="Notas" value={tour.notes || "—"} />
+          </div>
+        </section>
 
-            {/* Team */}
-            <InfoField label="Team" value={teamMember?.name ?? "—"} />
+        {/* Team */}
+        <section className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-50">
+            <h2 className="text-sm font-semibold text-gray-700">Equipa</h2>
+          </div>
+          <div className="px-4 py-3">
+            {canEditTeam ? (
+              <TeamPicker
+                tourId={id}
+                guideId={tour.guideId}
+                guideName={tour.guideName}
+                chefId={tour.chefId}
+                chefName={tour.chefName}
+                driverId={tour.driverId}
+                driverName={tour.driverName}
+                teamMembers={teamMembers}
+              />
+            ) : (
+              <div className="space-y-3">
+                <InfoField label="Guia"   value={tour.guideName  || "—"} />
+                <InfoField label="Chef"   value={tour.chefName   || "—"} />
+                <InfoField label="Driver" value={tour.driverName || "—"} />
+              </div>
+            )}
           </div>
         </section>
 

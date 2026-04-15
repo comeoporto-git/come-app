@@ -3,6 +3,7 @@
 import {
   createTransaction,
   updateTransaction,
+  updateTourTeam,
   verifyTransaction,
   archiveTransaction,
   closeTour,
@@ -15,6 +16,20 @@ async function requireAuth() {
   const session = await auth();
   if (!session) throw new Error("Unauthorized");
   return session;
+}
+
+export async function updateTourTeamAction(
+  tourId: string,
+  guideId: string | null,
+  chefId: string | null,
+  driverId: string | null,
+): Promise<void> {
+  const session = await requireAuth();
+  if (session.user.role !== "Super Guide" && session.user.role !== "Admin") {
+    throw new Error("Forbidden");
+  }
+  await updateTourTeam(tourId, guideId, chefId, driverId);
+  revalidatePath(`/guide/tours/${tourId}`);
 }
 
 export async function markInvoiceCollectedAction(
