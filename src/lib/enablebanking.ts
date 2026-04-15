@@ -13,26 +13,33 @@ export const EB_REDIRECT_URL =
 
 /** Normalise a PEM key that may have been mangled by env-var storage */
 function normalisePem(raw: string): string {
-  // 1. Replace literal \n (Vercel / dotenv single-line storage)
-  let pem = raw.replace(/\\n/g, "\n").trim();
+  // 1. Replace literal \n and \r\n (Vercel / dotenv single-line storage)
+  let pem = raw
+    .replace(/\\r\\n/g, "\n")
+    .replace(/\\n/g, "\n")
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .trim();
 
-  // 2. If the base64 body ended up on one line (no internal newlines),
-  //    re-wrap it at 64 chars so OpenSSL can decode it.
+  // 2. Strip ALL whitespace from the base64 body and re-wrap at 64 chars.
+  //    This fixes every variant: no newlines, wrong-length lines, CRLF, etc.
   const m = pem.match(/^(-----BEGIN [^-]+-----)([\s\S]*?)(-----END [^-]+-----)$/);
   if (m) {
     const header = m[1];
-    const body   = m[2].replace(/\s+/g, ""); // strip ALL whitespace from body
+    const body   = m[2].replace(/[\s=]/g, ""); // strip whitespace (keep base64 chars)
     const footer = m[3];
-    if (body.length > 0) {
-      const wrapped = body.match(/.{1,64}/g)!.join("\n");
-      pem = `${header}\n${wrapped}\n${footer}`;
-    }
+    // re-add = padding if stripped
+    const padded = body + "=".repeat((4 - (body.length % 4)) % 4);
+    const wrapped = padded.match(/.{1,64}/g)!.join("\n");
+    pem = `${header}\n${wrapped}\n${footer}`;
   }
   return pem;
 }
 
 async function jwt(): Promise<string> {
   const pem = normalisePem(PRIVATE_KEY);
+  // Log first line so we can confirm the PEM type in server logs
+  console.log("[EnableBanking] PEM header:", pem.split("\n")[0]);
   // createPrivateKey accepts both PKCS#1 (BEGIN RSA PRIVATE KEY) and
   // PKCS#8 (BEGIN PRIVATE KEY) — no need to pre-convert the downloaded key
   const key = createPrivateKey(pem);
