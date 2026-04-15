@@ -4,6 +4,7 @@ import "./globals.css";
 import { SessionProvider } from "next-auth/react";
 import { auth } from "@/lib/auth";
 import Script from "next/script";
+import { InstallPrompt } from "@/components/InstallPrompt";
 
 const montserrat = Montserrat({
   variable: "--font-montserrat",
@@ -35,7 +36,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
       <body className="min-h-full flex flex-col bg-[#667470] text-[#32373c]" style={{ fontFamily: "var(--font-montserrat), sans-serif" }}>
-        <SessionProvider session={session}>{children}</SessionProvider>
+        <SessionProvider session={session}>
+          {children}
+          <InstallPrompt />
+        </SessionProvider>
         <Script id="register-sw" strategy="afterInteractive">{`
           if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/sw.js');
