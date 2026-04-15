@@ -1,4 +1,5 @@
-import { SignJWT, importPKCS8 } from "jose";
+import { SignJWT } from "jose";
+import { createPrivateKey } from "node:crypto";
 import { getDb } from "@/lib/db";
 
 const APP_ID        = process.env.ENABLEBANKING_APP_ID!;
@@ -13,7 +14,9 @@ export const EB_REDIRECT_URL =
 async function jwt(): Promise<string> {
   // Vercel stores env vars with literal \n — restore real newlines for PEM parsing
   const pem = PRIVATE_KEY.replace(/\\n/g, "\n");
-  const key = await importPKCS8(pem, "RS256");
+  // createPrivateKey accepts both PKCS#1 (BEGIN RSA PRIVATE KEY) and
+  // PKCS#8 (BEGIN PRIVATE KEY) — no need to pre-convert the downloaded key
+  const key = createPrivateKey(pem);
   return new SignJWT({})
     .setProtectedHeader({ alg: "RS256", kid: APP_ID })
     .setIssuer("enablebanking.com")
