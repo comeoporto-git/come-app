@@ -504,6 +504,9 @@ export async function createTransaction(
       ...(data.bankReference
         ? { "ID do Banco": { rich_text: [{ text: { content: data.bankReference } }] } }
         : {}),
+      ...(data.precisaDeFatura
+        ? { "Precisa de Fatura": { select: { name: data.precisaDeFatura } } }
+        : {}),
     },
   });
   return page.id;
@@ -569,6 +572,16 @@ export type Fornecedor = {
   id: string;
   name: string;
 };
+
+export async function createFornecedor(name: string): Promise<Fornecedor> {
+  const page = await notion.pages.create({
+    parent: { database_id: FORNECEDORES_DB },
+    properties: {
+      Name: { title: [{ text: { content: name.trim() } }] },
+    },
+  });
+  return { id: page.id, name: name.trim() };
+}
 
 export async function getFornecedores(): Promise<Fornecedor[]> {
   const res = await notion.databases.query({

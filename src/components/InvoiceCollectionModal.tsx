@@ -3,7 +3,7 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { analyzeInvoice, type InvoiceData } from "@/actions/invoice";
-import { markInvoiceCollectedAction } from "@/actions/transactions";
+import { markInvoiceCollectedAction, createFornecedorAction } from "@/actions/transactions";
 import type { Transaction, Fornecedor } from "@/lib/notion";
 
 type Step = "capture" | "scanning" | "review";
@@ -21,7 +21,7 @@ const EMPTY_FORM: InvoiceData = {
 
 export function InvoiceCollectionModal({
   transaction,
-  fornecedores = [],
+  fornecedores: initialFornecedores = [],
   onClose,
 }: {
   transaction: Transaction;
@@ -33,6 +33,19 @@ export function InvoiceCollectionModal({
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
+
+  const [fornecedores, setFornecedores] = useState<Fornecedor[]>(initialFornecedores);
+  // Pre-select existing fornecedor if the transaction already has one
+  const [selectedFornecedorId, setSelectedFornecedorId] = useState<string>(
+    transaction.fornecedorId ?? ""
+  );
+  const [fornecedorQuery, setFornecedorQuery] = useState(
+    initialFornecedores.find((f) => f.id === transaction.fornecedorId)?.name ??
+    transaction.supplier ??
+    ""
+  );
+  const [showFornecedorList, setShowFornecedorList] = useState(false);
+  const [creatingFornecedor, setCreatingFornecedor] = useState(false);
 
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imageDataUrl, setImageDataUrl] = useState("");
@@ -72,6 +85,14 @@ export function InvoiceCollectionModal({
           fornecedores.map((f) => f.name)
         );
         setForm((f) => ({ ...f, ...result }));
+        // If AI recognised a supplier that matches a known fornecedor, pre-select it
+        const matched = fornecedores.find(
+          (f) => f.name.toLowerCase() === result.supplier?.toLowerCase()
+        );
+        if (matched) {
+          setSelectedFornecedorId(matched.id);
+          setFornecedorQuery(matched.name);
+        }
       } catch {
         setError("Não foi possível analisar a imagem. Podes preencher manualmente.");
       } finally {
@@ -95,6 +116,33 @@ export function InvoiceCollectionModal({
     });
   }
 
+  // Fornecedor picker helpers
+  const filteredFornecedores = fornecedorQuery.length > 0
+    ? fornecedores.filter((f) => f.name.toLowerCase().includes(fornecedorQuery.toLowerCase()))
+    : fornecedores;
+  const exactMatch = fornecedores.some(
+    (f) => f.name.toLowerCase() === fornecedorQuery.toLowerCase()
+  );
+  const showCreateOption = fornecedorQuery.trim().length > 1 && !exactMatch;
+
+  function selectFornecedor(f: Fornecedor) {
+    setSelectedFornecedorId(f.id);
+    setFornecedorQuery(f.name);
+    setShowFornecedorList(false);
+  }
+
+  async function handleCreateFornecedor() {
+    if (!fornecedorQuery.trim()) return;
+    setCreatingFornecedor(true);
+    try {
+      const newF = await createFornecedorAction(fornecedorQuery.trim());
+      setFornecedores((prev) => [...prev, newF].sort((a, b) => a.name.localeCompare(b.name)));
+      selectFornecedor(newF);
+    } finally {
+      setCreatingFornecedor(false);
+    }
+  }
+
   async function handleConfirm() {
     setSaving(true);
     setError("");
@@ -114,6 +162,7 @@ export function InvoiceCollectionModal({
         iva23: form.iva23,
         totalCost: form.totalCost,
         invoiceImageUrl,
+        fornecedorId: selectedFornecedorId || null,
       });
       router.refresh();
       onClose();
@@ -222,6 +271,63 @@ export function InvoiceCollectionModal({
 
               {/* Form */}
               <div className="space-y-3">
+
+                {/* Fornecedor picker */}
+                <Field label="Fornecedor">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={fornecedorQuery}
+                      onChange={(e) => {
+                        setFornecedorQuery(e.target.value);
+                        setSelectedFornecedorId("");
+                        setShowFornecedorList(true);
+                      }}
+                      onFocus={() => setShowFornecedorList(true)}
+                      onBlur={() => setTimeout(() => setShowFornecedorList(false), 200)}
+                      placeholder="Pesquisar ou criar fornecedor…"
+                      className="input pr-8"
+                      autoComplete="off"
+                    />
+                    {fornecedorQuery && (
+                      <button
+                        type="button"
+                        onMouseDown={(e) => { e.preventDefault(); setFornecedorQuery(""); setSelectedFornecedorId(""); }}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-500 text-lg leading-none"
+                      >
+                        ×
+                      </button>
+                    )}
+                    {showFornecedorList && (filteredFornecedores.length > 0 || showCreateOption) && (
+                      <ul className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-44 overflow-y-auto">
+                        {filteredFornecedores.map((f) => (
+                          <li key={f.id}>
+                            <button
+                              type="button"
+                              onMouseDown={() => selectFornecedor(f)}
+                              className="w-full text-left px-3 py-2.5 text-sm text-[#32373c] hover:bg-[#667470]/10 transition-colors first:rounded-t-xl last:rounded-b-xl"
+                            >
+                              {f.name}
+                            </button>
+                          </li>
+                        ))}
+                        {showCreateOption && (
+                          <li>
+                            <button
+                              type="button"
+                              onMouseDown={handleCreateFornecedor}
+                              disabled={creatingFornecedor}
+                              className="w-full text-left px-3 py-2.5 text-sm text-[#667470] font-semibold hover:bg-[#667470]/10 transition-colors border-t border-gray-100 first:border-t-0 last:rounded-b-xl disabled:opacity-50"
+                            >
+                              {creatingFornecedor ? "A criar…" : `+ Criar "${fornecedorQuery.trim()}"`}
+                            </button>
+                          </li>
+                        )}
+                      </ul>
+                    )}
+                  </div>
+                </Field>
+
                 <Field label="Nº Fatura">
                   <input
                     type="text"

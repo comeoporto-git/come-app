@@ -7,8 +7,9 @@ import {
   verifyTransaction,
   archiveTransaction,
   closeTour,
+  createFornecedor,
 } from "@/lib/notion";
-import type { Transaction } from "@/lib/notion";
+import type { Transaction, Fornecedor } from "@/lib/notion";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 
@@ -32,6 +33,11 @@ export async function updateTourTeamAction(
   revalidatePath(`/guide/tours/${tourId}`);
 }
 
+export async function createFornecedorAction(name: string): Promise<Fornecedor> {
+  await requireAuth();
+  return createFornecedor(name);
+}
+
 export async function markInvoiceCollectedAction(
   transactionId: string,
   data: {
@@ -42,14 +48,17 @@ export async function markInvoiceCollectedAction(
     iva23: number;
     totalCost: number;
     invoiceImageUrl?: string;
+    fornecedorId?: string | null;
   }
 ): Promise<void> {
   const session = await requireAuth();
   if (session.user.role !== "Super Guide" && session.user.role !== "Admin") {
     throw new Error("Forbidden");
   }
+  const { fornecedorId, ...rest } = data;
   await updateTransaction(transactionId, {
-    ...data,
+    ...rest,
+    ...(fornecedorId !== undefined ? { fornecedorId } : {}),
     precisaDeFatura: "Sim tratado",
     status: data.invoiceId ? "Paid" : "Pending Receipt",
   });

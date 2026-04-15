@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react";
 import { analyzeInvoice, submitAiCorrection, type InvoiceData } from "@/actions/invoice";
-import { logExpenseAction, finishPendingExpenseAction } from "@/actions/transactions";
+import { logExpenseAction, finishPendingExpenseAction, createFornecedorAction } from "@/actions/transactions";
 import type { Transaction, Fornecedor } from "@/lib/notion";
 import { useRouter } from "next/navigation";
 
@@ -22,20 +22,30 @@ const EMPTY_FORM: InvoiceData = {
 export function AddExpenseModal({
   tourId,
   pendingTransaction,
-  fornecedores = [],
+  fornecedores: initialFornecedores = [],
+  userRole = "Guide",
   onClose,
 }: {
   tourId: string;
   pendingTransaction?: Transaction;
   fornecedores?: Fornecedor[];
+  userRole?: string;
   onClose: () => void;
 }) {
   const router = useRouter();
+  const isSuperGuide = userRole === "Super Guide" || userRole === "Admin";
+
   const [mode, setMode] = useState<Mode>(pendingTransaction ? "scan" : "choose");
   const [scanning, setScanning] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState<"Cartão Comum" | "Pelo Guia">("Cartão Comum");
+  const [paymentMethod, setPaymentMethod] = useState<"Cartão COME" | "Pelo Guia">(
+    isSuperGuide ? "Cartão COME" : "Pelo Guia"
+  );
+  const [needsInvoice, setNeedsInvoice] = useState(false);
+
+  // Local fornecedor list (grows if user creates a new one)
+  const [fornecedores, setFornecedores] = useState<Fornecedor[]>(initialFornecedores);
 
   // AI flow state
   const [imageBase64, setImageBase64] = useState("");
@@ -52,9 +62,8 @@ export function AddExpenseModal({
     if (!file) return;
     setImageFile(file);
 
-    // PDFs can't be analysed by the vision model — skip AI and go straight to manual
     if (file.type === "application/pdf") {
-      setImageDataUrl(""); // no preview for PDFs
+      setImageDataUrl("");
       setImageBase64("");
       setError("");
       setMode("manual");
@@ -88,7 +97,6 @@ export function AddExpenseModal({
   function update(field: keyof InvoiceData, value: string | number) {
     setForm((f) => {
       const updated = { ...f, [field]: value };
-      // Auto-recalculate total
       if (["taxFree", "iva6", "iva13", "iva23"].includes(field as string)) {
         updated.totalCost =
           Number(updated.taxFree) +
@@ -100,11 +108,16 @@ export function AddExpenseModal({
     });
   }
 
+  async function handleCreateFornecedor(name: string): Promise<Fornecedor> {
+    const newF = await createFornecedorAction(name);
+    setFornecedores((prev) => [...prev, newF].sort((a, b) => a.name.localeCompare(b.name)));
+    return newF;
+  }
+
   async function handleSave() {
     setSaving(true);
     setError("");
     try {
-      // Upload invoice image to Vercel Blob if we have one
       let invoiceImageUrl: string | undefined;
       if (imageFile) {
         const fd = new FormData();
@@ -116,13 +129,11 @@ export function AddExpenseModal({
         }
       }
 
-      // Save AI correction if user reviewed AI output
       if (aiResult && mode === "review") {
         await submitAiCorrection(imageDataUrl, aiResult, form);
       }
 
       if (pendingTransaction) {
-        // Finishing a pending receipt
         await finishPendingExpenseAction(
           pendingTransaction.id,
           form.invoiceId,
@@ -135,7 +146,6 @@ export function AddExpenseModal({
           invoiceImageUrl,
         );
       } else {
-        // Find the Fornecedor ID by matching the selected name
         const selectedFornecedor = fornecedores.find(
           (f) => f.name.toLowerCase() === form.supplier.toLowerCase()
         );
@@ -155,6 +165,7 @@ export function AddExpenseModal({
           tourId,
           bankReference: "",
           invoiceImageUrl,
+          precisaDeFatura: needsInvoice ? "Sim" : undefined,
         });
       }
       router.refresh();
@@ -189,6 +200,7 @@ export function AddExpenseModal({
         status: "Pending Receipt",
         tourId,
         bankReference: "",
+        precisaDeFatura: needsInvoice ? "Sim" : undefined,
       });
       router.refresh();
       onClose();
@@ -251,7 +263,6 @@ export function AddExpenseModal({
                 </div>
               ) : (
                 <>
-                  {/* Hidden inputs — camera and file picker */}
                   <input
                     ref={cameraRef}
                     type="file"
@@ -339,8 +350,14 @@ export function AddExpenseModal({
                 </>
               )}
 
-              <InvoiceForm form={form} update={update} fornecedores={fornecedores} />
+              <InvoiceForm
+                form={form}
+                update={update}
+                fornecedores={fornecedores}
+                onCreateFornecedor={handleCreateFornecedor}
+              />
 
+              {/* Payment method — Cartão COME only for Super Guide / Admin */}
               <div>
                 <label className="text-xs text-gray-500 mb-1 block">Método de Pagamento</label>
                 <select
@@ -348,10 +365,31 @@ export function AddExpenseModal({
                   onChange={(e) => setPaymentMethod(e.target.value as typeof paymentMethod)}
                   className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
                 >
-                  <option value="Cartão Comum">Cartão Comum</option>
+                  {isSuperGuide && <option value="Cartão COME">Cartão COME</option>}
                   <option value="Pelo Guia">Pelo Guia</option>
                 </select>
               </div>
+
+              {/* Needs Invoice checkbox */}
+              {!pendingTransaction && (
+                <label className="flex items-center gap-3 cursor-pointer select-none">
+                  <div
+                    onClick={() => setNeedsInvoice((v) => !v)}
+                    className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+                      needsInvoice
+                        ? "bg-[#667470] border-[#667470]"
+                        : "border-gray-300 bg-white"
+                    }`}
+                  >
+                    {needsInvoice && (
+                      <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="none">
+                        <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    )}
+                  </div>
+                  <span className="text-sm text-gray-700">Precisa de Fatura</span>
+                </label>
+              )}
 
               <div className="grid grid-cols-2 gap-3 pt-2">
                 {mode === "manual" && (
@@ -390,13 +428,16 @@ function InvoiceForm({
   form,
   update,
   fornecedores,
+  onCreateFornecedor,
 }: {
   form: InvoiceData;
   update: (field: keyof InvoiceData, value: string | number) => void;
   fornecedores: Fornecedor[];
+  onCreateFornecedor: (name: string) => Promise<Fornecedor>;
 }) {
   const [query, setQuery] = useState("");
   const [showList, setShowList] = useState(false);
+  const [creating, setCreating] = useState(false);
 
   const filtered = query.length > 0
     ? fornecedores.filter((f) =>
@@ -404,10 +445,27 @@ function InvoiceForm({
       )
     : fornecedores;
 
+  // Check if typed name exactly matches an existing fornecedor
+  const exactMatch = fornecedores.some(
+    (f) => f.name.toLowerCase() === query.toLowerCase()
+  );
+  const showCreateOption = query.trim().length > 1 && !exactMatch;
+
   function selectFornecedor(name: string) {
     update("supplier", name);
     setQuery(name);
     setShowList(false);
+  }
+
+  async function handleCreate() {
+    if (!query.trim()) return;
+    setCreating(true);
+    try {
+      const newF = await onCreateFornecedor(query.trim());
+      selectFornecedor(newF.name);
+    } finally {
+      setCreating(false);
+    }
   }
 
   return (
@@ -423,7 +481,7 @@ function InvoiceForm({
               setShowList(true);
             }}
             onFocus={() => setShowList(true)}
-            onBlur={() => setTimeout(() => setShowList(false), 150)}
+            onBlur={() => setTimeout(() => setShowList(false), 200)}
             placeholder="Pesquisar fornecedor…"
             className="input pr-8"
             autoComplete="off"
@@ -437,7 +495,7 @@ function InvoiceForm({
               ×
             </button>
           )}
-          {showList && filtered.length > 0 && (
+          {showList && (filtered.length > 0 || showCreateOption) && (
             <ul className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
               {filtered.map((f) => (
                 <li key={f.id}>
@@ -450,6 +508,18 @@ function InvoiceForm({
                   </button>
                 </li>
               ))}
+              {showCreateOption && (
+                <li>
+                  <button
+                    type="button"
+                    onMouseDown={handleCreate}
+                    disabled={creating}
+                    className="w-full text-left px-3 py-2.5 text-sm text-[#667470] font-semibold hover:bg-[#667470]/10 transition-colors border-t border-gray-100 first:border-t-0 last:rounded-b-xl disabled:opacity-50"
+                  >
+                    {creating ? "A criar…" : `+ Criar "${query.trim()}"`}
+                  </button>
+                </li>
+              )}
             </ul>
           )}
         </div>

@@ -154,7 +154,7 @@ export default async function TourDetailPage({ params }: { params: Promise<{ id:
                 €{totalSpent.toFixed(2)}
               </span>
             </h2>
-            {!isClosed && <AddExpenseButton tourId={id} fornecedores={fornecedores} />}
+            {!isClosed && <AddExpenseButton tourId={id} fornecedores={fornecedores} userRole={session.user.role} />}
           </div>
           <ExpenseList transactions={transactions} tourId={id} isClosed={isClosed} fornecedores={fornecedores} />
         </section>

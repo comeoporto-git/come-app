@@ -7,9 +7,11 @@ import type { Fornecedor } from "@/lib/notion";
 export function AddExpenseButton({
   tourId,
   fornecedores,
+  userRole,
 }: {
   tourId: string;
   fornecedores: Fornecedor[];
+  userRole: string;
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -24,6 +26,7 @@ export function AddExpenseButton({
         <AddExpenseModal
           tourId={tourId}
           fornecedores={fornecedores}
+          userRole={userRole}
           onClose={() => setOpen(false)}
         />
       )}

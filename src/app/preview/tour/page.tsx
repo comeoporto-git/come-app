@@ -75,7 +75,7 @@ export default function PreviewTourPage() {
             <h2 className="text-sm font-semibold text-[#32373c]">
               Despesas <span className="text-gray-400 font-normal">€47.80</span>
             </h2>
-            <AddExpenseButton tourId="preview-tour" fornecedores={MOCK_FORNECEDORES} />
+            <AddExpenseButton tourId="preview-tour" fornecedores={MOCK_FORNECEDORES} userRole="Super Guide" />
           </div>
 
           <ul className="space-y-2">
