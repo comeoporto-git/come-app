@@ -44,6 +44,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/sw.js');
           }
+          // Capture beforeinstallprompt early, before React hydrates
+          window.__pwaPrompt = null;
+          window.addEventListener('beforeinstallprompt', function(e) {
+            e.preventDefault();
+            window.__pwaPrompt = e;
+            window.dispatchEvent(new Event('pwa-prompt-ready'));
+          });
         `}</Script>
       </body>
     </html>

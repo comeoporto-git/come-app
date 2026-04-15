@@ -37,16 +37,35 @@ export function InstallPrompt() {
       return;
     }
 
+    // Check if the prompt was captured early (before React hydrated)
+    const win = window as typeof window & { __pwaPrompt?: BeforeInstallPromptEvent };
+    if (win.__pwaPrompt) {
+      setDeferredPrompt(win.__pwaPrompt);
+      setHidden(false);
+      return;
+    }
+
+    // Otherwise listen for it now
     const handler = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e as BeforeInstallPromptEvent);
       setHidden(false);
     };
+    const readyHandler = () => {
+      if (win.__pwaPrompt) {
+        setDeferredPrompt(win.__pwaPrompt);
+        setHidden(false);
+      }
+    };
 
     window.addEventListener("beforeinstallprompt", handler);
+    window.addEventListener("pwa-prompt-ready", readyHandler);
     window.addEventListener("appinstalled", () => setHidden(true));
 
-    return () => window.removeEventListener("beforeinstallprompt", handler);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handler);
+      window.removeEventListener("pwa-prompt-ready", readyHandler);
+    };
   }, []);
 
   function dismiss() {
