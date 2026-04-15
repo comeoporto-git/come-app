@@ -30,7 +30,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="pt" className={`${montserrat.variable} h-full antialiased`}>
       <head>
-        <link rel="apple-touch-icon" href="/icon-192x192.png" />
+        <link rel="apple-touch-icon" sizes="192x192" href="/icon-192x192.png" />
+        <link rel="apple-touch-icon" sizes="512x512" href="/icon-512x512.png" />
+        <meta name="mobile-web-app-capable" content="yes" />
       </head>
       <body className="min-h-full flex flex-col bg-[#667470] text-[#32373c]" style={{ fontFamily: "var(--font-montserrat), sans-serif" }}>
         <SessionProvider session={session}>{children}</SessionProvider>
