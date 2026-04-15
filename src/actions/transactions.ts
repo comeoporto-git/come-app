@@ -38,7 +38,7 @@ export async function markInvoiceCollectedAction(
     precisaDeFatura: "Sim tratado",
     status: data.invoiceId ? "Paid" : "Pending Receipt",
   });
-  revalidatePath("/super-guide");
+  revalidatePath("/super-guide/invoices");
 }
 
 export async function logExpenseAction(

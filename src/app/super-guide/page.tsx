@@ -1,26 +1,20 @@
 import { auth } from "@/lib/auth";
-import {
-  getTransactionsNeedingInvoice,
-  getTransactionsTreated,
-  getFornecedores,
-} from "@/lib/notion";
+import { getTransactionsNeedingInvoice } from "@/lib/notion";
 import { redirect } from "next/navigation";
 import { signOut } from "@/lib/auth";
 import Image from "next/image";
-import { InvoiceQueue } from "@/components/InvoiceQueue";
+import Link from "next/link";
 
-export default async function SuperGuidePage() {
+export default async function SuperGuideDashboard() {
   const session = await auth();
   if (!session) redirect("/login");
   if (session.user.role !== "Super Guide" && session.user.role !== "Admin") {
     redirect("/");
   }
 
-  const [needingInvoice, treated, fornecedores] = await Promise.all([
-    getTransactionsNeedingInvoice(),
-    getTransactionsTreated(),
-    getFornecedores(),
-  ]);
+  // Fetch pending invoice count for the badge
+  const needingInvoice = await getTransactionsNeedingInvoice();
+  const pendingCount = needingInvoice.length;
 
   return (
     <div className="min-h-screen bg-[#667470]">
@@ -53,19 +47,37 @@ export default async function SuperGuidePage() {
         </div>
       </header>
 
-      <main className="max-w-lg mx-auto px-4 py-8">
-        <div className="mb-6">
-          <h1 className="text-white font-bold text-lg">Faturas em Falta</h1>
-          <p className="text-white/60 text-sm mt-1">
-            Despesas que precisam de fatura
-          </p>
-        </div>
+      <main className="max-w-lg mx-auto px-4 py-10 space-y-4">
+        {/* Tours */}
+        <Link href="/guide">
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex items-center gap-5 hover:shadow-md active:scale-[0.98] transition-all cursor-pointer">
+            <div className="w-14 h-14 rounded-2xl bg-[#667470]/10 flex items-center justify-center text-3xl shrink-0">
+              🗓️
+            </div>
+            <div>
+              <p className="font-bold text-[#32373c] text-base">Tours</p>
+              <p className="text-sm text-gray-400 mt-0.5">Ver os teus tours agendados</p>
+            </div>
+          </div>
+        </Link>
 
-        <InvoiceQueue
-          needingInvoice={needingInvoice}
-          treated={treated}
-          fornecedores={fornecedores}
-        />
+        {/* Faturas em Falta */}
+        <Link href="/super-guide/invoices">
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex items-center gap-5 hover:shadow-md active:scale-[0.98] transition-all cursor-pointer">
+            <div className="w-14 h-14 rounded-2xl bg-orange-50 flex items-center justify-center text-3xl shrink-0">
+              🧾
+            </div>
+            <div className="flex-1">
+              <p className="font-bold text-[#32373c] text-base">Faturas em Falta</p>
+              <p className="text-sm text-gray-400 mt-0.5">Despesas sem fatura associada</p>
+            </div>
+            {pendingCount > 0 && (
+              <span className="bg-red-500 text-white text-xs font-bold px-2.5 py-1 rounded-full shrink-0">
+                {pendingCount}
+              </span>
+            )}
+          </div>
+        </Link>
       </main>
     </div>
   );
