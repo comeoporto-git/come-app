@@ -3,7 +3,6 @@ import { createPrivateKey } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { getDb } from "@/lib/db";
 
-const APP_ID  = process.env.ENABLEBANKING_APP_ID!;
 const BASE_URL = "https://api.enablebanking.com";
 
 /** Load the raw PEM — prefer a file path (local dev), fall back to inline env var */
@@ -13,8 +12,9 @@ function loadPrivateKeyPem(): string {
   return process.env.ENABLEBANKING_PRIVATE_KEY ?? "";
 }
 
-export const EB_REDIRECT_URL =
-  `${process.env.NEXT_PUBLIC_BASE_URL}/api/enablebanking/callback`;
+export function getRedirectUrl() {
+  return `${process.env.NEXT_PUBLIC_BASE_URL}/api/enablebanking/callback`;
+}
 
 // ── JWT ───────────────────────────────────────────────────────────────────────
 
@@ -44,14 +44,15 @@ function normalisePem(raw: string): string {
 }
 
 async function jwt(): Promise<string> {
+  const appId = process.env.ENABLEBANKING_APP_ID!;
   const pem = normalisePem(loadPrivateKeyPem());
   // Log first line so we can confirm the PEM type in server logs
-  console.log("[EnableBanking] PEM header:", pem.split("\n")[0]);
+  console.log("[EnableBanking] APP_ID:", appId, "| PEM header:", pem.split("\n")[0]);
   // createPrivateKey accepts both PKCS#1 (BEGIN RSA PRIVATE KEY) and
   // PKCS#8 (BEGIN PRIVATE KEY) — no need to pre-convert the downloaded key
   const key = createPrivateKey(pem);
   return new SignJWT({})
-    .setProtectedHeader({ alg: "RS256", kid: APP_ID })
+    .setProtectedHeader({ alg: "RS256", kid: appId })
     .setIssuer("enablebanking.com")
     .setAudience("api.enablebanking.com")
     .setIssuedAt()
@@ -96,7 +97,7 @@ export async function createAuthUrl(
   const data = await api<{ url: string }>("POST", "/auth", {
     aspsp: { name: aspspName, country },
     state: crypto.randomUUID(),
-    redirect_url: EB_REDIRECT_URL,
+    redirect_url: getRedirectUrl(),
     access: { valid_until: validUntil },
     psu_type: "business",
   });
