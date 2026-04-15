@@ -101,18 +101,20 @@ export default async function AdminToursPage() {
         </section>
 
         {/* Past */}
-        {pastTours.length > 0 && (
-          <section>
-            <h2 className="text-xs font-bold uppercase tracking-widest text-white/30 mb-3">
-              Anteriores · {pastTours.length}
-            </h2>
+        <section>
+          <h2 className="text-xs font-bold uppercase tracking-widest text-white/30 mb-3">
+            Anteriores{pastTours.length > 0 ? ` · ${pastTours.length}` : ""}
+          </h2>
+          {pastTours.length === 0 ? (
+            <p className="text-sm text-white/30">Sem tours anteriores</p>
+          ) : (
             <ul className="flex flex-col gap-4">
               {pastTours.map((tour) => (
                 <TourCard key={tour.id} tour={tour} guideName={teamMap[tour.teamId ?? ""] ?? "—"} past />
               ))}
             </ul>
-          </section>
-        )}
+          )}
+        </section>
       </main>
     </div>
   );
