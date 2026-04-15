@@ -47,7 +47,7 @@ async function jwt(): Promise<string> {
   const appId = process.env.ENABLEBANKING_APP_ID!;
   const pem = normalisePem(loadPrivateKeyPem());
   // Log first line so we can confirm the PEM type in server logs
-  console.log("[EnableBanking] APP_ID:", appId, "| PEM header:", pem.split("\n")[0]);
+  console.log("[EnableBanking] APP_ID:", JSON.stringify(appId), "| PEM header:", pem.split("\n")[0]);
   // createPrivateKey accepts both PKCS#1 (BEGIN RSA PRIVATE KEY) and
   // PKCS#8 (BEGIN PRIVATE KEY) — no need to pre-convert the downloaded key
   const key = createPrivateKey(pem);
@@ -112,11 +112,13 @@ export async function exchangeCode(code: string): Promise<{
 }> {
   const data = await api<{
     session_id: string;
-    accounts?: { account_id: string; account_servicer?: { name?: string } }[];
+    accounts?: { uid: string; account_id?: unknown; account_servicer?: { name?: string } }[];
     access?: { valid_until?: string };
   }>("POST", "/sessions", { code });
 
-  const accountIds = (data.accounts ?? []).map((a) => a.account_id);
+  // `uid` is the UUID used in API paths (/accounts/{uid}/transactions)
+  // `account_id` is the bank account identifier object (IBAN etc.) — not for API calls
+  const accountIds = (data.accounts ?? []).map((a) => a.uid).filter(Boolean);
   const institutionName =
     data.accounts?.[0]?.account_servicer?.name ?? "Crédito Agrícola";
   const validUntil = data.access?.valid_until ?? null;
