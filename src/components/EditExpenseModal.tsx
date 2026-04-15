@@ -37,6 +37,7 @@ export function EditExpenseModal({
   const [imageDataUrl, setImageDataUrl] = useState("");
   const [lightboxSrc, setLightboxSrc] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState<FormState>({
     supplier: transaction.supplier,
@@ -275,7 +276,23 @@ export function EditExpenseModal({
             {/* Replace receipt photo */}
             <div>
               <label className="text-xs text-gray-500 mb-1 block">Substituir Fatura (opcional)</label>
-              <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleImageChange} capture="environment" />
+              {/* Camera input */}
+              <input
+                ref={cameraRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={handleImageChange}
+                capture="environment"
+              />
+              {/* File/gallery picker */}
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,application/pdf"
+                className="hidden"
+                onChange={handleImageChange}
+              />
               {imageDataUrl ? (
                 <div className="relative">
                   <img
@@ -284,12 +301,28 @@ export function EditExpenseModal({
                     className="w-full max-h-48 object-contain rounded-xl border border-gray-200 cursor-zoom-in"
                     onClick={() => setLightboxSrc(imageDataUrl)}
                   />
-                  <button onClick={() => { setImageDataUrl(""); setImageFile(null); }} className="absolute top-1 right-1 text-xs bg-white border rounded-full px-2 py-0.5 text-gray-500">✕</button>
+                  <button
+                    onClick={() => { setImageDataUrl(""); setImageFile(null); }}
+                    className="absolute top-1 right-1 text-xs bg-white border rounded-full px-2 py-0.5 text-gray-500"
+                  >
+                    ✕
+                  </button>
                 </div>
               ) : (
-                <button onClick={() => fileRef.current?.click()} className="w-full border border-dashed border-gray-300 rounded-xl py-3 text-sm text-gray-400 hover:bg-gray-50">
-                  📷 Tirar/Escolher foto
-                </button>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => cameraRef.current?.click()}
+                    className="flex items-center justify-center gap-2 border border-dashed border-[#667470]/40 rounded-xl py-3 text-sm text-[#667470] bg-[#667470]/5 hover:bg-[#667470]/10 transition-colors font-medium"
+                  >
+                    📷 Tirar Foto
+                  </button>
+                  <button
+                    onClick={() => fileRef.current?.click()}
+                    className="flex items-center justify-center gap-2 border border-dashed border-gray-300 rounded-xl py-3 text-sm text-gray-500 hover:bg-gray-50 transition-colors font-medium"
+                  >
+                    🖼️ Carregar Ficheiro
+                  </button>
+                </div>
               )}
             </div>
 

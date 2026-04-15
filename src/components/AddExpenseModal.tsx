@@ -45,6 +45,7 @@ export function AddExpenseModal({
   const [form, setForm] = useState<InvoiceData>(EMPTY_FORM);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
 
   async function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -239,22 +240,40 @@ export function AddExpenseModal({
                   <p className="text-sm text-gray-500">A analisar com IA…</p>
                 </div>
               ) : (
-                <div
-                  className="border-2 border-dashed border-[#667470]/30 rounded-2xl p-8 text-center cursor-pointer hover:bg-[#667470]/5 transition-colors"
-                  onClick={() => fileRef.current?.click()}
-                >
+                <>
+                  {/* Hidden inputs — camera and file picker */}
                   <input
-                    ref={fileRef}
+                    ref={cameraRef}
                     type="file"
                     accept="image/jpeg,image/png,image/webp"
                     className="hidden"
                     onChange={handleImageChange}
                     capture="environment"
                   />
-                  <div className="text-4xl mb-2">📸</div>
-                  <p className="text-sm font-semibold text-[#667470] font-semibold">Tirar Foto / Escolher Imagem</p>
-                  <p className="text-xs text-gray-400 mt-1">JPEG, PNG ou WebP</p>
-                </div>
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,application/pdf"
+                    className="hidden"
+                    onChange={handleImageChange}
+                  />
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      onClick={() => cameraRef.current?.click()}
+                      className="flex flex-col items-center justify-center gap-2 p-5 rounded-2xl border-2 border-[#667470]/30 bg-[#667470]/5 hover:bg-[#667470]/10 transition-colors"
+                    >
+                      <span className="text-3xl">📷</span>
+                      <span className="text-sm font-semibold text-[#667470]">Tirar Foto</span>
+                    </button>
+                    <button
+                      onClick={() => fileRef.current?.click()}
+                      className="flex flex-col items-center justify-center gap-2 p-5 rounded-2xl border-2 border-gray-200 bg-gray-50 hover:bg-gray-100 transition-colors"
+                    >
+                      <span className="text-3xl">🖼️</span>
+                      <span className="text-sm font-semibold text-gray-700">Carregar Foto/Ficheiro</span>
+                    </button>
+                  </div>
+                </>
               )}
               {!scanning && (
                 <button

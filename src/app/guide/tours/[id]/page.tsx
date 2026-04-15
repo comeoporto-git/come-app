@@ -65,34 +65,53 @@ export default async function TourDetailPage({ params }: { params: Promise<{ id:
             <h2 className="text-sm font-semibold text-gray-700">Informação do Grupo</h2>
           </div>
           <div className="px-4 py-3 space-y-3">
-            {tour.status && (
-              <div>
-                <p className="text-xs text-gray-500 mb-1">Estado</p>
+            {/* Estado */}
+            <div>
+              <p className="text-xs text-gray-500 mb-1">Estado</p>
+              {tour.status ? (
                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                   tour.status === "Confirmed" ? "bg-green-100 text-green-700" :
                   tour.status === "Pending"   ? "bg-yellow-100 text-yellow-700" :
                   tour.status === "Cancelled" ? "bg-red-100 text-red-700" :
                   "bg-gray-100 text-gray-500"
                 }`}>{tour.status}</span>
-              </div>
-            )}
-            {(tour.serviceName || tour.type) && <InfoField label="Serviço" value={tour.serviceName || tour.type} />}
-            {tour.clientName && <InfoField label="Cliente" value={tour.clientName} />}
+              ) : (
+                <p className="text-sm text-gray-800 font-medium">—</p>
+              )}
+            </div>
+
+            {/* Serviço */}
+            <InfoField label="Serviço" value={(tour.serviceName || tour.type) ?? "—"} />
+
+            {/* Cliente */}
+            <InfoField label="Cliente" value={tour.clientName ?? "—"} />
+
+            {/* Nº de Pax */}
             <InfoField label="Nº de Pax" value={tour.numGuests ? String(tour.numGuests) : "—"} />
-            {tour.names && <InfoField label="Nomes" value={tour.names} />}
-            {tour.phoneNumber && (
-              <div>
-                <p className="text-xs text-gray-500 mb-1">Contacto</p>
+
+            {/* Nomes */}
+            <InfoField label="Nomes" value={tour.names ?? "—"} />
+
+            {/* Contacto */}
+            <div>
+              <p className="text-xs text-gray-500 mb-1">Contacto</p>
+              {tour.phoneNumber ? (
                 <a
                   href={`tel:${tour.phoneNumber}`}
                   className="text-sm text-[#667470] font-medium hover:underline"
                 >
                   {tour.phoneNumber}
                 </a>
-              </div>
-            )}
-            {tour.notes && <InfoField label="Notas" value={tour.notes} />}
-            {teamMember && <InfoField label="Team" value={teamMember.name} />}
+              ) : (
+                <p className="text-sm text-gray-800 font-medium">—</p>
+              )}
+            </div>
+
+            {/* Notas */}
+            <InfoField label="Notas" value={tour.notes ?? "—"} />
+
+            {/* Team */}
+            <InfoField label="Team" value={teamMember?.name ?? "—"} />
           </div>
         </section>
 
