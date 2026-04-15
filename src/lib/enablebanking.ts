@@ -11,7 +11,9 @@ export const EB_REDIRECT_URL =
 // ── JWT ───────────────────────────────────────────────────────────────────────
 
 async function jwt(): Promise<string> {
-  const key = await importPKCS8(PRIVATE_KEY, "RS256");
+  // Vercel stores env vars with literal \n — restore real newlines for PEM parsing
+  const pem = PRIVATE_KEY.replace(/\\n/g, "\n");
+  const key = await importPKCS8(pem, "RS256");
   return new SignJWT({})
     .setProtectedHeader({ alg: "RS256", kid: APP_ID })
     .setIssuer("enablebanking.com")
@@ -52,9 +54,9 @@ export async function createAuthUrl(
   aspspName: string,
   country = "PT",
 ): Promise<string> {
-  const validUntil = new Date(
-    Date.now() + 90 * 24 * 60 * 60 * 1000,
-  ).toISOString();
+  const validUntil = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 10); // YYYY-MM-DD — Enable Banking requires date-only format
   const data = await api<{ url: string }>("POST", "/auth", {
     aspsp: { name: aspspName, country },
     state: crypto.randomUUID(),

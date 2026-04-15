@@ -20,6 +20,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(new URL("/admin?bank_connected=1", req.url));
   } catch (err) {
     console.error("[EnableBanking callback]", err);
-    return NextResponse.redirect(new URL("/admin?bank_error=exchange_failed", req.url));
+    const detail = err instanceof Error ? err.message : String(err);
+    return NextResponse.redirect(
+      new URL(`/admin?bank_error=${encodeURIComponent(detail)}`, req.url)
+    );
   }
 }

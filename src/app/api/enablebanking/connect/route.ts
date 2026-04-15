@@ -12,6 +12,9 @@ export async function GET() {
     return NextResponse.redirect(url);
   } catch (err) {
     console.error("[EnableBanking connect]", err);
-    return NextResponse.json({ error: "Failed to create auth URL" }, { status: 500 });
+    const detail = err instanceof Error ? err.message : String(err);
+    const redirectUrl = new URL("/admin", process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000");
+    redirectUrl.searchParams.set("bank_error", detail);
+    return NextResponse.redirect(redirectUrl.toString());
   }
 }
