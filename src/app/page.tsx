@@ -7,6 +7,7 @@ export default async function RootPage() {
 
   const role = session.user?.role;
   if (role === "Guide") redirect("/guide");
+  if (role === "Super Guide") redirect("/super-guide");
   if (role === "Accountant") redirect("/accountant");
   if (role === "Admin") redirect("/admin");
 

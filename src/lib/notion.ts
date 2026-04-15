@@ -76,7 +76,7 @@ export type TeamMember = {
   name: string;
   email: string;
   phone: string;
-  role: "Admin" | "Guide" | "Accountant";
+  role: "Admin" | "Guide" | "Super Guide" | "Accountant";
 };
 
 function mapTeamMember(page: PageObjectResponse): TeamMember {
@@ -317,8 +317,10 @@ export type Transaction = {
   status: string;
   accountantVerified: boolean;
   tourId: string | null;
+  tourName?: string;      // resolved from the Sales relation (saleId)
   bankReference: string;
   invoiceImageUrl?: string;
+  precisaDeFatura?: "Sim" | "Não" | "Sim tratado" | "";
 };
 
 function mapTransaction(page: PageObjectResponse): Transaction {
@@ -344,9 +346,29 @@ function mapTransaction(page: PageObjectResponse): Transaction {
     status:             text(getProp(page, "Status")),
     accountantVerified: bool(getProp(page, "Validado pela Contabilidade")),
     tourId:             tourIds[0] ?? null,
+    tourName:           "",
     bankReference:      text(getProp(page, "ID do Banco")),
     invoiceImageUrl:    fileUrl(getProp(page, "Fatura"), page.id) ?? undefined,
+    precisaDeFatura:    text(getProp(page, "Precisa de Fatura")) as Transaction["precisaDeFatura"],
   };
+}
+
+async function resolveTourNamesForTransactions(transactions: Transaction[]): Promise<Transaction[]> {
+  const uniqueTourIds = [...new Set(transactions.map((t) => t.tourId).filter(Boolean))] as string[];
+  if (!uniqueTourIds.length) return transactions;
+  const tourNameMap: Record<string, string> = {};
+  await Promise.all(
+    uniqueTourIds.map(async (id) => {
+      try {
+        const page = (await notion.pages.retrieve({ page_id: id })) as PageObjectResponse;
+        tourNameMap[id] = text(getProp(page, "ID"));
+      } catch { /* ignore */ }
+    })
+  );
+  return transactions.map((t) => ({
+    ...t,
+    tourName: t.tourId ? (tourNameMap[t.tourId] ?? "") : "",
+  }));
 }
 
 export async function getTransactionsForTour(tourId: string): Promise<Transaction[]> {
@@ -385,6 +407,30 @@ export async function getAccountantTransactions(): Promise<Transaction[]> {
   return (res.results as PageObjectResponse[])
     .map(mapTransaction)
     .filter((t) => !t.supplier.startsWith("IN -"));
+}
+
+export async function getTransactionsNeedingInvoice(): Promise<Transaction[]> {
+  const res = await notion.databases.query({
+    database_id: TRANSACTIONS_DB,
+    filter: { property: "Precisa de Fatura", select: { equals: "Sim" } },
+    sorts: [{ property: "Data", direction: "descending" }],
+    page_size: 100,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any);
+  const transactions = (res.results as PageObjectResponse[]).map(mapTransaction);
+  return resolveTourNamesForTransactions(transactions);
+}
+
+export async function getTransactionsTreated(): Promise<Transaction[]> {
+  const res = await notion.databases.query({
+    database_id: TRANSACTIONS_DB,
+    filter: { property: "Precisa de Fatura", select: { equals: "Sim tratado" } },
+    sorts: [{ property: "Data", direction: "descending" }],
+    page_size: 100,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any);
+  const transactions = (res.results as PageObjectResponse[]).map(mapTransaction);
+  return resolveTourNamesForTransactions(transactions);
 }
 
 export async function createTransaction(
@@ -455,6 +501,10 @@ export async function updateTransaction(
     props["ID do Banco"] = { rich_text: [{ text: { content: data.bankReference } }] };
   if (data.invoiceImageUrl)
     props["Fatura"] = { files: [{ type: "external", name: "invoice", external: { url: data.invoiceImageUrl } }] };
+  if (data.precisaDeFatura !== undefined)
+    props["Precisa de Fatura"] = data.precisaDeFatura
+      ? { select: { name: data.precisaDeFatura } }
+      : { select: null };
 
   await notion.pages.update({
     page_id: pageId,

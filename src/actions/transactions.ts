@@ -17,11 +17,35 @@ async function requireAuth() {
   return session;
 }
 
+export async function markInvoiceCollectedAction(
+  transactionId: string,
+  data: {
+    invoiceId: string;
+    taxFree: number;
+    iva6: number;
+    iva13: number;
+    iva23: number;
+    totalCost: number;
+    invoiceImageUrl?: string;
+  }
+): Promise<void> {
+  const session = await requireAuth();
+  if (session.user.role !== "Super Guide" && session.user.role !== "Admin") {
+    throw new Error("Forbidden");
+  }
+  await updateTransaction(transactionId, {
+    ...data,
+    precisaDeFatura: "Sim tratado",
+    status: data.invoiceId ? "Paid" : "Pending Receipt",
+  });
+  revalidatePath("/super-guide");
+}
+
 export async function logExpenseAction(
   data: Omit<Transaction, "id" | "accountantVerified">
 ): Promise<string> {
   const session = await requireAuth();
-  if (session.user.role !== "Guide" && session.user.role !== "Admin") {
+  if (session.user.role !== "Guide" && session.user.role !== "Admin" && session.user.role !== "Super Guide") {
     throw new Error("Forbidden");
   }
   const id = await createTransaction(data);
@@ -41,7 +65,7 @@ export async function finishPendingExpenseAction(
   invoiceImageUrl?: string,
 ): Promise<void> {
   const session = await requireAuth();
-  if (session.user.role !== "Guide" && session.user.role !== "Admin") {
+  if (session.user.role !== "Guide" && session.user.role !== "Admin" && session.user.role !== "Super Guide") {
     throw new Error("Forbidden");
   }
   await updateTransaction(transactionId, {
@@ -76,7 +100,7 @@ export async function editExpenseAction(
   }
 ): Promise<void> {
   const session = await requireAuth();
-  if (session.user.role !== "Guide" && session.user.role !== "Admin") {
+  if (session.user.role !== "Guide" && session.user.role !== "Admin" && session.user.role !== "Super Guide") {
     throw new Error("Forbidden");
   }
   await updateTransaction(transactionId, {
@@ -98,7 +122,7 @@ export async function editExpenseAction(
 
 export async function closeTourAction(tourId: string): Promise<void> {
   const session = await requireAuth();
-  if (session.user.role !== "Guide" && session.user.role !== "Admin") {
+  if (session.user.role !== "Guide" && session.user.role !== "Admin" && session.user.role !== "Super Guide") {
     throw new Error("Forbidden");
   }
   await closeTour(tourId);
@@ -125,7 +149,7 @@ export async function deleteExpenseAction(
   tourId: string,
 ): Promise<void> {
   const session = await requireAuth();
-  if (session.user.role !== "Guide" && session.user.role !== "Admin") {
+  if (session.user.role !== "Guide" && session.user.role !== "Admin" && session.user.role !== "Super Guide") {
     throw new Error("Forbidden");
   }
   await archiveTransaction(transactionId);

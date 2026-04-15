@@ -1,0 +1,72 @@
+import { auth } from "@/lib/auth";
+import {
+  getTransactionsNeedingInvoice,
+  getTransactionsTreated,
+  getFornecedores,
+} from "@/lib/notion";
+import { redirect } from "next/navigation";
+import { signOut } from "@/lib/auth";
+import Image from "next/image";
+import { InvoiceQueue } from "@/components/InvoiceQueue";
+
+export default async function SuperGuidePage() {
+  const session = await auth();
+  if (!session) redirect("/login");
+  if (session.user.role !== "Super Guide" && session.user.role !== "Admin") {
+    redirect("/");
+  }
+
+  const [needingInvoice, treated, fornecedores] = await Promise.all([
+    getTransactionsNeedingInvoice(),
+    getTransactionsTreated(),
+    getFornecedores(),
+  ]);
+
+  return (
+    <div className="min-h-screen bg-[#667470]">
+      {/* Header */}
+      <header className="bg-[#7b8b87] sticky top-0 z-10">
+        <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
+          <Image
+            src="https://comeoporto.com/wp-content/uploads/2023/08/cropped-COME-Porto-Food-Tours-Logo-Black-.png"
+            alt="COME"
+            width={72}
+            height={28}
+            className="object-contain invert"
+            unoptimized
+          />
+          <div className="flex items-center gap-4">
+            <span className="text-sm text-white/70 font-medium">
+              {session.user?.name?.split(" ")[0]}
+            </span>
+            <form
+              action={async () => {
+                "use server";
+                await signOut({ redirectTo: "/login" });
+              }}
+            >
+              <button className="text-xs text-white/40 hover:text-white transition-colors">
+                Sair
+              </button>
+            </form>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-lg mx-auto px-4 py-8">
+        <div className="mb-6">
+          <h1 className="text-white font-bold text-lg">Faturas em Falta</h1>
+          <p className="text-white/60 text-sm mt-1">
+            Despesas que precisam de fatura
+          </p>
+        </div>
+
+        <InvoiceQueue
+          needingInvoice={needingInvoice}
+          treated={treated}
+          fornecedores={fornecedores}
+        />
+      </main>
+    </div>
+  );
+}
