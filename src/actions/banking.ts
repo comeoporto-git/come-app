@@ -1,16 +1,23 @@
 "use server";
 
-import { plaidClient, getPlaidItems, updateCursor } from "@/lib/plaid";
+import { plaidClient, getPlaidItems, updateCursor, removePlaidItem } from "@/lib/plaid";
 import {
   getTransactionsForMatching,
   createTransaction,
   updateTransaction,
+  archiveTransaction,
 } from "@/lib/notion";
 import { revalidatePath } from "next/cache";
-import { RemovedTransaction, Transaction as PlaidTransaction } from "plaid";
+import { Transaction as PlaidTransaction } from "plaid";
+import { auth } from "@/lib/auth";
 
 const MATCH_WINDOW_MS = 3 * 24 * 60 * 60 * 1000; // ±3 days
 const AMOUNT_TOLERANCE = 0.02; // 2 cents rounding tolerance
+
+async function requireAdmin() {
+  const session = await auth();
+  if (!session || session.user.role !== "Admin") throw new Error("Forbidden");
+}
 
 // ── Core sync + matching ──────────────────────────────────────────────────────
 
@@ -36,16 +43,15 @@ export async function syncBankTransactions(): Promise<{
       hasMore = has_more;
       cursor = next_cursor;
 
-      // Process new + modified bank transactions
+      // Process new + modified bank transactions (Plaid: positive = debit/outflow)
       const bankTxns = [...added, ...modified].filter(
-        (t: PlaidTransaction) => t.amount > 0 // outflows only (Plaid: positive = debit)
+        (t: PlaidTransaction) => t.amount > 0
       );
 
       for (const bankTxn of bankTxns) {
         const result = await matchTransaction(bankTxn);
         if (result === "matched") matched++;
         else if (result === "unmatched") unmatched++;
-        else if (result === "flagged") flagged++;
       }
     }
 
@@ -55,6 +61,8 @@ export async function syncBankTransactions(): Promise<{
   // Flag invoices with no bank entry after 3 days
   flagged += await flagMissingBankEntries();
 
+  revalidatePath("/admin");
+  revalidatePath("/admin/reconciliation");
   revalidatePath("/accountant");
   return { matched, unmatched, flagged };
 }
@@ -68,7 +76,6 @@ async function matchTransaction(
   const bankAmount = Math.abs(bankTxn.amount);
   const bankRef = bankTxn.transaction_id;
 
-  // Get all pending Notion invoices paid by company card
   const invoices = await getTransactionsForMatching();
 
   for (const invoice of invoices) {
@@ -79,16 +86,12 @@ async function matchTransaction(
     const amountDiff = Math.abs(invoice.totalCost - bankAmount);
 
     if (dateDiff <= MATCH_WINDOW_MS && amountDiff <= AMOUNT_TOLERANCE) {
-      // ✅ Scenario 1: Match found
-      await updateTransaction(invoice.id, {
-        status: "Paid",
-        bankReference: bankRef,
-      });
+      await updateTransaction(invoice.id, { status: "Paid", bankReference: bankRef });
       return "matched";
     }
   }
 
-  // ❌ Scenario 2: Bank transaction exists but no invoice — create placeholder
+  // No invoice match — create placeholder
   await createTransaction({
     supplier: bankTxn.merchant_name ?? bankTxn.name ?? "Desconhecido",
     fornecedorId: null,
@@ -119,7 +122,6 @@ async function flagMissingBankEntries(): Promise<number> {
     if (!invoice.date) continue;
     const invoiceDate = new Date(invoice.date);
 
-    // Scenario 3: Cartão Comum invoice older than 3 days with no bank match
     if (
       invoice.paymentMethod === "Cartão COME" &&
       invoice.status === "Paid" &&
@@ -131,4 +133,42 @@ async function flagMissingBankEntries(): Promise<number> {
     }
   }
   return count;
+}
+
+// ── Disconnect bank ───────────────────────────────────────────────────────────
+
+export async function disconnectBankAction(itemId: string): Promise<void> {
+  await requireAdmin();
+  await removePlaidItem(itemId);
+  revalidatePath("/admin");
+}
+
+// ── Reconciliation actions ────────────────────────────────────────────────────
+
+/** Dismiss an "Unmatched Bank Entry" — it was not a company expense */
+export async function dismissUnmatchedAction(transactionId: string): Promise<void> {
+  await requireAdmin();
+  await archiveTransaction(transactionId);
+  revalidatePath("/admin/reconciliation");
+}
+
+/** Clear a "Flag: Missing Bank Entry" — set back to Paid (bank processed differently) */
+export async function clearFlagAction(transactionId: string): Promise<void> {
+  await requireAdmin();
+  await updateTransaction(transactionId, { status: "Paid" });
+  revalidatePath("/admin/reconciliation");
+}
+
+/** Manually match an unmatched bank entry to an existing Notion invoice */
+export async function manualMatchAction(
+  bankTransactionId: string,
+  invoiceId: string,
+  bankReference: string,
+): Promise<void> {
+  await requireAdmin();
+  // Mark the invoice as matched
+  await updateTransaction(invoiceId, { status: "Paid", bankReference });
+  // Archive the unmatched placeholder
+  await archiveTransaction(bankTransactionId);
+  revalidatePath("/admin/reconciliation");
 }

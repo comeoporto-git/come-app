@@ -461,6 +461,28 @@ export async function getTransactionsNeedingInvoice(): Promise<Transaction[]> {
   return resolveTourNamesForTransactions(transactions);
 }
 
+export async function getUnmatchedBankTransactions(): Promise<Transaction[]> {
+  const res = await notion.databases.query({
+    database_id: TRANSACTIONS_DB,
+    filter: { property: "Status", select: { equals: "Unmatched Bank Entry" } },
+    sorts: [{ property: "Data", direction: "descending" }],
+    page_size: 100,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any);
+  return (res.results as PageObjectResponse[]).map(mapTransaction);
+}
+
+export async function getFlaggedTransactions(): Promise<Transaction[]> {
+  const res = await notion.databases.query({
+    database_id: TRANSACTIONS_DB,
+    filter: { property: "Status", select: { equals: "Flag: Missing Bank Entry" } },
+    sorts: [{ property: "Data", direction: "descending" }],
+    page_size: 100,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any);
+  return (res.results as PageObjectResponse[]).map(mapTransaction);
+}
+
 export async function getTransactionsTreated(): Promise<Transaction[]> {
   const res = await notion.databases.query({
     database_id: TRANSACTIONS_DB,

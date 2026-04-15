@@ -2,15 +2,24 @@ import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { signOut } from "@/lib/auth";
 import { getPlaidItems } from "@/lib/plaid";
+import { getUnmatchedBankTransactions, getFlaggedTransactions } from "@/lib/notion";
 import { PlaidConnectButton } from "@/components/PlaidConnectButton";
 import { BankSyncButton } from "@/components/BankSyncButton";
+import { DisconnectBankButton } from "@/components/DisconnectBankButton";
 import Image from "next/image";
+import Link from "next/link";
 
 export default async function AdminPage() {
   const session = await auth();
   if (!session || session.user.role !== "Admin") redirect("/");
 
-  const items = await getPlaidItems();
+  const [items, unmatched, flagged] = await Promise.all([
+    getPlaidItems(),
+    getUnmatchedBankTransactions(),
+    getFlaggedTransactions(),
+  ]);
+
+  const reconciliationCount = unmatched.length + flagged.length;
 
   return (
     <div className="min-h-screen bg-[#667470] text-[#32373c]">
@@ -48,20 +57,27 @@ export default async function AdminPage() {
             <div className="px-5 py-8 text-center text-gray-400">
               <div className="text-3xl mb-2">🏦</div>
               <p className="text-sm">Nenhuma conta ligada ainda</p>
-              <p className="text-xs mt-1">Clica em &quot;Ligar Conta&quot; para conectar o Crédito Agrícola</p>
+              <p className="text-xs mt-1">Clica em &quot;Ligar Conta&quot; para conectar o banco</p>
             </div>
           ) : (
             <ul className="divide-y divide-gray-50">
               {items.map((item) => (
-                <li key={item.id} className="px-5 py-3 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-600 text-sm">🏦</div>
-                    <div>
-                      <p className="text-sm font-medium text-[#32373c]">{item.institution_name}</p>
-                      <p className="text-xs text-gray-400">{item.cursor ? "Sincronizado" : "Aguarda primeira sincronização"}</p>
-                    </div>
+                <li key={item.id} className="px-5 py-3 flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-600 text-sm flex-shrink-0">
+                    🏦
                   </div>
-                  <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium">Ligado</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-[#32373c]">{item.institution_name}</p>
+                    <p className="text-xs text-gray-400">
+                      {item.cursor ? "Sincronizado" : "Aguarda primeira sincronização"}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3 flex-shrink-0">
+                    <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium">
+                      Ligado
+                    </span>
+                    <DisconnectBankButton itemId={item.item_id} name={item.institution_name} />
+                  </div>
                 </li>
               ))}
             </ul>
@@ -87,15 +103,26 @@ export default async function AdminPage() {
             { label: "Tours", href: "/admin/tours", icon: "🗓️" },
             { label: "Faturas em Falta", href: "/super-guide", icon: "🧾" },
             { label: "Contabilidade", href: "/accountant", icon: "📊" },
+            {
+              label: "Reconciliação",
+              href: "/admin/reconciliation",
+              icon: "⚖️",
+              badge: reconciliationCount > 0 ? reconciliationCount : undefined,
+            },
           ].map((link) => (
-            <a
+            <Link
               key={link.href}
               href={link.href}
-              className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-3 hover:border-[#667470]/30 transition-colors"
+              className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-3 hover:border-[#667470]/30 transition-colors relative"
             >
               <span className="text-2xl">{link.icon}</span>
               <span className="text-sm font-semibold text-[#32373c]">{link.label}</span>
-            </a>
+              {"badge" in link && link.badge !== undefined && (
+                <span className="ml-auto text-xs bg-red-500 text-white font-bold px-2 py-0.5 rounded-full">
+                  {link.badge}
+                </span>
+              )}
+            </Link>
           ))}
         </section>
       </main>

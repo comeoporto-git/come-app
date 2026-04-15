@@ -22,12 +22,17 @@ export const plaidClient = new PlaidApi(config);
 // ── Link Token ────────────────────────────────────────────────────────────────
 
 export async function createLinkToken(userId: string): Promise<string> {
+  const webhookUrl = process.env.NEXT_PUBLIC_BASE_URL
+    ? `${process.env.NEXT_PUBLIC_BASE_URL}/api/plaid/webhook`
+    : undefined;
+
   const res = await plaidClient.linkTokenCreate({
     user: { client_user_id: userId },
     client_name: "COME Porto Food Tours",
     products: [Products.Transactions],
     country_codes: [CountryCode.Pt],
     language: "pt",
+    ...(webhookUrl ? { webhook: webhookUrl } : {}),
   });
   return res.data.link_token;
 }
@@ -68,4 +73,16 @@ export async function getPlaidItems(): Promise<PlaidItem[]> {
 export async function updateCursor(itemId: string, cursor: string): Promise<void> {
   const sql = getDb();
   await sql`UPDATE plaid_items SET cursor = ${cursor} WHERE item_id = ${itemId}`;
+}
+
+export async function removePlaidItem(itemId: string): Promise<void> {
+  const sql = getDb();
+  const rows = await sql`SELECT access_token FROM plaid_items WHERE item_id = ${itemId}`;
+  if (!rows.length) return;
+  try {
+    await plaidClient.itemRemove({ access_token: rows[0].access_token as string });
+  } catch {
+    // proceed with local deletion even if Plaid call fails (e.g. token already invalid)
+  }
+  await sql`DELETE FROM plaid_items WHERE item_id = ${itemId}`;
 }
