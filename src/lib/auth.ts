@@ -31,11 +31,22 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return member !== null;
     },
     async jwt({ token, user }) {
-      if (user?.email) {
-        const member = await getTeamMemberByEmail(user.email);
-        if (member) {
-          token.role = member.role;
-          token.notionId = member.id;
+      const REFRESH_INTERVAL = 30 * 60 * 1000; // 30 minutes
+      const now = Date.now();
+      const shouldRefresh =
+        user?.email || // always refresh on sign-in
+        !token.roleUpdatedAt ||
+        now - (token.roleUpdatedAt as number) > REFRESH_INTERVAL;
+
+      if (shouldRefresh) {
+        const email = (user?.email ?? token.email) as string | undefined;
+        if (email) {
+          const member = await getTeamMemberByEmail(email);
+          if (member) {
+            token.role = member.role;
+            token.notionId = member.id;
+            token.roleUpdatedAt = now;
+          }
         }
       }
       return token;
