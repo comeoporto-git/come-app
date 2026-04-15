@@ -138,6 +138,7 @@ export default async function AdminPage({
               icon: "⚖️",
               badge: reconciliationCount > 0 ? reconciliationCount : undefined,
             },
+            { label: "Movimentos", href: "/admin/bank-transactions", icon: "🏦" },
           ].map((link) => (
             <Link
               key={link.href}
