@@ -91,9 +91,8 @@ export async function createAuthUrl(
   aspspName: string,
   country = "PT",
 ): Promise<string> {
-  const validUntil = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000)
-    .toISOString()
-    .slice(0, 10); // YYYY-MM-DD — Enable Banking requires date-only format
+  // Enable Banking requires a full ISO-8601 datetime with timezone (not date-only)
+  const validUntil = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString();
   const data = await api<{ url: string }>("POST", "/auth", {
     aspsp: { name: aspspName, country },
     state: crypto.randomUUID(),
