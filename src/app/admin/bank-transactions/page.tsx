@@ -38,17 +38,28 @@ export default async function BankTransactionsPage({
 
   const allTxns: (EBTransaction & { accountId: string; institution: string })[] = [];
 
+  const errors: string[] = [];
+
+  console.log("[BankTxns] sessions:", sessions.map(s => ({ id: s.session_id, accounts: s.accountIds })));
+
   await Promise.all(
-    sessions.flatMap((s) =>
-      s.accountIds.map(async (accountId) => {
-        try {
-          const txns = await getAccountTransactions(accountId, dateFrom, dateTo);
-          txns.forEach((t) => allTxns.push({ ...t, accountId, institution: s.institution_name }));
-        } catch {
-          // skip failed accounts
-        }
-      })
-    )
+    sessions.flatMap((s) => {
+      if (s.accountIds.length === 0) {
+        errors.push(`Session ${s.session_id} has no account IDs`);
+        return [];
+      }
+      return s.accountIds.map(async (accountId) => {
+            try {
+              const txns = await getAccountTransactions(accountId, dateFrom, dateTo);
+              console.log(`[BankTxns] account ${accountId}: ${txns.length} txns`);
+              txns.forEach((t) => allTxns.push({ ...t, accountId, institution: s.institution_name }));
+            } catch (err) {
+              const msg = err instanceof Error ? err.message : String(err);
+              console.error(`[BankTxns] account ${accountId} error:`, msg);
+              errors.push(`${accountId}: ${msg}`);
+            }
+          });
+    })
   );
 
   // Sort newest first
@@ -108,6 +119,14 @@ export default async function BankTransactionsPage({
           </div>
         </div>
 
+        {errors.length > 0 && (
+          <div className="bg-red-50 border border-red-200 rounded-2xl px-5 py-3 space-y-1">
+            {errors.map((e, i) => (
+              <p key={i} className="text-xs text-red-600 font-mono">{e}</p>
+            ))}
+          </div>
+        )}
+
         {sessions.length === 0 ? (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-5 py-12 text-center text-gray-400">
             <div className="text-3xl mb-2">🏦</div>
@@ -116,7 +135,12 @@ export default async function BankTransactionsPage({
               Ligar conta
             </Link>
           </div>
-        ) : allTxns.length === 0 ? (
+        ) : sessions.every((s) => s.accountIds.length === 0) ? (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4 text-sm text-amber-700">
+            ⚠️ Conta ligada mas sem IDs de conta guardados. Desliga e volta a ligar a conta no{" "}
+            <Link href="/admin" className="underline">Admin</Link>.
+          </div>
+        ) : allTxns.length === 0 && errors.length === 0 ? (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-5 py-12 text-center text-gray-400">
             <p className="text-sm">Sem movimentos nos últimos {days} dias</p>
           </div>
