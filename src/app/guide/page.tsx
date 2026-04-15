@@ -4,11 +4,18 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { signOut } from "@/lib/auth";
 import Image from "next/image";
+import { TourTabs } from "@/components/TourTabs";
+
+function isToday(iso: string | null): boolean {
+  if (!iso) return false;
+  const d = new Date(iso);
+  const t = new Date();
+  return d.toDateString() === t.toDateString();
+}
 
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
-  const d = new Date(iso);
-  return d.toLocaleDateString("pt-PT", {
+  return new Date(iso).toLocaleDateString("pt-PT", {
     weekday: "short",
     day: "numeric",
     month: "short",
@@ -18,12 +25,11 @@ function formatDate(iso: string | null): string {
   });
 }
 
-function isToday(iso: string | null): boolean {
-  if (!iso) return false;
-  const d = new Date(iso);
-  const t = new Date();
-  return d.toDateString() === t.toDateString();
-}
+const STATUS_COLORS: Record<string, string> = {
+  Confirmed: "bg-green-100 text-green-700",
+  Pending:   "bg-yellow-100 text-yellow-700",
+  Cancelled: "bg-red-100 text-red-700",
+};
 
 export default async function GuideDashboard() {
   const session = await auth();
@@ -35,7 +41,7 @@ export default async function GuideDashboard() {
     getPastToursForGuide(email),
   ]);
 
-  const todays = tours.filter((t) => isToday(t.date));
+  const todays   = tours.filter((t) => isToday(t.date));
   const upcoming = tours.filter((t) => !isToday(t.date));
 
   return (
@@ -68,120 +74,50 @@ export default async function GuideDashboard() {
       </header>
 
       <main className="max-w-lg mx-auto px-4 py-8 space-y-8">
-        {/* Today */}
+        {/* Today — always shown as a highlighted block above the tabs */}
         {todays.length > 0 && (
           <section>
             <h2 className="text-xs font-bold uppercase tracking-widest text-white/80 mb-3">
-              Hoje
+              Hoje · {todays.length}
             </h2>
-            <ul className="flex flex-col gap-6">
+            <ul className="flex flex-col gap-4">
               {todays.map((tour) => (
-                <TourCard key={tour.id} tour={tour} highlight />
+                <Link key={tour.id} href={`/guide/tours/${tour.id}`}>
+                  <li className="rounded-2xl p-5 shadow-sm border bg-[#32373c] border-[#32373c] text-white transition-all active:scale-[0.98] cursor-pointer space-y-1">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0 space-y-1">
+                        <p className="font-semibold text-sm text-white">{tour.saleId}</p>
+                        <p className="text-xs text-white/60">{formatDate(tour.date)}</p>
+                        {tour.serviceName && (
+                          <p className="text-xs text-white/60">{tour.serviceName}</p>
+                        )}
+                        {tour.numGuests > 0 && (
+                          <p className="text-xs text-white/50">{tour.numGuests} pax</p>
+                        )}
+                      </div>
+                      <div className="flex flex-col items-end gap-2 shrink-0">
+                        <span className="text-xs bg-[#7b8b87] text-white px-2 py-0.5 rounded-full font-semibold">
+                          Hoje
+                        </span>
+                        {tour.status && (
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[tour.status] ?? "bg-gray-100 text-gray-500"}`}>
+                            {tour.status}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </li>
+                </Link>
               ))}
             </ul>
           </section>
         )}
 
-        {/* Upcoming */}
+        {/* Tabs: Próximas / Anteriores */}
         <section>
-          <h2 className="text-xs font-bold uppercase tracking-widest text-white/50 mb-3">
-            Próximos
-          </h2>
-          {upcoming.length === 0 && todays.length === 0 ? (
-            <div className="text-center py-12 text-white/50">
-              <div className="text-4xl mb-2">🗓️</div>
-              <p className="text-sm">Sem tours agendados</p>
-            </div>
-          ) : upcoming.length === 0 ? (
-            <p className="text-sm text-white/50">Sem tours futuros</p>
-          ) : (
-            <ul className="flex flex-col gap-6">
-              {upcoming.map((tour) => (
-                <TourCard key={tour.id} tour={tour} />
-              ))}
-            </ul>
-          )}
-        </section>
-
-        {/* Past */}
-        <section>
-          <h2 className="text-xs font-bold uppercase tracking-widest text-white/30 mb-3">
-            Anteriores{pastTours.length > 0 ? ` · ${pastTours.length}` : ""}
-          </h2>
-          {pastTours.length === 0 ? (
-            <p className="text-sm text-white/30">Sem tours anteriores</p>
-          ) : (
-            <ul className="flex flex-col gap-4">
-              {pastTours.map((tour) => (
-                <TourCard key={tour.id} tour={tour} past />
-              ))}
-            </ul>
-          )}
+          <TourTabs upcoming={upcoming} past={pastTours} />
         </section>
       </main>
     </div>
-  );
-}
-
-const STATUS_COLORS: Record<string, string> = {
-  Confirmed:  "bg-green-100 text-green-700",
-  Pending:    "bg-yellow-100 text-yellow-700",
-  Cancelled:  "bg-red-100 text-red-700",
-};
-
-function TourCard({
-  tour,
-  highlight,
-  past,
-}: {
-  tour: Awaited<ReturnType<typeof getToursForGuide>>[0];
-  highlight?: boolean;
-  past?: boolean;
-}) {
-  return (
-    <Link href={`/guide/tours/${tour.id}`}>
-      <li
-        className={`rounded-2xl p-5 shadow-sm border transition-all active:scale-[0.98] cursor-pointer ${
-          highlight
-            ? "bg-[#32373c] text-white border-[#32373c]"
-            : past
-            ? "bg-white/60 border-white/20 text-[#32373c]"
-            : "bg-white border-gray-100 text-[#32373c]"
-        }`}
-      >
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex-1 min-w-0 space-y-1">
-            <p className={`font-semibold text-sm ${highlight ? "text-white" : past ? "text-[#32373c]/70" : "text-[#32373c]"}`}>
-              {tour.saleId}
-            </p>
-            <p className={`text-xs ${highlight ? "text-white/60" : "text-gray-500"}`}>
-              {formatDate(tour.date)}
-            </p>
-            {tour.serviceName && (
-              <p className={`text-xs ${highlight ? "text-white/60" : "text-gray-600"}`}>
-                {tour.serviceName}
-              </p>
-            )}
-            {tour.numGuests > 0 && (
-              <p className={`text-xs ${highlight ? "text-white/50" : "text-gray-400"}`}>
-                {tour.numGuests} pax
-              </p>
-            )}
-          </div>
-          <div className="flex flex-col items-end gap-2 shrink-0">
-            {highlight && (
-              <span className="text-xs bg-[#7b8b87] text-white px-2 py-0.5 rounded-full font-semibold">
-                Hoje
-              </span>
-            )}
-            {tour.status && (
-              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[tour.status] ?? "bg-gray-100 text-gray-500"}`}>
-                {tour.status}
-              </span>
-            )}
-          </div>
-        </div>
-      </li>
-    </Link>
   );
 }
