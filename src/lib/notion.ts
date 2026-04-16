@@ -608,6 +608,20 @@ export async function getTransactionsForTour(tourId: string): Promise<Transactio
   } catch { return []; }
 }
 
+export async function getEarningsForTour(tourId: string): Promise<Transaction[]> {
+  try {
+    const res = await notion.databases.query({
+      database_id: TRANSACTIONS_DB,
+      filter: { property: "🎫 Sales", relation: { contains: tourId } },
+      sorts: [{ property: "Data", direction: "descending" }],
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
+    return (res.results as PageObjectResponse[])
+      .map(mapTransaction)
+      .filter((t) => t.supplier.startsWith("IN -"));
+  } catch { return []; }
+}
+
 export async function getTransactionsForMatching(): Promise<Transaction[]> {
   // Fetch Cartão COME transactions; filter non-IN- entries in code
   // to avoid errors from select options that may not exist yet in Notion
