@@ -2,10 +2,11 @@ import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { signOut } from "@/lib/auth";
 import { getEBSessions } from "@/lib/enablebanking";
-import { getUnmatchedBankTransactions, getFlaggedTransactions } from "@/lib/notion";
+import { getUnmatchedBankTransactions, getFlaggedTransactions, getTeamMembers } from "@/lib/notion";
 import { EnableBankingConnectButton } from "@/components/EnableBankingConnectButton";
 import { DisconnectEnableBankingButton } from "@/components/DisconnectEnableBankingButton";
 import { BankSyncButton } from "@/components/BankSyncButton";
+import { UserManagement } from "@/components/UserManagement";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -19,10 +20,11 @@ export default async function AdminPage({
 
   const params = await searchParams;
 
-  const [ebSessions, unmatched, flagged] = await Promise.all([
+  const [ebSessions, unmatched, flagged, teamMembers] = await Promise.all([
     getEBSessions(),
     getUnmatchedBankTransactions(),
     getFlaggedTransactions(),
+    getTeamMembers(),
   ]);
 
   const reconciliationCount = unmatched.length + flagged.length;
@@ -125,6 +127,23 @@ export default async function AdminPage({
             <BankSyncButton />
           </section>
         )}
+
+        {/* Team / Users */}
+        <section className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-50">
+            <h2 className="text-sm font-semibold text-[#32373c]">Utilizadores</h2>
+            <p className="text-xs text-gray-400 mt-0.5">
+              Clica no role para alterar · {teamMembers.length} membros
+            </p>
+          </div>
+          {teamMembers.length === 0 ? (
+            <div className="px-5 py-8 text-center text-gray-400 text-sm">
+              Sem membros registados
+            </div>
+          ) : (
+            <UserManagement members={teamMembers} />
+          )}
+        </section>
 
         {/* Quick links */}
         <section className="grid grid-cols-2 gap-3">

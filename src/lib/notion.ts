@@ -117,6 +117,18 @@ export async function getTeamMemberById(id: string): Promise<TeamMember | null> 
   } catch { return null; }
 }
 
+export async function updateTeamMemberRole(
+  memberId: string,
+  role: TeamMember["role"],
+): Promise<void> {
+  await notion.pages.update({
+    page_id: memberId,
+    properties: {
+      Role: { select: { name: role } },
+    } as Parameters<typeof notion.pages.update>[0]["properties"],
+  });
+}
+
 // ── Tours (Sales DB) ──────────────────────────────────────────────────────────
 //
 // Property name mapping (our code → Notion Sales DB):
