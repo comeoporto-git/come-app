@@ -1,5 +1,6 @@
 import { Client } from "@notionhq/client";
 import type { PageObjectResponse } from "@notionhq/client/build/src/api-endpoints";
+import { unstable_cache } from "next/cache";
 
 export const notion = new Client({ auth: process.env.NOTION_TOKEN });
 
@@ -104,26 +105,34 @@ function mapTeamMember(page: PageObjectResponse): TeamMember {
   };
 }
 
-export async function getTeamMembers(): Promise<TeamMember[]> {
-  try {
+export const getTeamMembers = unstable_cache(
+  async (): Promise<TeamMember[]> => {
+    try {
+      const res = await notion.databases.query({
+        database_id: TEAM_DB,
+        sorts: [{ property: "Name", direction: "ascending" }],
+        page_size: 100,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any);
+      return (res.results as PageObjectResponse[]).map(mapTeamMember).filter((m) => m.name);
+    } catch { return []; }
+  },
+  ["team-members"],
+  { revalidate: 300, tags: ["team-members"] }, // 5 min — safe to cache, changes rarely
+);
+
+export const getTeamMemberByEmail = unstable_cache(
+  async (email: string): Promise<TeamMember | null> => {
     const res = await notion.databases.query({
       database_id: TEAM_DB,
-      sorts: [{ property: "Name", direction: "ascending" }],
-      page_size: 100,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any);
-    return (res.results as PageObjectResponse[]).map(mapTeamMember).filter((m) => m.name);
-  } catch { return []; }
-}
-
-export async function getTeamMemberByEmail(email: string): Promise<TeamMember | null> {
-  const res = await notion.databases.query({
-    database_id: TEAM_DB,
-    filter: { property: "email", email: { equals: email } },
-  });
-  if (!res.results.length) return null;
-  return mapTeamMember(res.results[0] as PageObjectResponse);
-}
+      filter: { property: "email", email: { equals: email } },
+    });
+    if (!res.results.length) return null;
+    return mapTeamMember(res.results[0] as PageObjectResponse);
+  },
+  ["team-member-by-email"],
+  { revalidate: 300, tags: ["team-members"] }, // 5 min
+);
 
 export async function getTeamMemberById(id: string): Promise<TeamMember | null> {
   try {
@@ -594,7 +603,8 @@ async function resolveTourNamesForTransactions(transactions: Transaction[]): Pro
   }));
 }
 
-export async function getTransactionsForTour(tourId: string): Promise<Transaction[]> {
+/** Single Notion query fetching all transactions for a tour (expenses + earnings). */
+async function getRawTransactionsForTour(tourId: string): Promise<Transaction[]> {
   try {
     const res = await notion.databases.query({
       database_id: TRANSACTIONS_DB,
@@ -602,24 +612,16 @@ export async function getTransactionsForTour(tourId: string): Promise<Transactio
       sorts: [{ property: "Data", direction: "descending" }],
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
-    return (res.results as PageObjectResponse[])
-      .map(mapTransaction)
-      .filter((t) => !t.supplier.startsWith("IN -"));
+    return (res.results as PageObjectResponse[]).map(mapTransaction);
   } catch { return []; }
 }
 
+export async function getTransactionsForTour(tourId: string): Promise<Transaction[]> {
+  return (await getRawTransactionsForTour(tourId)).filter((t) => !t.supplier.startsWith("IN -"));
+}
+
 export async function getEarningsForTour(tourId: string): Promise<Transaction[]> {
-  try {
-    const res = await notion.databases.query({
-      database_id: TRANSACTIONS_DB,
-      filter: { property: "🎫 Sales", relation: { contains: tourId } },
-      sorts: [{ property: "Data", direction: "descending" }],
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any);
-    return (res.results as PageObjectResponse[])
-      .map(mapTransaction)
-      .filter((t) => t.supplier.startsWith("IN -"));
-  } catch { return []; }
+  return (await getRawTransactionsForTour(tourId)).filter((t) => t.supplier.startsWith("IN -"));
 }
 
 export async function getTransactionsForMatching(): Promise<Transaction[]> {
@@ -849,15 +851,19 @@ export async function createFornecedor(name: string): Promise<Fornecedor> {
   return { id: page.id, name: name.trim() };
 }
 
-export async function getFornecedores(): Promise<Fornecedor[]> {
-  const res = await notion.databases.query({
-    database_id: FORNECEDORES_DB,
-    sorts: [{ property: "Name", direction: "ascending" }],
-    page_size: 100,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  } as any);
-  return (res.results as PageObjectResponse[])
-    .map((page) => ({ id: page.id, name: text(getProp(page, "Name")) }))
-    .filter((f) => f.name);
-}
+export const getFornecedores = unstable_cache(
+  async (): Promise<Fornecedor[]> => {
+    const res = await notion.databases.query({
+      database_id: FORNECEDORES_DB,
+      sorts: [{ property: "Name", direction: "ascending" }],
+      page_size: 100,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
+    return (res.results as PageObjectResponse[])
+      .map((page) => ({ id: page.id, name: text(getProp(page, "Name")) }))
+      .filter((f) => f.name);
+  },
+  ["fornecedores"],
+  { revalidate: 300, tags: ["fornecedores"] }, // 5 min — changes rarely
+);
 

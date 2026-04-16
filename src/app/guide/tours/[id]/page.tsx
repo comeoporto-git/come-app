@@ -10,6 +10,7 @@ import {
 } from "@/lib/notion";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
+import { Suspense } from "react";
 import { closeTourAction } from "@/actions/transactions";
 import { ExpenseList } from "@/components/ExpenseList";
 import { AddExpenseButton } from "@/components/AddExpenseButton";
@@ -27,12 +28,62 @@ function formatDate(iso: string | null): string {
   });
 }
 
+// ── Shell (renders immediately, only needs auth cookie) ───────────────────────
+
 export default async function TourDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
   if (!session) redirect("/login");
 
   const { id } = await params;
   const role = session.user.role;
+  const email = session.user.email ?? "";
+  const backHref = role === "Admin" ? "/admin/tours" : "/guide/services";
+
+  return (
+    <div className="min-h-screen bg-gray-50 pb-24">
+      <Suspense fallback={<PageSkeleton backHref={backHref} />}>
+        <TourPageContent id={id} role={role} email={email} backHref={backHref} />
+      </Suspense>
+    </div>
+  );
+}
+
+// ── Skeleton shown while Notion data loads ────────────────────────────────────
+
+function PageSkeleton({ backHref }: { backHref: string }) {
+  return (
+    <>
+      <header className="bg-white border-b border-gray-100 sticky top-0 z-10">
+        <div className="max-w-lg mx-auto px-4 py-3 flex items-center gap-3">
+          <Link href={backHref} className="text-gray-400 hover:text-gray-700">←</Link>
+          <div className="flex-1 min-w-0 space-y-1.5">
+            <div className="h-4 w-36 bg-gray-100 rounded animate-pulse" />
+            <div className="h-3 w-48 bg-gray-100 rounded animate-pulse" />
+          </div>
+        </div>
+      </header>
+      <main className="max-w-lg mx-auto px-4 py-5 space-y-5">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 h-48 animate-pulse" />
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 h-28 animate-pulse" />
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 h-32 animate-pulse" />
+      </main>
+    </>
+  );
+}
+
+// ── Full page content (async — fetches all Notion data) ───────────────────────
+
+async function TourPageContent({
+  id,
+  role,
+  email,
+  backHref,
+}: {
+  id: string;
+  role: string;
+  email: string;
+  backHref: string;
+}) {
   const isChef = role === "Chef";
   const canEditTeam = role === "Super Guide" || role === "Admin";
   const canSeeFinancials = role === "Super Guide" || role === "Admin";
@@ -43,26 +94,23 @@ export default async function TourDetailPage({ params }: { params: Promise<{ id:
     canSeeFinancials ? getEarningsForTour(id) : Promise.resolve([]),
     getFornecedores(),
     getTeamMembers(),
-    isChef ? getTeamMemberByEmail(session.user.email ?? "") : Promise.resolve(null),
+    isChef ? getTeamMemberByEmail(email) : Promise.resolve(null),
   ]);
 
   if (!tour) notFound();
 
-  const totalSpent   = transactions.reduce((s, t) => s + t.totalCost, 0); // negative values
-  const faturacao    = earnings.reduce((s, t) => s + t.totalCost, 0);
-  const lucro        = faturacao + totalSpent; // totalSpent is negative, so this subtracts
-  const margem       = faturacao > 0 ? (lucro / faturacao) * 100 : null;
-  const isClosed = tour.expensesClosed;
-  const backHref = role === "Admin" ? "/admin/tours" : "/guide/services";
+  const totalSpent = transactions.reduce((s, t) => s + t.totalCost, 0); // negative values
+  const faturacao  = earnings.reduce((s, t) => s + t.totalCost, 0);
+  const lucro      = faturacao + totalSpent; // totalSpent is negative, so this subtracts
+  const margem     = faturacao > 0 ? (lucro / faturacao) * 100 : null;
+  const isClosed   = tour.expensesClosed;
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-24">
+    <>
       {/* Header */}
       <header className="bg-white border-b border-gray-100 sticky top-0 z-10">
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center gap-3">
-          <Link href={backHref} className="text-gray-400 hover:text-gray-700">
-            ←
-          </Link>
+          <Link href={backHref} className="text-gray-400 hover:text-gray-700">←</Link>
           <div className="flex-1 min-w-0">
             <h1 className="text-base font-semibold text-gray-900 truncate">{tour.saleId}</h1>
             <p className="text-xs text-gray-500">{formatDate(tour.date)}</p>
@@ -82,7 +130,6 @@ export default async function TourDetailPage({ params }: { params: Promise<{ id:
             <h2 className="text-sm font-semibold text-gray-700">Informação do Grupo</h2>
           </div>
           <div className="px-4 py-3 space-y-3">
-            {/* Estado */}
             <div>
               <p className="text-xs text-gray-500 mb-1">Estado</p>
               {tour.status ? (
@@ -105,7 +152,6 @@ export default async function TourDetailPage({ params }: { params: Promise<{ id:
             <InfoField label="Nº de Pax" value={tour.numGuests ? String(tour.numGuests) : "—"} />
             <InfoField label="Nomes"    value={tour.names || "—"} />
 
-            {/* Contacto */}
             <div>
               <p className="text-xs text-gray-500 mb-1">Contacto</p>
               {tour.phoneNumber ? (
@@ -246,9 +292,11 @@ export default async function TourDetailPage({ params }: { params: Promise<{ id:
           </form>
         )}
       </main>
-    </div>
+    </>
   );
 }
+
+// ── Sub-components ────────────────────────────────────────────────────────────
 
 function KpiCard({ label, value, color }: { label: string; value: string; color: string }) {
   return (
