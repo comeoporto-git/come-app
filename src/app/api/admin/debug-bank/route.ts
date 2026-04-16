@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { getDb } from "@/lib/db";
-import { getEBSessions, getAccountTransactions } from "@/lib/enablebanking";
+import { getEBSessions } from "@/lib/enablebanking";
 
 export async function GET() {
   const session = await auth();
@@ -15,28 +15,17 @@ export async function GET() {
   // Count rows in bank_transactions
   let txnCount = 0;
   let tableExists = false;
+  let recentTxns: unknown[] = [];
   try {
     const rows = await sql`SELECT COUNT(*) as count FROM bank_transactions`;
     txnCount = Number(rows[0].count);
     tableExists = true;
-  } catch (err) {
+    recentTxns = await sql`
+      SELECT transaction_id, transaction_date, credit_debit, amount, merchant_name
+      FROM bank_transactions ORDER BY transaction_date DESC LIMIT 5
+    `;
+  } catch {
     tableExists = false;
-  }
-
-  // Try a small live fetch to see if rate limit has cleared
-  const liveTest: Record<string, unknown> = {};
-  const today = new Date().toISOString().slice(0, 10);
-  const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
-
-  for (const s of dbSessions) {
-    for (const accountId of s.accountIds) {
-      try {
-        const txns = await getAccountTransactions(accountId, yesterday, today);
-        liveTest[accountId] = { ok: true, count: txns.length };
-      } catch (err) {
-        liveTest[accountId] = { ok: false, error: err instanceof Error ? err.message : String(err) };
-      }
-    }
   }
 
   return NextResponse.json({
@@ -48,6 +37,7 @@ export async function GET() {
     })),
     tableExists,
     txnCount,
-    liveTest,
+    recentTxns,
+    note: "Live API test removed — was consuming daily rate limit quota",
   });
 }

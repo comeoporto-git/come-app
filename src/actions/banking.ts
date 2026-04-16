@@ -37,9 +37,12 @@ export async function syncBankTransactions(): Promise<{
   matched: number;
   unmatched: number;
   flagged: number;
+  fetched: number;
+  errors: string[];
 }> {
   const sessions = await getEBSessions();
-  let matched = 0, unmatched = 0, flagged = 0;
+  let matched = 0, unmatched = 0, flagged = 0, fetched = 0;
+  const errors: string[] = [];
 
   // Build a set of already-known bank references to avoid duplicates
   const existingUnmatched = await getUnmatchedBankTransactions();
@@ -59,12 +62,22 @@ export async function syncBankTransactions(): Promise<{
       try {
         txns = await getAccountTransactions(accountId, from, to);
       } catch (err) {
-        console.error(`[BankSync] failed to fetch account ${accountId}:`, err);
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[BankSync] failed to fetch account ${accountId}:`, msg);
+        errors.push(msg);
         continue;
       }
 
+      fetched += txns.length;
+
       // Persist all transactions to DB (avoids re-fetching & rate limits)
-      await upsertBankTransactions(txns, accountId, session.institution_name);
+      try {
+        await upsertBankTransactions(txns, accountId, session.institution_name);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[BankSync] failed to upsert transactions:`, msg);
+        errors.push(`DB upsert failed: ${msg}`);
+      }
 
       // Only process debits (money leaving the account)
       const debits = txns.filter((t) => t.credit_debit_indicator === "DBIT");
@@ -88,7 +101,8 @@ export async function syncBankTransactions(): Promise<{
   revalidatePath("/admin");
   revalidatePath("/admin/reconciliation");
   revalidatePath("/accountant");
-  return { matched, unmatched, flagged };
+  revalidatePath("/admin/bank-transactions");
+  return { matched, unmatched, flagged, fetched, errors };
 }
 
 // ── Two-pass matching ─────────────────────────────────────────────────────────
