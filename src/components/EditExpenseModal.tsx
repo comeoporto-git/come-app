@@ -197,29 +197,7 @@ export function EditExpenseModal({
           <div className="space-y-3">
             {/* Existing invoice — image or PDF */}
             {transaction.invoiceImageUrl && !imageDataUrl && (
-              transaction.invoiceImageUrl.toLowerCase().endsWith(".pdf") ||
-              transaction.invoiceImageUrl.includes("application/pdf") ? (
-                <a
-                  href={transaction.invoiceImageUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-3 p-3 rounded-xl border border-gray-200 bg-gray-50 hover:bg-gray-100 transition-colors"
-                >
-                  <span className="text-2xl">📄</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-700">Fatura em PDF</p>
-                    <p className="text-xs text-[#667470]">Toque para abrir</p>
-                  </div>
-                  <span className="text-xs text-gray-400">↗</span>
-                </a>
-              ) : (
-                <img
-                  src={transaction.invoiceImageUrl}
-                  alt="Fatura atual"
-                  className="w-full max-h-48 object-contain rounded-xl border border-gray-200 cursor-zoom-in"
-                  onClick={() => setLightboxSrc(transaction.invoiceImageUrl!)}
-                />
-              )
+              <InvoicePreview url={transaction.invoiceImageUrl} onZoom={setLightboxSrc} />
             )}
 
             {/* Supplier */}
@@ -374,5 +352,45 @@ export function EditExpenseModal({
         </div>
       </div>
     </div>
+  );
+}
+
+// ── Invoice preview with robust fallback ─────────────────────────────────────
+
+function InvoicePreview({ url, onZoom }: { url: string; onZoom: (src: string) => void }) {
+  const [failed, setFailed] = useState(false);
+  const isPdf =
+    url.toLowerCase().endsWith(".pdf") ||
+    url.includes("application/pdf") ||
+    url.includes("/invoice-image/"); // proxy route may serve PDF
+
+  if (isPdf || failed) {
+    return (
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center gap-3 p-3 rounded-xl border border-gray-200 bg-gray-50 hover:bg-gray-100 transition-colors"
+      >
+        <span className="text-2xl">{failed ? "🖼️" : "📄"}</span>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-gray-700">
+            {failed ? "Ver fatura" : "Fatura em PDF"}
+          </p>
+          <p className="text-xs text-[#667470]">Toque para abrir</p>
+        </div>
+        <span className="text-xs text-gray-400">↗</span>
+      </a>
+    );
+  }
+
+  return (
+    <img
+      src={url}
+      alt="Fatura atual"
+      className="w-full max-h-48 object-contain rounded-xl border border-gray-200 cursor-zoom-in"
+      onClick={() => onZoom(url)}
+      onError={() => setFailed(true)}
+    />
   );
 }
