@@ -90,13 +90,15 @@ function mapTeamMember(page: PageObjectResponse): TeamMember {
 }
 
 export async function getTeamMembers(): Promise<TeamMember[]> {
-  const res = await notion.databases.query({
-    database_id: TEAM_DB,
-    sorts: [{ property: "Name", direction: "ascending" }],
-    page_size: 100,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  } as any);
-  return (res.results as PageObjectResponse[]).map(mapTeamMember).filter((m) => m.name);
+  try {
+    const res = await notion.databases.query({
+      database_id: TEAM_DB,
+      sorts: [{ property: "Name", direction: "ascending" }],
+      page_size: 100,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
+    return (res.results as PageObjectResponse[]).map(mapTeamMember).filter((m) => m.name);
+  } catch { return []; }
 }
 
 export async function getTeamMemberByEmail(email: string): Promise<TeamMember | null> {
@@ -412,15 +414,17 @@ async function resolveTourNamesForTransactions(transactions: Transaction[]): Pro
 }
 
 export async function getTransactionsForTour(tourId: string): Promise<Transaction[]> {
-  const res = await notion.databases.query({
-    database_id: TRANSACTIONS_DB,
-    filter: { property: "🎫 Sales", relation: { contains: tourId } },
-    sorts: [{ property: "Data", direction: "descending" }],
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  } as any);
-  return (res.results as PageObjectResponse[])
-    .map(mapTransaction)
-    .filter((t) => !t.supplier.startsWith("IN -"));
+  try {
+    const res = await notion.databases.query({
+      database_id: TRANSACTIONS_DB,
+      filter: { property: "🎫 Sales", relation: { contains: tourId } },
+      sorts: [{ property: "Data", direction: "descending" }],
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
+    return (res.results as PageObjectResponse[])
+      .map(mapTransaction)
+      .filter((t) => !t.supplier.startsWith("IN -"));
+  } catch { return []; }
 }
 
 export async function getTransactionsForMatching(): Promise<Transaction[]> {

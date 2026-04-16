@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { updateTourTeamAction } from "@/actions/transactions";
 import type { TeamMember } from "@/lib/notion";
 
@@ -30,7 +29,6 @@ export function TeamPicker({
   driverPhone?: string;
   teamMembers: TeamMember[];
 }) {
-  const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -48,8 +46,8 @@ export function TeamPicker({
         selectedChef   || null,
         selectedDriver || null,
       );
-      router.refresh();
-      setEditing(false);
+      // Full reload is more reliable than router.refresh() after Notion mutations
+      window.location.reload();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao guardar equipa");
     } finally {
