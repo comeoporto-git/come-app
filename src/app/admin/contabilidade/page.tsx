@@ -95,7 +95,7 @@ export default async function ContabilidadePage() {
           </div>
         </Link>
 
-        <div className="pt-2" />
+        <div className="pt-6" />
 
         {/* Despesas Avulso */}
         <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3">
