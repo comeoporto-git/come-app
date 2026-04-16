@@ -129,7 +129,7 @@ export async function getTeamMemberById(id: string): Promise<TeamMember | null> 
 //   notes          → "Notes"            (Text)
 //   guideId        → "Guia"             (Relation → Team DB)
 //   chefId         → "Chef"             (Relation → Team DB)
-//   driverId       → "Driver"           (Relation → Team DB)
+//   driverId       → "Driver 1"         (Relation → Team DB)
 //   expensesClosed → "Expenses Closed"  (Select — empty = open, any value = closed)
 
 export type Tour = {
@@ -163,7 +163,7 @@ function mapTour(page: PageObjectResponse): Tour {
   const clientIds  = relation(getProp(page, "Client"));
   const guideIds   = relation(getProp(page, "Guia"));
   const chefIds    = relation(getProp(page, "Chef"));
-  const driverIds  = relation(getProp(page, "Driver"));
+  const driverIds  = relation(getProp(page, "Driver 1"));
   return {
     id:              page.id,
     saleId:          text(getProp(page, "ID")),
@@ -238,21 +238,18 @@ export async function updateTourTeam(
     throw new Error(`Notion: ${msg}`);
   }
 
-  // Update Driver — try as Relation first (correct type); fall back silently if
-  // it's still configured as Select in Notion (user needs to change the property type)
-  if (driverId !== undefined) {
-    try {
-      await notion.pages.update({
-        page_id: tourId,
-        properties: {
-          Driver: { relation: driverId ? [{ id: driverId }] : [] },
-        } as Parameters<typeof notion.pages.update>[0]["properties"],
-      });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      // If Driver is still a Select in Notion, log but don't crash the whole save
-      console.warn("[updateTourTeam] Driver update skipped (wrong property type?):", msg);
-    }
+  // Update Driver 1 as a Relation
+  try {
+    await notion.pages.update({
+      page_id: tourId,
+      properties: {
+        "Driver 1": { relation: driverId ? [{ id: driverId }] : [] },
+      } as Parameters<typeof notion.pages.update>[0]["properties"],
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[updateTourTeam] Driver 1 error:", msg);
+    throw new Error(`Notion (Driver 1): ${msg}`);
   }
 }
 
