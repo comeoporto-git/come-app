@@ -481,6 +481,20 @@ export async function getPeloGuiaTransactionsForMatching(): Promise<Transaction[
   } catch { return []; }
 }
 
+/** All transactions that have been matched to a bank debit (have a bankReference) */
+export async function getMatchedTransactions(): Promise<Transaction[]> {
+  try {
+    const res = await notion.databases.query({
+      database_id: TRANSACTIONS_DB,
+      filter: { property: "ID do Banco", rich_text: { is_not_empty: true } },
+      sorts: [{ property: "Data", direction: "descending" }],
+      page_size: 200,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
+    return (res.results as PageObjectResponse[]).map(mapTransaction);
+  } catch { return []; }
+}
+
 export async function getUnmatchedBankTransactions(): Promise<Transaction[]> {
   try {
     const res = await notion.databases.query({
