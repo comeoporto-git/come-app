@@ -291,7 +291,7 @@ export function AddExpenseModal({
                   if (chefName) {
                     setForm((f) => ({ ...f, supplier: chefName }));
                   }
-                  setMode("manual");
+                  setMode("choose");
                 }}
                 className="w-full flex items-center gap-4 p-4 rounded-2xl border-2 border-gray-200 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
               >
