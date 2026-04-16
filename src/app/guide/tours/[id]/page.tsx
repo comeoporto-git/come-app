@@ -3,6 +3,7 @@ import {
   getTourById,
   getTransactionsForTour,
   getChefTransactionsForTour,
+  getEarningsForTour,
   getFornecedores,
   getTeamMembers,
   getTeamMemberByEmail,
@@ -34,10 +35,12 @@ export default async function TourDetailPage({ params }: { params: Promise<{ id:
   const role = session.user.role;
   const isChef = role === "Chef";
   const canEditTeam = role === "Super Guide" || role === "Admin";
+  const canSeeFinancials = role === "Super Guide" || role === "Admin";
 
-  const [tour, transactions, fornecedores, teamMembers, chefMember] = await Promise.all([
+  const [tour, transactions, earnings, fornecedores, teamMembers, chefMember] = await Promise.all([
     getTourById(id),
     isChef ? getChefTransactionsForTour(id) : getTransactionsForTour(id),
+    canSeeFinancials ? getEarningsForTour(id) : Promise.resolve([]),
     getFornecedores(),
     getTeamMembers(),
     isChef ? getTeamMemberByEmail(session.user.email ?? "") : Promise.resolve(null),
@@ -45,7 +48,10 @@ export default async function TourDetailPage({ params }: { params: Promise<{ id:
 
   if (!tour) notFound();
 
-  const totalSpent = transactions.reduce((s, t) => s + t.totalCost, 0);
+  const totalSpent   = transactions.reduce((s, t) => s + t.totalCost, 0);
+  const faturacao    = earnings.reduce((s, t) => s + t.totalCost, 0);
+  const lucro        = faturacao - totalSpent;
+  const margem       = faturacao > 0 ? (lucro / faturacao) * 100 : null;
   const isClosed = tour.expensesClosed;
   const backHref = role === "Admin" ? "/admin/tours" : "/guide/services";
 
@@ -157,6 +163,51 @@ export default async function TourDetailPage({ params }: { params: Promise<{ id:
           </div>
         </section>
 
+        {/* Financial KPIs — Super Guide / Admin only */}
+        {canSeeFinancials && (
+          <section className="grid grid-cols-2 gap-3">
+            <KpiCard label="Faturação" value={`€${faturacao.toFixed(2)}`} color="text-emerald-600" />
+            <KpiCard label="Custos"    value={`€${totalSpent.toFixed(2)}`} color="text-red-500" />
+            <KpiCard
+              label="Lucro"
+              value={`€${lucro.toFixed(2)}`}
+              color={lucro >= 0 ? "text-emerald-600" : "text-red-500"}
+            />
+            <KpiCard
+              label="Margem de Lucro"
+              value={margem !== null ? `${margem.toFixed(1)}%` : "—"}
+              color={margem !== null && margem >= 0 ? "text-emerald-600" : "text-red-500"}
+            />
+          </section>
+        )}
+
+        {/* Earning transactions — Super Guide / Admin only */}
+        {canSeeFinancials && earnings.length > 0 && (
+          <section>
+            <h2 className="text-sm font-semibold text-gray-700 mb-3">
+              Faturação
+              <span className="ml-2 text-gray-400 font-normal">€{faturacao.toFixed(2)}</span>
+            </h2>
+            <ul className="flex flex-col gap-2">
+              {earnings.map((e) => (
+                <li key={e.id} className="bg-emerald-50 border border-emerald-100 rounded-2xl px-4 py-3 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-emerald-800 truncate">
+                      {e.supplier.replace(/^IN\s*-\s*/, "")}
+                    </p>
+                    {e.invoiceId && (
+                      <p className="text-xs text-emerald-600 mt-0.5">{e.invoiceId}</p>
+                    )}
+                  </div>
+                  <p className="text-sm font-bold text-emerald-700 shrink-0">
+                    +€{e.totalCost.toFixed(2)}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
         {/* Expenses */}
         <section>
           <div className="flex items-center justify-between mb-3">
@@ -195,6 +246,15 @@ export default async function TourDetailPage({ params }: { params: Promise<{ id:
           </form>
         )}
       </main>
+    </div>
+  );
+}
+
+function KpiCard({ label, value, color }: { label: string; value: string; color: string }) {
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+      <p className="text-xs text-gray-500 mb-1">{label}</p>
+      <p className={`text-lg font-bold ${color}`}>{value}</p>
     </div>
   );
 }
