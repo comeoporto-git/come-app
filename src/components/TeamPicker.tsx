@@ -33,12 +33,14 @@ export function TeamPicker({
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [selectedGuide, setSelectedGuide]   = useState(guideId  ?? "");
   const [selectedChef, setSelectedChef]     = useState(chefId   ?? "");
   const [selectedDriver, setSelectedDriver] = useState(driverId ?? "");
 
   async function handleSave() {
     setSaving(true);
+    setError(null);
     try {
       await updateTourTeamAction(
         tourId,
@@ -48,8 +50,8 @@ export function TeamPicker({
       );
       router.refresh();
       setEditing(false);
-    } catch {
-      // silent — page will still show stale data until next refresh
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao guardar equipa");
     } finally {
       setSaving(false);
     }
@@ -102,6 +104,9 @@ export function TeamPicker({
         onChange={setSelectedDriver}
         members={teamMembers}
       />
+      {error && (
+        <p className="text-xs text-red-500 font-medium px-1">{error}</p>
+      )}
       <div className="flex gap-2 pt-1">
         <button
           onClick={handleSave}
