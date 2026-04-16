@@ -201,7 +201,7 @@ export async function updateTeamMemberRole(
 //   saleId         → "ID"               (Title)
 //   service        → "Service"          (Relation → Services DB)
 //   date           → "Date"             (Date)
-//   client         → "Client"           (Relation → Client DB)
+//   client         → "💼 Client"        (Relation → Client DB)
 //   numGuests      → "Number of Guests" (Number)
 //   names          → "Names"            (Text)
 //   notes          → "Notes"            (Text)
@@ -239,7 +239,7 @@ export type Tour = {
 
 function mapTour(page: PageObjectResponse): Tour {
   const serviceIds = relation(getProp(page, "Service"));
-  const clientIds  = relation(getProp(page, "Client"));
+  const clientIds  = relation(getProp(page, "💼 Client"));
   const guideIds   = relation(getProp(page, "Guia"));
   const chefIds    = relation(getProp(page, "Chef"));
   const driverIds  = relation(getProp(page, "Driver 1"));

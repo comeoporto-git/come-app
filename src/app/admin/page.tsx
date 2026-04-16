@@ -191,9 +191,9 @@ export default async function AdminPage({
 
 function getMissingFields(tour: Tour): string[] {
   const missing: string[] = [];
-  if (!tour.clientName)  missing.push("Agência / DMC");
+  if (!tour.clientName)  missing.push("Cliente");
   if (!tour.numGuests)   missing.push("Nº Pax");
-  if (!tour.names)       missing.push("Nomes Hóspedes");
+  if (!tour.names)       missing.push("Nomes");
   if (!tour.phoneNumber) missing.push("Contacto");
   return missing;
 }
