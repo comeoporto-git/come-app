@@ -40,14 +40,17 @@ export function TeamPicker({
     setSaving(true);
     setError(null);
     try {
-      await updateTourTeamAction(
+      const result = await updateTourTeamAction(
         tourId,
         selectedGuide  || null,
         selectedChef   || null,
         selectedDriver || null,
       );
-      // Full reload is more reliable than router.refresh() after Notion mutations
-      window.location.reload();
+      if (result.error) {
+        setError(result.error);
+      } else {
+        window.location.reload();
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao guardar equipa");
     } finally {
