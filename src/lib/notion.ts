@@ -16,6 +16,17 @@ function getProp(page: PageObjectResponse, name: string) {
   return (page.properties as Record<string, unknown>)[name];
 }
 
+/** Reads the title of any Notion page regardless of what the title column is named. */
+function pageTitle(page: PageObjectResponse): string {
+  for (const prop of Object.values(page.properties)) {
+    const p = prop as Record<string, unknown>;
+    if (p.type === "title") {
+      return (p.title as { plain_text: string }[])[0]?.plain_text ?? "";
+    }
+  }
+  return "";
+}
+
 function text(prop: unknown): string {
   if (!prop || typeof prop !== "object") return "";
   const p = prop as Record<string, unknown>;
@@ -273,19 +284,19 @@ async function resolveRelationNames(tours: Tour[]): Promise<Tour[]> {
   const serviceTypeMap: Record<string, string> = {};
 
   await Promise.all([
-    // Service pages: grab Name + Type
+    // Service pages: grab title + Type
     ...serviceIds.map(async (id) => {
       try {
         const page = (await notion.pages.retrieve({ page_id: id })) as PageObjectResponse;
-        nameMap[id]        = text(getProp(page, "Name"));
+        nameMap[id]        = pageTitle(page);
         serviceTypeMap[id] = text(getProp(page, "Type"));
       } catch { /* ignore */ }
     }),
-    // Everything else: just Name
+    // Everything else (client, guide, chef, driver): use title regardless of column name
     ...otherIds.map(async (id) => {
       try {
         const page = (await notion.pages.retrieve({ page_id: id })) as PageObjectResponse;
-        nameMap[id] = text(getProp(page, "Name"));
+        nameMap[id] = pageTitle(page);
       } catch { /* ignore */ }
     }),
   ]);
