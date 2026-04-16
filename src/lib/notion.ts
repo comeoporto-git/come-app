@@ -195,27 +195,29 @@ export async function getServicesWithMissingInfo(): Promise<Tour[]> {
 }
 
 export async function getPendingServices(): Promise<Tour[]> {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const in15Days = new Date(today);
-  in15Days.setDate(in15Days.getDate() + 15);
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const in15Days = new Date(today);
+    in15Days.setDate(in15Days.getDate() + 15);
 
-  const res = await notion.databases.query({
-    database_id: TOURS_DB,
-    filter: {
-      and: [
-        { property: "Date", date: { on_or_after: today.toISOString() } },
-        { property: "Date", date: { before: in15Days.toISOString() } },
-        { property: "Status", status: { equals: "Pending" } },
-      ],
-    },
-    sorts: [{ property: "Date", direction: "ascending" }],
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  } as any);
+    const res = await notion.databases.query({
+      database_id: TOURS_DB,
+      filter: {
+        and: [
+          { property: "Date", date: { on_or_after: today.toISOString() } },
+          { property: "Date", date: { before: in15Days.toISOString() } },
+          { property: "Status", select: { equals: "Pending" } },
+        ],
+      },
+      sorts: [{ property: "Date", direction: "ascending" }],
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
 
-  return resolveRelationNames(
-    (res.results as PageObjectResponse[]).map(mapTour)
-  );
+    return resolveRelationNames(
+      (res.results as PageObjectResponse[]).map(mapTour)
+    );
+  } catch { return []; }
 }
 
 export async function updateTeamMemberRole(
