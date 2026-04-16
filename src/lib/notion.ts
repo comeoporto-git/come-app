@@ -180,7 +180,7 @@ export async function getServicesWithMissingInfo(): Promise<Tour[]> {
 
   return tours.filter(
     (t) =>
-      t.status !== "Cancelled" &&
+      t.status !== "Cancelled" && t.status !== "Canceled" &&
       (!t.numGuests || !t.names || !t.phoneNumber || !t.clientName || !t.notes)
   );
 }

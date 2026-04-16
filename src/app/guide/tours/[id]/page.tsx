@@ -83,7 +83,7 @@ export default async function TourDetailPage({ params }: { params: Promise<{ id:
                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                   tour.status === "Confirmed" ? "bg-green-100 text-green-700" :
                   tour.status === "Pending"   ? "bg-yellow-100 text-yellow-700" :
-                  tour.status === "Cancelled" ? "bg-red-100 text-red-700" :
+                  (tour.status === "Cancelled" || tour.status === "Canceled") ? "bg-red-100 text-red-700" :
                   "bg-gray-100 text-gray-500"
                 }`}>{tour.status}</span>
               ) : (
