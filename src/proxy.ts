@@ -25,7 +25,7 @@ export default auth((req) => {
   const role = session.user?.role;
 
   // Role-based access control
-  if (pathname.startsWith("/guide") && role !== "Guide" && role !== "Super Guide" && role !== "Admin") {
+  if (pathname.startsWith("/guide") && role !== "Guide" && role !== "Super Guide" && role !== "Admin" && role !== "Chef") {
     return NextResponse.redirect(new URL("/unauthorized", req.url));
   }
   if (
