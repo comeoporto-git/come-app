@@ -195,6 +195,7 @@ function getMissingFields(tour: Tour): string[] {
   if (!tour.numGuests)   missing.push("Nº Pax");
   if (!tour.names)       missing.push("Nomes");
   if (!tour.phoneNumber) missing.push("Contacto");
+  if (!tour.notes)       missing.push("Notas");
   return missing;
 }
 

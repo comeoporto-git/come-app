@@ -179,7 +179,7 @@ export async function getServicesWithMissingInfo(): Promise<Tour[]> {
   );
 
   return tours.filter(
-    (t) => !t.numGuests || !t.names || !t.phoneNumber || !t.clientName
+    (t) => !t.numGuests || !t.names || !t.phoneNumber || !t.clientName || !t.notes
   );
 }
 
