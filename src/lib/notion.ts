@@ -223,14 +223,20 @@ export async function updateTourTeam(
   chefId: string | null,
   driverId: string | null,
 ): Promise<void> {
-  await notion.pages.update({
-    page_id: tourId,
-    properties: {
-      Guia:   { relation: guideId  ? [{ id: guideId  }] : [] },
-      Chef:   { relation: chefId   ? [{ id: chefId   }] : [] },
-      Driver: { relation: driverId ? [{ id: driverId }] : [] },
-    } as Parameters<typeof notion.pages.update>[0]["properties"],
-  });
+  try {
+    await notion.pages.update({
+      page_id: tourId,
+      properties: {
+        Guia:   { relation: guideId  ? [{ id: guideId  }] : [] },
+        Chef:   { relation: chefId   ? [{ id: chefId   }] : [] },
+        Driver: { relation: driverId ? [{ id: driverId }] : [] },
+      } as Parameters<typeof notion.pages.update>[0]["properties"],
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[updateTourTeam] Notion error:", msg, { tourId, guideId, chefId, driverId });
+    throw new Error(`Notion: ${msg}`);
+  }
 }
 
 export async function getToursForGuide(email: string): Promise<Tour[]> {
