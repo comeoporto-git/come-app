@@ -48,9 +48,9 @@ export default async function TourDetailPage({ params }: { params: Promise<{ id:
 
   if (!tour) notFound();
 
-  const totalSpent   = transactions.reduce((s, t) => s + t.totalCost, 0);
+  const totalSpent   = transactions.reduce((s, t) => s + t.totalCost, 0); // negative values
   const faturacao    = earnings.reduce((s, t) => s + t.totalCost, 0);
-  const lucro        = faturacao - totalSpent;
+  const lucro        = faturacao + totalSpent; // totalSpent is negative, so this subtracts
   const margem       = faturacao > 0 ? (lucro / faturacao) * 100 : null;
   const isClosed = tour.expensesClosed;
   const backHref = role === "Admin" ? "/admin/tours" : "/guide/services";
