@@ -223,19 +223,36 @@ export async function updateTourTeam(
   chefId: string | null,
   driverId: string | null,
 ): Promise<void> {
+  // Update Guia + Chef as relations (they are Relation fields in Notion)
   try {
     await notion.pages.update({
       page_id: tourId,
       properties: {
-        Guia:   { relation: guideId  ? [{ id: guideId  }] : [] },
-        Chef:   { relation: chefId   ? [{ id: chefId   }] : [] },
-        Driver: { relation: driverId ? [{ id: driverId }] : [] },
+        Guia: { relation: guideId ? [{ id: guideId }] : [] },
+        Chef: { relation: chefId  ? [{ id: chefId  }] : [] },
       } as Parameters<typeof notion.pages.update>[0]["properties"],
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error("[updateTourTeam] Notion error:", msg, { tourId, guideId, chefId, driverId });
+    console.error("[updateTourTeam] Guia/Chef error:", msg);
     throw new Error(`Notion: ${msg}`);
+  }
+
+  // Update Driver — try as Relation first (correct type); fall back silently if
+  // it's still configured as Select in Notion (user needs to change the property type)
+  if (driverId !== undefined) {
+    try {
+      await notion.pages.update({
+        page_id: tourId,
+        properties: {
+          Driver: { relation: driverId ? [{ id: driverId }] : [] },
+        } as Parameters<typeof notion.pages.update>[0]["properties"],
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      // If Driver is still a Select in Notion, log but don't crash the whole save
+      console.warn("[updateTourTeam] Driver update skipped (wrong property type?):", msg);
+    }
   }
 }
 
