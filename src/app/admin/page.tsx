@@ -61,48 +61,46 @@ export default async function AdminPage({
           </div>
         )}
 
-        {/* Gestão de Tours */}
-        <Link href="/admin/gestao-tours">
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex items-center gap-4 hover:border-[#667470]/30 active:scale-[0.98] transition-all cursor-pointer">
-            <div className="w-14 h-14 rounded-2xl bg-[#667470]/10 flex items-center justify-center text-3xl shrink-0">🗓️</div>
-            <div className="flex-1 min-w-0">
-              <p className="font-bold text-[#32373c] text-base">Gestão de Tours</p>
-              <p className="text-sm text-gray-400 mt-0.5">Serviços, Incompletos, Pendentes</p>
+        <div className="grid grid-cols-2 gap-3">
+          {/* Gestão de Tours */}
+          <Link href="/admin/gestao-tours">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex flex-col gap-3 hover:border-[#667470]/30 active:scale-[0.98] transition-all cursor-pointer relative min-h-[120px]">
+              {toursAlertCount > 0 && (
+                <span className="absolute top-3 right-3 bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">{toursAlertCount}</span>
+              )}
+              <div className="w-12 h-12 rounded-2xl bg-[#667470]/10 flex items-center justify-center text-2xl shrink-0">🗓️</div>
+              <div>
+                <p className="font-bold text-[#32373c] text-sm leading-tight">Gestão de Tours</p>
+                <p className="text-xs text-gray-400 mt-0.5 leading-tight">Serviços, Incompletos, Pendentes</p>
+              </div>
             </div>
-            {toursAlertCount > 0 && (
-              <span className="bg-red-500 text-white text-xs font-bold px-2.5 py-1 rounded-full shrink-0">
-                {toursAlertCount}
-              </span>
-            )}
-          </div>
-        </Link>
+          </Link>
 
-        {/* Contabilidade */}
-        <Link href="/admin/contabilidade">
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex items-center gap-4 hover:border-[#667470]/30 active:scale-[0.98] transition-all cursor-pointer">
-            <div className="w-14 h-14 rounded-2xl bg-blue-50 flex items-center justify-center text-3xl shrink-0">📊</div>
-            <div className="flex-1 min-w-0">
-              <p className="font-bold text-[#32373c] text-base">Contabilidade</p>
-              <p className="text-sm text-gray-400 mt-0.5">Banco, Faturas, Transferências, Reconciliação</p>
+          {/* Contabilidade */}
+          <Link href="/admin/contabilidade">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex flex-col gap-3 hover:border-[#667470]/30 active:scale-[0.98] transition-all cursor-pointer relative min-h-[120px]">
+              {(reconciliationCount + guideExpenses.length) > 0 && (
+                <span className="absolute top-3 right-3 bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">{reconciliationCount + guideExpenses.length}</span>
+              )}
+              <div className="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center text-2xl shrink-0">📊</div>
+              <div>
+                <p className="font-bold text-[#32373c] text-sm leading-tight">Contabilidade</p>
+                <p className="text-xs text-gray-400 mt-0.5 leading-tight">Banco, Faturas, Transferências</p>
+              </div>
             </div>
-            {(reconciliationCount + guideExpenses.length) > 0 && (
-              <span className="bg-red-500 text-white text-xs font-bold px-2.5 py-1 rounded-full shrink-0">
-                {reconciliationCount + guideExpenses.length}
-              </span>
-            )}
-          </div>
-        </Link>
+          </Link>
 
-        {/* Utilizadores */}
-        <Link href="/admin/users">
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex items-center gap-4 hover:border-[#667470]/30 active:scale-[0.98] transition-all cursor-pointer">
-            <div className="w-14 h-14 rounded-2xl bg-purple-50 flex items-center justify-center text-3xl shrink-0">👥</div>
-            <div className="flex-1 min-w-0">
-              <p className="font-bold text-[#32373c] text-base">Utilizadores</p>
-              <p className="text-sm text-gray-400 mt-0.5">Gerir equipa e permissões</p>
+          {/* Utilizadores */}
+          <Link href="/admin/users">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex flex-col gap-3 hover:border-[#667470]/30 active:scale-[0.98] transition-all cursor-pointer relative min-h-[120px]">
+              <div className="w-12 h-12 rounded-2xl bg-purple-50 flex items-center justify-center text-2xl shrink-0">👥</div>
+              <div>
+                <p className="font-bold text-[#32373c] text-sm leading-tight">Utilizadores</p>
+                <p className="text-xs text-gray-400 mt-0.5 leading-tight">Gerir equipa e permissões</p>
+              </div>
             </div>
-          </div>
-        </Link>
+          </Link>
+        </div>
       </main>
     </div>
   );
