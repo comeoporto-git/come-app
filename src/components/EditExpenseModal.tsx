@@ -39,15 +39,16 @@ export function EditExpenseModal({
   const fileRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
 
+  // totalCost in Notion is stored as negative; show/work with positive in the form
   const [form, setForm] = useState<FormState>({
     supplier: transaction.supplier,
     date: transaction.date ?? new Date().toISOString().slice(0, 10),
     invoiceId: transaction.invoiceId,
-    taxFree: transaction.taxFree,
-    iva6: transaction.iva6,
-    iva13: transaction.iva13,
-    iva23: transaction.iva23,
-    totalCost: transaction.totalCost,
+    taxFree: Math.abs(transaction.taxFree),
+    iva6: Math.abs(transaction.iva6),
+    iva13: Math.abs(transaction.iva13),
+    iva23: Math.abs(transaction.iva23),
+    totalCost: Math.abs(transaction.totalCost),
     paymentMethod: transaction.paymentMethod,
   });
 
@@ -194,14 +195,31 @@ export function EditExpenseModal({
           )}
 
           <div className="space-y-3">
-            {/* Existing invoice photo */}
+            {/* Existing invoice — image or PDF */}
             {transaction.invoiceImageUrl && !imageDataUrl && (
-              <img
-                src={transaction.invoiceImageUrl}
-                alt="Fatura atual"
-                className="w-full max-h-48 object-contain rounded-xl border border-gray-200 cursor-zoom-in"
-                onClick={() => setLightboxSrc(transaction.invoiceImageUrl!)}
-              />
+              transaction.invoiceImageUrl.toLowerCase().endsWith(".pdf") ||
+              transaction.invoiceImageUrl.includes("application/pdf") ? (
+                <a
+                  href={transaction.invoiceImageUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 p-3 rounded-xl border border-gray-200 bg-gray-50 hover:bg-gray-100 transition-colors"
+                >
+                  <span className="text-2xl">📄</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-700">Fatura em PDF</p>
+                    <p className="text-xs text-[#667470]">Toque para abrir</p>
+                  </div>
+                  <span className="text-xs text-gray-400">↗</span>
+                </a>
+              ) : (
+                <img
+                  src={transaction.invoiceImageUrl}
+                  alt="Fatura atual"
+                  className="w-full max-h-48 object-contain rounded-xl border border-gray-200 cursor-zoom-in"
+                  onClick={() => setLightboxSrc(transaction.invoiceImageUrl!)}
+                />
+              )
             )}
 
             {/* Supplier */}

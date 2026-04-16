@@ -194,6 +194,30 @@ export async function getServicesWithMissingInfo(): Promise<Tour[]> {
   );
 }
 
+export async function getPendingServices(): Promise<Tour[]> {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const in15Days = new Date(today);
+  in15Days.setDate(in15Days.getDate() + 15);
+
+  const res = await notion.databases.query({
+    database_id: TOURS_DB,
+    filter: {
+      and: [
+        { property: "Date", date: { on_or_after: today.toISOString() } },
+        { property: "Date", date: { before: in15Days.toISOString() } },
+        { property: "Status", status: { equals: "Pending" } },
+      ],
+    },
+    sorts: [{ property: "Date", direction: "ascending" }],
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any);
+
+  return resolveRelationNames(
+    (res.results as PageObjectResponse[]).map(mapTour)
+  );
+}
+
 export async function updateTeamMemberRole(
   memberId: string,
   role: TeamMember["role"],
@@ -553,6 +577,8 @@ export type Transaction = {
   bankReference: string;
   invoiceImageUrl?: string;
   precisaDeFatura?: "Sim" | "Não" | "Sim tratado" | "";
+  transferenciaFeita?: boolean;
+  comprovantivoUrl?: string;
 };
 
 function mapTransaction(page: PageObjectResponse): Transaction {
@@ -582,6 +608,8 @@ function mapTransaction(page: PageObjectResponse): Transaction {
     bankReference:      text(getProp(page, "ID do Banco")),
     invoiceImageUrl:    fileUrl(getProp(page, "Fatura"), page.id) ?? undefined,
     precisaDeFatura:    text(getProp(page, "Precisa de Fatura")) as Transaction["precisaDeFatura"],
+    transferenciaFeita: bool(getProp(page, "Transferência Feita")),
+    comprovantivoUrl:   fileUrl(getProp(page, "Comprovativo de Pagamento"), page.id) ?? undefined,
   };
 }
 
@@ -759,10 +787,12 @@ export async function createTransaction(
       "IVA 6%":           { number: data.iva6 },
       "IVA 13%":          { number: data.iva13 },
       "IVA 23%":          { number: data.iva23 },
-      Valor:              { number: data.totalCost },
+      Valor:              { number: -(Math.abs(data.totalCost)) },  // always negative
       "Pago Por":         { select: { name: data.whoPaid } },
       "Método de Pagamento": { select: { name: data.paymentMethod } },
       Status:             { select: { name: data.status } },
+      "Tipo":             { select: { name: "Expense" } },
+      "Conta de Pagamento": { select: { name: "COME" } },
       ...(data.tourId
         ? { "🎫 Sales": { relation: [{ id: data.tourId }] } }
         : {}),
@@ -797,7 +827,7 @@ export async function updateTransaction(
   if (data.iva6 !== undefined)        props["IVA 6%"] = { number: data.iva6 };
   if (data.iva13 !== undefined)       props["IVA 13%"] = { number: data.iva13 };
   if (data.iva23 !== undefined)       props["IVA 23%"] = { number: data.iva23 };
-  if (data.totalCost !== undefined)   props.Valor = { number: data.totalCost };
+  if (data.totalCost !== undefined)   props.Valor = { number: -(Math.abs(data.totalCost)) }; // always negative
   if (data.whoPaid !== undefined)
     props["Pago Por"] = { select: { name: data.whoPaid } };
   if (data.paymentMethod !== undefined)
@@ -832,6 +862,42 @@ export async function verifyTransaction(pageId: string, verified: boolean): Prom
 
 export async function archiveTransaction(pageId: string): Promise<void> {
   await notion.pages.update({ page_id: pageId, archived: true });
+}
+
+/** All "Pelo Guia" expenses where Transferência Feita is not yet checked. */
+export async function getGuideExpenses(): Promise<Transaction[]> {
+  try {
+    const res = await notion.databases.query({
+      database_id: TRANSACTIONS_DB,
+      filter: {
+        and: [
+          { property: "Método de Pagamento", select: { equals: "Pelo Guia" } },
+          { property: "Transferência Feita", checkbox: { equals: false } },
+        ],
+      },
+      sorts: [{ property: "Data", direction: "descending" }],
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
+    return (res.results as PageObjectResponse[]).map(mapTransaction);
+  } catch { return []; }
+}
+
+export async function markTransferenciaFeita(pageId: string): Promise<void> {
+  await notion.pages.update({
+    page_id: pageId,
+    properties: { "Transferência Feita": { checkbox: true } },
+  });
+}
+
+export async function setComprovativoUrl(pageId: string, url: string): Promise<void> {
+  await notion.pages.update({
+    page_id: pageId,
+    properties: {
+      "Comprovativo de Pagamento": {
+        files: [{ type: "external", name: "comprovativo", external: { url } }],
+      },
+    } as Parameters<typeof notion.pages.update>[0]["properties"],
+  });
 }
 
 // ── Fornecedores ──────────────────────────────────────────────────────────────

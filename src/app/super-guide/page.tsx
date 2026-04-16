@@ -1,5 +1,5 @@
 import { auth } from "@/lib/auth";
-import { getTransactionsNeedingInvoice } from "@/lib/notion";
+import { getTransactionsNeedingInvoice, getGuideExpenses } from "@/lib/notion";
 import { redirect } from "next/navigation";
 import { signOut } from "@/lib/auth";
 import Image from "next/image";
@@ -12,9 +12,12 @@ export default async function SuperGuideDashboard() {
     redirect("/");
   }
 
-  // Fetch pending invoice count for the badge
-  const needingInvoice = await getTransactionsNeedingInvoice();
+  const [needingInvoice, guideExpenses] = await Promise.all([
+    getTransactionsNeedingInvoice(),
+    getGuideExpenses(),
+  ]);
   const pendingCount = needingInvoice.length;
+  const transferenciasCount = guideExpenses.length;
 
   return (
     <div className="min-h-screen bg-[#667470]">
@@ -78,6 +81,24 @@ export default async function SuperGuideDashboard() {
             )}
           </div>
         </Link>
+        {/* Transferências em Falta */}
+        <Link href="/admin/em-falta">
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex items-center gap-5 hover:shadow-md active:scale-[0.98] transition-all cursor-pointer">
+            <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center text-3xl shrink-0">
+              💸
+            </div>
+            <div className="flex-1">
+              <p className="font-bold text-[#32373c] text-base">Transferências em Falta</p>
+              <p className="text-sm text-gray-400 mt-0.5">Despesas pagas pelos guias</p>
+            </div>
+            {transferenciasCount > 0 && (
+              <span className="bg-red-500 text-white text-xs font-bold px-2.5 py-1 rounded-full shrink-0">
+                {transferenciasCount}
+              </span>
+            )}
+          </div>
+        </Link>
+
         {/* Perfil */}
         <Link href="/profile">
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex items-center gap-5 hover:shadow-md active:scale-[0.98] transition-all cursor-pointer">

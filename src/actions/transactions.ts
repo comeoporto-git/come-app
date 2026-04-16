@@ -8,6 +8,8 @@ import {
   archiveTransaction,
   closeTour,
   createFornecedor,
+  markTransferenciaFeita,
+  setComprovativoUrl,
 } from "@/lib/notion";
 import type { Transaction, Fornecedor } from "@/lib/notion";
 import { revalidatePath } from "next/cache";
@@ -187,6 +189,29 @@ export async function verifyTransactionAction(
   await verifyTransaction(transactionId, verified);
   revalidatePath("/accountant");
   if (tourId) revalidatePath(`/guide/tours/${tourId}`);
+}
+
+export async function uploadComprovantivoAction(
+  transactionId: string,
+  fileUrl: string,
+): Promise<void> {
+  const session = await requireAuth();
+  if (session.user.role !== "Admin" && session.user.role !== "Super Guide") {
+    throw new Error("Forbidden");
+  }
+  await setComprovativoUrl(transactionId, fileUrl);
+  revalidatePath("/admin/em-falta");
+}
+
+export async function markTransferenciaFeitaAction(
+  transactionId: string,
+): Promise<void> {
+  const session = await requireAuth();
+  if (session.user.role !== "Admin" && session.user.role !== "Super Guide") {
+    throw new Error("Forbidden");
+  }
+  await markTransferenciaFeita(transactionId);
+  revalidatePath("/admin/em-falta");
 }
 
 export async function deleteExpenseAction(
