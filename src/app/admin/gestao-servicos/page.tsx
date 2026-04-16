@@ -55,7 +55,7 @@ export default async function GestaoToursPage() {
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-4 py-8 space-y-6">
+      <main className="max-w-2xl mx-auto px-4 py-8 space-y-8">
 
         {/* Serviços button */}
         <Link href="/admin/tours">
@@ -69,6 +69,7 @@ export default async function GestaoToursPage() {
           </div>
         </Link>
 
+        <div className="space-y-6">
         {/* Serviços Incompletos */}
         <section className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="px-5 py-4 border-b border-gray-50 flex items-center justify-between">
@@ -142,6 +143,7 @@ export default async function GestaoToursPage() {
             </ul>
           )}
         </section>
+        </div>
 
       </main>
     </div>

@@ -44,6 +44,8 @@ export default async function EmFaltaPage() {
           </div>
         </Link>
 
+        <div className="pt-2" />
+
         {/* Transferências em Falta */}
         <section className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="px-5 py-4 border-b border-gray-50 flex items-center justify-between">
