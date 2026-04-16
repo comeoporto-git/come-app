@@ -93,9 +93,9 @@ export default async function TourDetailPage({ params }: { params: Promise<{ id:
 
             {tour.serviceType && <InfoField label="Tipo" value={tour.serviceType} />}
             <InfoField label="Serviço" value={tour.serviceName || "—"} />
-            <InfoField label="Cliente"  value={tour.clientName || "—"} />
-            <InfoField label="Nº de Pax" value={tour.numGuests ? String(tour.numGuests) : "—"} />
-            <InfoField label="Nomes"    value={tour.names || "—"} />
+            <InfoField label="Agência / DMC" value={tour.clientName || "—"} />
+            <InfoField label="Nº de Pax"   value={tour.numGuests ? String(tour.numGuests) : "—"} />
+            <InfoField label="Nomes dos Hóspedes" value={tour.names || "—"} />
 
             {/* Contacto */}
             <div>
