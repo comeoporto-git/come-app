@@ -69,6 +69,8 @@ export default async function GestaoToursPage() {
           </div>
         </Link>
 
+        <div className="pt-2" />
+
         <div className="space-y-6">
         {/* Serviços Incompletos */}
         <section className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
