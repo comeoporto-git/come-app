@@ -47,7 +47,7 @@ export default async function GestaoToursPage() {
             />
           </div>
           <div className="flex items-center gap-4">
-            <span className="text-xs text-white/50 font-medium uppercase tracking-widest">Gestão de Tours</span>
+            <span className="text-xs text-white/50 font-medium uppercase tracking-widest">Gestão de Serviços</span>
             <form action={async () => { "use server"; await signOut({ redirectTo: "/login" }); }}>
               <button className="text-xs text-white/40 hover:text-white transition-colors">Sair</button>
             </form>
