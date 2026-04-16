@@ -95,6 +95,20 @@ function TourCard({
   );
 }
 
+function filterTours(tours: Tour[], query: string, teamMap?: Record<string, string>): Tour[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return tours;
+  return tours.filter((t) => {
+    const guideName = teamMap?.[t.teamId ?? ""] ?? "";
+    return (
+      t.saleId.toLowerCase().includes(q) ||
+      (t.serviceName ?? "").toLowerCase().includes(q) ||
+      (t.clientName ?? "").toLowerCase().includes(q) ||
+      guideName.toLowerCase().includes(q)
+    );
+  });
+}
+
 export function TourTabs({
   upcoming,
   past,
@@ -106,7 +120,11 @@ export function TourTabs({
   teamMap?: Record<string, string>;
   currentUserId?: string;
 }) {
-  const [tab, setTab] = useState<Tab>("upcoming");
+  const [tab, setTab]       = useState<Tab>("upcoming");
+  const [query, setQuery]   = useState("");
+
+  const visibleUpcoming = filterTours(upcoming, query, teamMap);
+  const visiblePast     = filterTours(past,     query, teamMap);
 
   return (
     <div className="space-y-4">
@@ -134,13 +152,42 @@ export function TourTabs({
         </button>
       </div>
 
+      {/* Search box */}
+      <div className="relative">
+        <svg
+          className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40 pointer-events-none"
+          viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+          strokeLinecap="round" strokeLinejoin="round"
+        >
+          <circle cx="11" cy="11" r="8" />
+          <path d="m21 21-4.35-4.35" />
+        </svg>
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Pesquisar serviços…"
+          className="w-full bg-white/15 text-white placeholder-white/40 text-sm rounded-xl pl-9 pr-9 py-2.5 focus:outline-none focus:bg-white/25 transition-colors"
+        />
+        {query && (
+          <button
+            onClick={() => setQuery("")}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/70"
+          >
+            ✕
+          </button>
+        )}
+      </div>
+
       {/* List */}
       {tab === "upcoming" ? (
-        upcoming.length === 0 ? (
-          <p className="text-sm text-white/50 text-center py-8">Sem serviços futuros</p>
+        visibleUpcoming.length === 0 ? (
+          <p className="text-sm text-white/50 text-center py-8">
+            {query ? "Sem resultados" : "Sem serviços futuros"}
+          </p>
         ) : (
           <ul className="flex flex-col gap-4">
-            {upcoming.map((tour) => (
+            {visibleUpcoming.map((tour) => (
               <TourCard
                 key={tour.id}
                 tour={tour}
@@ -150,11 +197,13 @@ export function TourTabs({
             ))}
           </ul>
         )
-      ) : past.length === 0 ? (
-        <p className="text-sm text-white/30 text-center py-8">Sem serviços anteriores</p>
+      ) : visiblePast.length === 0 ? (
+        <p className="text-sm text-white/30 text-center py-8">
+          {query ? "Sem resultados" : "Sem serviços anteriores"}
+        </p>
       ) : (
         <ul className="flex flex-col gap-4">
-          {past.map((tour) => (
+          {visiblePast.map((tour) => (
             <TourCard
               key={tour.id}
               tour={tour}

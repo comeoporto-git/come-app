@@ -349,6 +349,32 @@ async function resolveRelationNames(tours: Tour[]): Promise<Tour[]> {
   }));
 }
 
+export async function updateTourServiceInfo(
+  tourId: string,
+  data: {
+    numGuests: number | null;
+    names: string;
+    phoneNumber: string;
+    notes: string;
+  },
+): Promise<void> {
+  try {
+    await notion.pages.update({
+      page_id: tourId,
+      properties: {
+        "Number of Guests": { number: data.numGuests ?? null },
+        Names: { rich_text: data.names ? [{ text: { content: data.names } }] : [] },
+        "Phone Number": { phone_number: data.phoneNumber || null },
+        Notes: { rich_text: data.notes ? [{ text: { content: data.notes } }] : [] },
+      } as Parameters<typeof notion.pages.update>[0]["properties"],
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[updateTourServiceInfo] error:", msg);
+    throw new Error(`Notion: ${msg}`);
+  }
+}
+
 export async function updateTourTeam(
   tourId: string,
   guideId: string | null,

@@ -4,6 +4,7 @@ import {
   createTransaction,
   updateTransaction,
   updateTourTeam,
+  updateTourServiceInfo,
   verifyTransaction,
   archiveTransaction,
   closeTour,
@@ -33,6 +34,29 @@ export async function updateTourTeamAction(
   }
   try {
     await updateTourTeam(tourId, guideId, chefId, driverId);
+    revalidatePath(`/guide/tours/${tourId}`);
+    return {};
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { error: msg };
+  }
+}
+
+export async function updateTourServiceInfoAction(
+  tourId: string,
+  data: {
+    numGuests: number | null;
+    names: string;
+    phoneNumber: string;
+    notes: string;
+  },
+): Promise<{ error?: string }> {
+  const session = await requireAuth();
+  if (session.user.role !== "Super Guide" && session.user.role !== "Admin") {
+    return { error: "Forbidden: apenas Super Guide ou Admin podem editar esta informação" };
+  }
+  try {
+    await updateTourServiceInfo(tourId, data);
     revalidatePath(`/guide/tours/${tourId}`);
     return {};
   } catch (err) {

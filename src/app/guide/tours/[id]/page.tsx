@@ -15,6 +15,7 @@ import { closeTourAction } from "@/actions/transactions";
 import { ExpenseList } from "@/components/ExpenseList";
 import { AddExpenseButton } from "@/components/AddExpenseButton";
 import { TeamPicker } from "@/components/TeamPicker";
+import { ServiceInfoEditor } from "@/components/ServiceInfoEditor";
 
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
@@ -124,46 +125,56 @@ async function TourPageContent({
       </header>
 
       <main className="max-w-lg mx-auto px-4 py-5 space-y-5">
-        {/* Group Info */}
+        {/* Service Info */}
         <section className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="px-4 py-3 border-b border-gray-50">
-            <h2 className="text-sm font-semibold text-gray-700">Informação do Grupo</h2>
+            <h2 className="text-sm font-semibold text-gray-700">Informação do Serviço</h2>
           </div>
           <div className="px-4 py-3 space-y-3">
-            <div>
-              <p className="text-xs text-gray-500 mb-1">Estado</p>
-              {tour.status ? (
-                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                  tour.status === "Confirmed" ? "bg-green-100 text-green-700" :
-                  tour.status === "Pending"   ? "bg-yellow-100 text-yellow-700" :
-                  (tour.status === "Cancelled" || tour.status === "Canceled") ? "bg-red-100 text-red-700" :
-                  "bg-gray-100 text-gray-500"
-                }`}>{tour.status}</span>
-              ) : (
-                <p className="text-sm text-gray-800 font-medium">—</p>
-              )}
-            </div>
-
-            {tour.serviceType && <InfoField label="Tipo" value={tour.serviceType} />}
-            <InfoField label="Serviço" value={tour.serviceName || "—"} />
-            {(role === "Super Guide" || role === "Admin") && (
-              <InfoField label="Cliente" value={tour.clientName || "—"} />
+            {canEditTeam ? (
+              <ServiceInfoEditor
+                tourId={id}
+                status={tour.status}
+                serviceType={tour.serviceType}
+                serviceName={tour.serviceName}
+                clientName={tour.clientName}
+                numGuests={tour.numGuests}
+                names={tour.names}
+                phoneNumber={tour.phoneNumber}
+                notes={tour.notes}
+              />
+            ) : (
+              <>
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">Estado</p>
+                  {tour.status ? (
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                      tour.status === "Confirmed" ? "bg-green-100 text-green-700" :
+                      tour.status === "Pending"   ? "bg-yellow-100 text-yellow-700" :
+                      (tour.status === "Cancelled" || tour.status === "Canceled") ? "bg-red-100 text-red-700" :
+                      "bg-gray-100 text-gray-500"
+                    }`}>{tour.status}</span>
+                  ) : (
+                    <p className="text-sm text-gray-800 font-medium">—</p>
+                  )}
+                </div>
+                {tour.serviceType && <InfoField label="Tipo" value={tour.serviceType} />}
+                <InfoField label="Serviço" value={tour.serviceName || "—"} />
+                <InfoField label="Nº de Pax" value={tour.numGuests ? String(tour.numGuests) : "—"} />
+                <InfoField label="Nomes"    value={tour.names || "—"} />
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">Contacto</p>
+                  {tour.phoneNumber ? (
+                    <a href={`tel:${tour.phoneNumber}`} className="text-sm text-[#667470] font-medium hover:underline">
+                      {tour.phoneNumber}
+                    </a>
+                  ) : (
+                    <p className="text-sm text-gray-800 font-medium">—</p>
+                  )}
+                </div>
+                <InfoField label="Notas" value={tour.notes || "—"} />
+              </>
             )}
-            <InfoField label="Nº de Pax" value={tour.numGuests ? String(tour.numGuests) : "—"} />
-            <InfoField label="Nomes"    value={tour.names || "—"} />
-
-            <div>
-              <p className="text-xs text-gray-500 mb-1">Contacto</p>
-              {tour.phoneNumber ? (
-                <a href={`tel:${tour.phoneNumber}`} className="text-sm text-[#667470] font-medium hover:underline">
-                  {tour.phoneNumber}
-                </a>
-              ) : (
-                <p className="text-sm text-gray-800 font-medium">—</p>
-              )}
-            </div>
-
-            <InfoField label="Notas" value={tour.notes || "—"} />
           </div>
         </section>
 
