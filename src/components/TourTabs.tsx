@@ -120,7 +120,7 @@ export function TourTabs({
       {/* List */}
       {tab === "upcoming" ? (
         upcoming.length === 0 ? (
-          <p className="text-sm text-white/50 text-center py-8">Sem tours futuros</p>
+          <p className="text-sm text-white/50 text-center py-8">Sem serviços futuros</p>
         ) : (
           <ul className="flex flex-col gap-4">
             {upcoming.map((tour) => (
@@ -134,7 +134,7 @@ export function TourTabs({
           </ul>
         )
       ) : past.length === 0 ? (
-        <p className="text-sm text-white/30 text-center py-8">Sem tours anteriores</p>
+        <p className="text-sm text-white/30 text-center py-8">Sem serviços anteriores</p>
       ) : (
         <ul className="flex flex-col gap-4">
           {past.map((tour) => (

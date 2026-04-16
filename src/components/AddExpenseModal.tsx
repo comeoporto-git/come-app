@@ -280,8 +280,8 @@ export function AddExpenseModal({
               >
                 <span className="text-3xl flex-shrink-0">🛒</span>
                 <div>
-                  <p className="text-sm font-bold text-[#32373c]">Despesa do Tour</p>
-                  <p className="text-xs text-gray-500 mt-0.5">Ingredientes ou materiais comprados para o tour</p>
+                  <p className="text-sm font-bold text-[#32373c]">Despesa do Serviço</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Ingredientes ou materiais comprados para o serviço</p>
                 </div>
               </button>
               <button

@@ -105,7 +105,7 @@ export default async function GuideDashboard() {
         {todays.length > 0 && (
           <section>
             <h2 className="text-xs font-bold uppercase tracking-widest text-white/80 mb-3">
-              Hoje · {todays.length}
+              Hoje · {todays.length} {todays.length === 1 ? "serviço" : "serviços"}
             </h2>
             <ul className="flex flex-col gap-4">
               {todays.map((tour) => {

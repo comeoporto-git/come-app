@@ -91,7 +91,8 @@ export default async function TourDetailPage({ params }: { params: Promise<{ id:
               )}
             </div>
 
-            <InfoField label="Serviço" value={(tour.serviceName || tour.type) || "—"} />
+            <InfoField label="Serviço" value={tour.serviceName || "—"} />
+            {tour.serviceType && <InfoField label="Tipo" value={tour.serviceType} />}
             <InfoField label="Cliente"  value={tour.clientName || "—"} />
             <InfoField label="Nº de Pax" value={tour.numGuests ? String(tour.numGuests) : "—"} />
             <InfoField label="Nomes"    value={tour.names || "—"} />
@@ -187,7 +188,7 @@ export default async function TourDetailPage({ params }: { params: Promise<{ id:
               type="submit"
               className="w-full bg-[#32373c] text-white font-semibold py-3.5 rounded-2xl text-sm hover:bg-[#1a2018] transition-colors active:scale-[0.98] tracking-wide"
             >
-              Fechar Tour e Despesas
+              Fechar Serviço e Despesas
             </button>
           </form>
         )}

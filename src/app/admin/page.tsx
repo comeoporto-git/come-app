@@ -129,7 +129,7 @@ export default async function AdminPage({
         {/* Quick links */}
         <section className="grid grid-cols-2 gap-3">
           {[
-            { label: "Tours", href: "/admin/tours", icon: "🗓️" },
+            { label: "Serviços", href: "/admin/tours", icon: "🗓️" },
             { label: "Faturas em Falta", href: "/super-guide", icon: "🧾" },
             { label: "Contabilidade", href: "/accountant", icon: "📊" },
             {

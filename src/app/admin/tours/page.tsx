@@ -61,7 +61,7 @@ export default async function AdminToursPage() {
             />
           </div>
           <div className="flex items-center gap-4">
-            <span className="text-xs text-white/50 font-medium uppercase tracking-widest">Tours</span>
+            <span className="text-xs text-white/50 font-medium uppercase tracking-widest">Serviços</span>
             <form action={async () => { "use server"; await signOut({ redirectTo: "/login" }); }}>
               <button className="text-xs text-white/40 hover:text-white transition-colors">Sair</button>
             </form>
@@ -74,7 +74,7 @@ export default async function AdminToursPage() {
         {todays.length > 0 && (
           <section>
             <h2 className="text-xs font-bold uppercase tracking-widest text-white/80 mb-3">
-              Hoje · {todays.length} tour{todays.length !== 1 ? "s" : ""}
+              Hoje · {todays.length}
             </h2>
             <ul className="flex flex-col gap-4">
               {todays.map((tour) => {

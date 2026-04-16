@@ -149,6 +149,7 @@ export type Tour = {
   saleId: string;
   service: string;
   serviceName: string;
+  serviceType: string;   // "Type" field from the linked Services DB page
   type: string;
   date: string | null;
   client: string;
@@ -181,6 +182,7 @@ function mapTour(page: PageObjectResponse): Tour {
     saleId:          text(getProp(page, "ID")),
     service:         serviceIds[0] ?? "",
     serviceName:     "",
+    serviceType:     "",
     type:            text(getProp(page, "Type")),
     date:            dateStr(getProp(page, "Date")),
     client:          clientIds[0] ?? "",
@@ -202,30 +204,45 @@ function mapTour(page: PageObjectResponse): Tour {
 }
 
 async function resolveRelationNames(tours: Tour[]): Promise<Tour[]> {
-  const allIds = [...new Set([
-    ...tours.map((t) => t.service),
+  const serviceIds = [...new Set(tours.map((t) => t.service).filter(Boolean) as string[])];
+  const otherIds   = [...new Set([
     ...tours.map((t) => t.client),
     ...tours.map((t) => t.guideId),
     ...tours.map((t) => t.chefId),
     ...tours.map((t) => t.driverId),
   ].filter(Boolean) as string[])];
-  if (!allIds.length) return tours;
-  const map: Record<string, string> = {};
-  await Promise.all(
-    allIds.map(async (id) => {
+
+  if (!serviceIds.length && !otherIds.length) return tours;
+
+  const nameMap:        Record<string, string> = {};
+  const serviceTypeMap: Record<string, string> = {};
+
+  await Promise.all([
+    // Service pages: grab Name + Type
+    ...serviceIds.map(async (id) => {
       try {
         const page = (await notion.pages.retrieve({ page_id: id })) as PageObjectResponse;
-        map[id] = text(getProp(page, "Name"));
+        nameMap[id]        = text(getProp(page, "Name"));
+        serviceTypeMap[id] = text(getProp(page, "Type"));
       } catch { /* ignore */ }
-    })
-  );
+    }),
+    // Everything else: just Name
+    ...otherIds.map(async (id) => {
+      try {
+        const page = (await notion.pages.retrieve({ page_id: id })) as PageObjectResponse;
+        nameMap[id] = text(getProp(page, "Name"));
+      } catch { /* ignore */ }
+    }),
+  ]);
+
   return tours.map((t) => ({
     ...t,
-    serviceName: map[t.service]   ?? "",
-    clientName:  map[t.client]    ?? "",
-    guideName:   map[t.guideId!]  ?? "",
-    chefName:    map[t.chefId!]   ?? "",
-    driverName:  map[t.driverId!] ?? "",
+    serviceName:  nameMap[t.service]        ?? "",
+    serviceType:  serviceTypeMap[t.service] ?? "",
+    clientName:   nameMap[t.client]         ?? "",
+    guideName:    nameMap[t.guideId!]       ?? "",
+    chefName:     nameMap[t.chefId!]        ?? "",
+    driverName:   nameMap[t.driverId!]      ?? "",
   }));
 }
 

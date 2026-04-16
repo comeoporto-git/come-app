@@ -55,8 +55,8 @@ export default async function SuperGuideDashboard() {
               🗓️
             </div>
             <div>
-              <p className="font-bold text-[#32373c] text-base">Tours</p>
-              <p className="text-sm text-gray-400 mt-0.5">Ver os teus tours agendados</p>
+              <p className="font-bold text-[#32373c] text-base">Serviços</p>
+              <p className="text-sm text-gray-400 mt-0.5">Ver os teus serviços agendados</p>
             </div>
           </div>
         </Link>
