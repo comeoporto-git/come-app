@@ -48,8 +48,8 @@ export default async function SuperGuideDashboard() {
       </header>
 
       <main className="max-w-lg mx-auto px-4 py-10 space-y-4">
-        {/* Tours */}
-        <Link href="/guide">
+        {/* Serviços */}
+        <Link href="/guide/services">
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex items-center gap-5 hover:shadow-md active:scale-[0.98] transition-all cursor-pointer">
             <div className="w-14 h-14 rounded-2xl bg-[#667470]/10 flex items-center justify-center text-3xl shrink-0">
               🗓️
@@ -76,6 +76,18 @@ export default async function SuperGuideDashboard() {
                 {pendingCount}
               </span>
             )}
+          </div>
+        </Link>
+        {/* Perfil */}
+        <Link href="/profile">
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex items-center gap-5 hover:shadow-md active:scale-[0.98] transition-all cursor-pointer">
+            <div className="w-14 h-14 rounded-2xl bg-[#667470]/10 flex items-center justify-center text-3xl shrink-0">
+              👤
+            </div>
+            <div>
+              <p className="font-bold text-[#32373c] text-base">Perfil</p>
+              <p className="text-sm text-gray-400 mt-0.5">Ver e editar os teus dados</p>
+            </div>
           </div>
         </Link>
       </main>

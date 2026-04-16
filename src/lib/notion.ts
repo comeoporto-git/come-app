@@ -117,6 +117,19 @@ export async function getTeamMemberById(id: string): Promise<TeamMember | null> 
   } catch { return null; }
 }
 
+export async function updateTeamMemberProfile(
+  memberId: string,
+  data: { name: string; phone: string },
+): Promise<void> {
+  await notion.pages.update({
+    page_id: memberId,
+    properties: {
+      Name:    { title: [{ text: { content: data.name } }] },
+      Contact: { phone_number: data.phone || null },
+    } as Parameters<typeof notion.pages.update>[0]["properties"],
+  });
+}
+
 export async function updateTeamMemberRole(
   memberId: string,
   role: TeamMember["role"],

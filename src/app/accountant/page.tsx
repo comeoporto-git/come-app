@@ -54,6 +54,7 @@ export default async function AccountantPage({
           </div>
           <div className="flex items-center gap-3">
             {tab === "faturas" && <ExportCSVButton transactions={transactions} />}
+            <Link href="/profile" className="text-xs text-gray-400 hover:text-[#667470] transition-colors">Perfil</Link>
             <form action={async () => { "use server"; await signOut({ redirectTo: "/login" }); }}>
               <button className="text-xs text-gray-400 hover:text-red-500 transition-colors">Sair</button>
             </form>

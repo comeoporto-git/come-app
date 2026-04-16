@@ -47,7 +47,7 @@ export default async function TourDetailPage({ params }: { params: Promise<{ id:
 
   const totalSpent = transactions.reduce((s, t) => s + t.totalCost, 0);
   const isClosed = tour.expensesClosed;
-  const backHref = role === "Admin" ? "/admin/tours" : "/guide";
+  const backHref = role === "Admin" ? "/admin/tours" : "/guide/services";
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
@@ -91,8 +91,8 @@ export default async function TourDetailPage({ params }: { params: Promise<{ id:
               )}
             </div>
 
-            <InfoField label="Serviço" value={tour.serviceName || "—"} />
             {tour.serviceType && <InfoField label="Tipo" value={tour.serviceType} />}
+            <InfoField label="Serviço" value={tour.serviceName || "—"} />
             <InfoField label="Cliente"  value={tour.clientName || "—"} />
             <InfoField label="Nº de Pax" value={tour.numGuests ? String(tour.numGuests) : "—"} />
             <InfoField label="Nomes"    value={tour.names || "—"} />
