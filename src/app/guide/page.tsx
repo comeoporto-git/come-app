@@ -2,6 +2,8 @@ import { auth } from "@/lib/auth";
 import {
   getToursForGuide,
   getPastToursForGuide,
+  getToursForChef,
+  getPastToursForChef,
   getAllUpcomingTours,
   getAllPastTours,
   getTeamMembers,
@@ -39,15 +41,21 @@ export default async function GuideDashboard() {
   const session = await auth();
   if (!session) redirect("/login");
 
-  const isSuperGuide = session.user.role === "Super Guide";
+  const role = session.user.role;
+  const isSuperGuide = role === "Super Guide";
+  const isChef = role === "Chef";
   const email = session.user?.email ?? "";
   const currentNotionId = session.user?.notionId ?? "";
 
-  // Super Guide sees all tours; regular Guide sees only their own
+  // Super Guide sees all tours; Chef sees chef-assigned; Guide sees own tours
   const [tours, pastTours, teamMembers] = await Promise.all([
-    isSuperGuide ? getAllUpcomingTours() : getToursForGuide(email),
-    isSuperGuide ? getAllPastTours()     : getPastToursForGuide(email),
-    isSuperGuide ? getTeamMembers()      : Promise.resolve([]),
+    isSuperGuide ? getAllUpcomingTours()  :
+    isChef       ? getToursForChef(email) :
+                   getToursForGuide(email),
+    isSuperGuide ? getAllPastTours()          :
+    isChef       ? getPastToursForChef(email) :
+                   getPastToursForGuide(email),
+    isSuperGuide ? getTeamMembers() : Promise.resolve([]),
   ]);
 
   const teamMap = Object.fromEntries(teamMembers.map((m) => [m.id, m.name]));
@@ -64,6 +72,9 @@ export default async function GuideDashboard() {
             <Link href="/super-guide" className="text-white/40 hover:text-white transition-colors text-lg leading-none mr-2">
               ←
             </Link>
+          )}
+          {isChef && (
+            <span className="text-xs text-white/50 font-semibold uppercase tracking-widest">Chef</span>
           )}
           <Image
             src="https://comeoporto.com/wp-content/uploads/2023/08/cropped-COME-Porto-Food-Tours-Logo-Black-.png"

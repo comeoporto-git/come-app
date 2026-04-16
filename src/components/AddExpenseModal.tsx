@@ -6,7 +6,7 @@ import { logExpenseAction, finishPendingExpenseAction, createFornecedorAction } 
 import type { Transaction, Fornecedor } from "@/lib/notion";
 import { useRouter } from "next/navigation";
 
-type Mode = "choose" | "scan" | "manual" | "review";
+type Mode = "chef-choose" | "choose" | "scan" | "manual" | "review";
 
 const EMPTY_FORM: InvoiceData = {
   supplier: "",
@@ -24,24 +24,35 @@ export function AddExpenseModal({
   pendingTransaction,
   fornecedores: initialFornecedores = [],
   userRole = "Guide",
+  chefName,
   onClose,
 }: {
   tourId: string;
   pendingTransaction?: Transaction;
   fornecedores?: Fornecedor[];
   userRole?: string;
+  chefName?: string;
   onClose: () => void;
 }) {
   const router = useRouter();
   const isSuperGuide = userRole === "Super Guide" || userRole === "Admin";
+  const isChef = userRole === "Chef";
 
-  const [mode, setMode] = useState<Mode>(pendingTransaction ? "scan" : "choose");
+  // Chef: start with a type choice; others go straight to choose/scan
+  const initialMode: Mode = pendingTransaction ? "scan" : isChef ? "chef-choose" : "choose";
+
+  // "tour-expense" → ingredients / materials (Fornecedores, paymentMethod "Pelo Chef")
+  // "service-invoice" → chef's own service fee (chef name as supplier, paymentMethod "Chef Fee")
+  const [chefExpenseType, setChefExpenseType] = useState<"tour-expense" | "service-invoice" | null>(null);
+
+  const [mode, setMode] = useState<Mode>(initialMode);
   const [scanning, setScanning] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState<"Cartão COME" | "Pelo Guia">(
-    isSuperGuide ? "Cartão COME" : "Pelo Guia"
-  );
+
+  // For chefs: payment method is fixed by expense type; for others it's selectable
+  const defaultPaymentMethod = isSuperGuide ? "Cartão COME" : "Pelo Guia";
+  const [paymentMethod, setPaymentMethod] = useState<string>(defaultPaymentMethod);
   const [needsInvoice, setNeedsInvoice] = useState(false);
 
   // Local fornecedor list (grows if user creates a new one)
@@ -146,12 +157,21 @@ export function AddExpenseModal({
           invoiceImageUrl,
         );
       } else {
+        // Determine the effective payment method for chefs
+        const effectivePaymentMethod = isChef
+          ? (chefExpenseType === "service-invoice" ? "Chef Fee" : "Pelo Chef")
+          : paymentMethod;
+
         const selectedFornecedor = fornecedores.find(
           (f) => f.name.toLowerCase() === form.supplier.toLowerCase()
         );
+        // For service invoices the supplier is the chef's own name (no Fornecedor record)
+        const effectiveFornecedorId =
+          chefExpenseType === "service-invoice" ? null : (selectedFornecedor?.id ?? null);
+
         await logExpenseAction({
           supplier: form.supplier,
-          fornecedorId: selectedFornecedor?.id ?? null,
+          fornecedorId: effectiveFornecedorId,
           date: form.date,
           invoiceId: form.invoiceId,
           taxFree: form.taxFree,
@@ -159,8 +179,11 @@ export function AddExpenseModal({
           iva13: form.iva13,
           iva23: form.iva23,
           totalCost: form.totalCost,
-          whoPaid: paymentMethod === "Pelo Guia" ? "Guide" : "Company",
-          paymentMethod,
+          whoPaid: effectivePaymentMethod === "Pelo Guia" ? "Guide"
+                 : effectivePaymentMethod === "Cartão COME" ? "Company"
+                 : effectivePaymentMethod === "Pelo Chef" ? "Chef"
+                 : "Chef",
+          paymentMethod: effectivePaymentMethod,
           status: form.invoiceId ? "Paid" : "Pending Receipt",
           tourId,
           bankReference: "",
@@ -182,12 +205,16 @@ export function AddExpenseModal({
     setSaving(true);
     setError("");
     try {
+      const effectivePaymentMethod = isChef
+        ? (chefExpenseType === "service-invoice" ? "Chef Fee" : "Pelo Chef")
+        : paymentMethod;
+
       const selectedFornecedor = fornecedores.find(
         (f) => f.name.toLowerCase() === form.supplier.toLowerCase()
       );
       await logExpenseAction({
         supplier: form.supplier,
-        fornecedorId: selectedFornecedor?.id ?? null,
+        fornecedorId: chefExpenseType === "service-invoice" ? null : (selectedFornecedor?.id ?? null),
         date: form.date,
         invoiceId: "",
         taxFree: 0,
@@ -195,8 +222,10 @@ export function AddExpenseModal({
         iva13: 0,
         iva23: 0,
         totalCost: form.totalCost,
-        whoPaid: paymentMethod === "Pelo Guia" ? "Guide" : "Company",
-        paymentMethod,
+        whoPaid: effectivePaymentMethod === "Pelo Guia" ? "Guide"
+               : effectivePaymentMethod === "Cartão COME" ? "Company"
+               : "Chef",
+        paymentMethod: effectivePaymentMethod,
         status: "Pending Receipt",
         tourId,
         bankReference: "",
@@ -224,12 +253,54 @@ export function AddExpenseModal({
 
         <div className="px-5 pb-8 pt-2">
           <h2 className="text-lg font-bold text-gray-900 mb-4">
-            {pendingTransaction ? "Adicionar Recibo" : "Nova Despesa"}
+            {pendingTransaction
+              ? "Adicionar Recibo"
+              : mode === "chef-choose"
+              ? "Tipo de Despesa"
+              : chefExpenseType === "service-invoice"
+              ? "Fatura de Serviço"
+              : "Nova Despesa"}
           </h2>
 
           {error && (
             <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-600 mb-4">
               {error}
+            </div>
+          )}
+
+          {/* CHEF: choose expense type */}
+          {mode === "chef-choose" && (
+            <div className="space-y-3">
+              <button
+                onClick={() => {
+                  setChefExpenseType("tour-expense");
+                  setMode("choose");
+                }}
+                className="w-full flex items-center gap-4 p-4 rounded-2xl border-2 border-[#667470]/30 bg-[#667470]/5 hover:bg-[#667470]/10 transition-colors text-left"
+              >
+                <span className="text-3xl flex-shrink-0">🛒</span>
+                <div>
+                  <p className="text-sm font-bold text-[#32373c]">Despesa do Tour</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Ingredientes ou materiais comprados para o tour</p>
+                </div>
+              </button>
+              <button
+                onClick={() => {
+                  setChefExpenseType("service-invoice");
+                  // Pre-fill supplier with chef's own name
+                  if (chefName) {
+                    setForm((f) => ({ ...f, supplier: chefName }));
+                  }
+                  setMode("manual");
+                }}
+                className="w-full flex items-center gap-4 p-4 rounded-2xl border-2 border-gray-200 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
+              >
+                <span className="text-3xl flex-shrink-0">🧾</span>
+                <div>
+                  <p className="text-sm font-bold text-[#32373c]">Fatura de Serviço</p>
+                  <p className="text-xs text-gray-500 mt-0.5">A tua fatura de honorários à COME</p>
+                </div>
+              </button>
             </div>
           )}
 
@@ -298,7 +369,7 @@ export function AddExpenseModal({
               )}
               {!scanning && (
                 <button
-                  onClick={() => setMode("choose")}
+                  onClick={() => setMode(isChef ? "chef-choose" : "choose")}
                   className="text-sm text-gray-400 hover:text-gray-600 w-full text-center"
                 >
                   ← Voltar
@@ -350,25 +421,31 @@ export function AddExpenseModal({
                 </>
               )}
 
-              <InvoiceForm
-                form={form}
-                update={update}
-                fornecedores={fornecedores}
-                onCreateFornecedor={handleCreateFornecedor}
-              />
+              {chefExpenseType === "service-invoice" ? (
+                <ServiceInvoiceForm form={form} update={update} />
+              ) : (
+                <InvoiceForm
+                  form={form}
+                  update={update}
+                  fornecedores={fornecedores}
+                  onCreateFornecedor={handleCreateFornecedor}
+                />
+              )}
 
-              {/* Payment method — Cartão COME only for Super Guide / Admin */}
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">Método de Pagamento</label>
-                <select
-                  value={paymentMethod}
-                  onChange={(e) => setPaymentMethod(e.target.value as typeof paymentMethod)}
-                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
-                >
-                  {isSuperGuide && <option value="Cartão COME">Cartão COME</option>}
-                  <option value="Pelo Guia">Pelo Guia</option>
-                </select>
-              </div>
+              {/* Payment method — hidden for chefs (fixed by expense type) */}
+              {!isChef && (
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">Método de Pagamento</label>
+                  <select
+                    value={paymentMethod}
+                    onChange={(e) => setPaymentMethod(e.target.value)}
+                    className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
+                  >
+                    {isSuperGuide && <option value="Cartão COME">Cartão COME</option>}
+                    <option value="Pelo Guia">Pelo Guia</option>
+                  </select>
+                </div>
+              )}
 
               {/* Needs Invoice checkbox */}
               {!pendingTransaction && (
@@ -523,6 +600,99 @@ function InvoiceForm({
             </ul>
           )}
         </div>
+      </Field>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Data">
+          <input
+            type="date"
+            value={form.date}
+            onChange={(e) => update("date", e.target.value)}
+            className="input"
+          />
+        </Field>
+        <Field label="Nº Fatura">
+          <input
+            type="text"
+            value={form.invoiceId}
+            onChange={(e) => update("invoiceId", e.target.value)}
+            placeholder="FT 2024/001"
+            className="input"
+          />
+        </Field>
+      </div>
+      <Field label="Base tributável (s/ IVA)">
+        <input
+          type="number"
+          step="0.01"
+          min="0"
+          value={form.taxFree || ""}
+          onChange={(e) => update("taxFree", parseFloat(e.target.value) || 0)}
+          className="input"
+        />
+      </Field>
+      <div className="grid grid-cols-3 gap-2">
+        <Field label="IVA 6%">
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            value={form.iva6 || ""}
+            onChange={(e) => update("iva6", parseFloat(e.target.value) || 0)}
+            className="input"
+          />
+        </Field>
+        <Field label="IVA 13%">
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            value={form.iva13 || ""}
+            onChange={(e) => update("iva13", parseFloat(e.target.value) || 0)}
+            className="input"
+          />
+        </Field>
+        <Field label="IVA 23%">
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            value={form.iva23 || ""}
+            onChange={(e) => update("iva23", parseFloat(e.target.value) || 0)}
+            className="input"
+          />
+        </Field>
+      </div>
+      <Field label="Total">
+        <input
+          type="number"
+          step="0.01"
+          min="0"
+          value={form.totalCost || ""}
+          onChange={(e) => update("totalCost", parseFloat(e.target.value) || 0)}
+          className="input font-semibold"
+        />
+      </Field>
+    </div>
+  );
+}
+
+function ServiceInvoiceForm({
+  form,
+  update,
+}: {
+  form: InvoiceData;
+  update: (field: keyof InvoiceData, value: string | number) => void;
+}) {
+  return (
+    <div className="space-y-3">
+      <Field label="Fornecedor (o teu nome)" required>
+        <input
+          type="text"
+          value={form.supplier}
+          onChange={(e) => update("supplier", e.target.value)}
+          placeholder="O teu nome"
+          className="input"
+        />
       </Field>
       <div className="grid grid-cols-2 gap-3">
         <Field label="Data">

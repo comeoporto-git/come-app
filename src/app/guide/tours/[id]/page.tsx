@@ -1,5 +1,12 @@
 import { auth } from "@/lib/auth";
-import { getTourById, getTransactionsForTour, getFornecedores, getTeamMembers } from "@/lib/notion";
+import {
+  getTourById,
+  getTransactionsForTour,
+  getChefTransactionsForTour,
+  getFornecedores,
+  getTeamMembers,
+  getTeamMemberByEmail,
+} from "@/lib/notion";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { closeTourAction } from "@/actions/transactions";
@@ -24,21 +31,23 @@ export default async function TourDetailPage({ params }: { params: Promise<{ id:
   if (!session) redirect("/login");
 
   const { id } = await params;
-  const canEditTeam = session.user.role === "Super Guide" || session.user.role === "Admin";
+  const role = session.user.role;
+  const isChef = role === "Chef";
+  const canEditTeam = role === "Super Guide" || role === "Admin";
 
-  const [tour, transactions, fornecedores, teamMembers] = await Promise.all([
+  const [tour, transactions, fornecedores, teamMembers, chefMember] = await Promise.all([
     getTourById(id),
-    getTransactionsForTour(id),
+    isChef ? getChefTransactionsForTour(id) : getTransactionsForTour(id),
     getFornecedores(),
     getTeamMembers(),
+    isChef ? getTeamMemberByEmail(session.user.email ?? "") : Promise.resolve(null),
   ]);
 
   if (!tour) notFound();
 
   const totalSpent = transactions.reduce((s, t) => s + t.totalCost, 0);
   const isClosed = tour.expensesClosed;
-  const backHref =
-    session.user.role === "Admin" ? "/admin/tours" : "/guide";
+  const backHref = role === "Admin" ? "/admin/tours" : "/guide";
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
@@ -154,13 +163,20 @@ export default async function TourDetailPage({ params }: { params: Promise<{ id:
                 €{totalSpent.toFixed(2)}
               </span>
             </h2>
-            {!isClosed && <AddExpenseButton tourId={id} fornecedores={fornecedores} userRole={session.user.role} />}
+            {!isClosed && (
+              <AddExpenseButton
+                tourId={id}
+                fornecedores={fornecedores}
+                userRole={role}
+                chefName={chefMember?.name}
+              />
+            )}
           </div>
           <ExpenseList transactions={transactions} tourId={id} isClosed={isClosed} fornecedores={fornecedores} />
         </section>
 
-        {/* Close Tour */}
-        {!isClosed && (
+        {/* Close Tour — only guides, super guides, admins */}
+        {!isClosed && !isChef && (
           <form
             action={async () => {
               "use server";

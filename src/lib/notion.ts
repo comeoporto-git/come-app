@@ -76,7 +76,7 @@ export type TeamMember = {
   name: string;
   email: string;
   phone: string;
-  role: "Admin" | "Guide" | "Super Guide" | "Accountant";
+  role: "Admin" | "Guide" | "Super Guide" | "Accountant" | "Chef";
 };
 
 function mapTeamMember(page: PageObjectResponse): TeamMember {
@@ -294,6 +294,70 @@ export async function getPastToursForGuide(email: string): Promise<Tour[]> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any);
   return resolveRelationNames((res.results as PageObjectResponse[]).map(mapTour));
+}
+
+export async function getToursForChef(email: string): Promise<Tour[]> {
+  const member = await getTeamMemberByEmail(email);
+  if (!member) return [];
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const res = await notion.databases.query({
+    database_id: TOURS_DB,
+    filter: {
+      and: [
+        { property: "Chef", relation: { contains: member.id } },
+        { property: "Date", date: { on_or_after: today.toISOString() } },
+        { property: "Expenses Closed", select: { does_not_equal: "Closed" } },
+      ],
+    },
+    sorts: [{ property: "Date", direction: "ascending" }],
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any);
+  return resolveRelationNames((res.results as PageObjectResponse[]).map(mapTour));
+}
+
+export async function getPastToursForChef(email: string): Promise<Tour[]> {
+  const member = await getTeamMemberByEmail(email);
+  if (!member) return [];
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const res = await notion.databases.query({
+    database_id: TOURS_DB,
+    filter: {
+      and: [
+        { property: "Chef", relation: { contains: member.id } },
+        { property: "Date", date: { before: today.toISOString() } },
+      ],
+    },
+    sorts: [{ property: "Date", direction: "descending" }],
+    page_size: 30,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any);
+  return resolveRelationNames((res.results as PageObjectResponse[]).map(mapTour));
+}
+
+export async function getChefTransactionsForTour(tourId: string): Promise<Transaction[]> {
+  try {
+    const res = await notion.databases.query({
+      database_id: TRANSACTIONS_DB,
+      filter: {
+        and: [
+          { property: "🎫 Sales", relation: { contains: tourId } },
+          {
+            or: [
+              { property: "Método de Pagamento", select: { equals: "Pelo Chef" } },
+              { property: "Método de Pagamento", select: { equals: "Chef Fee" } },
+            ],
+          },
+        ],
+      },
+      sorts: [{ property: "Data", direction: "descending" }],
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
+    return (res.results as PageObjectResponse[]).map(mapTransaction);
+  } catch { return []; }
 }
 
 export async function getAllUpcomingTours(): Promise<Tour[]> {

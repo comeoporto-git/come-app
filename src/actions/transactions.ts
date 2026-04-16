@@ -75,7 +75,12 @@ export async function logExpenseAction(
   data: Omit<Transaction, "id" | "accountantVerified">
 ): Promise<string> {
   const session = await requireAuth();
-  if (session.user.role !== "Guide" && session.user.role !== "Admin" && session.user.role !== "Super Guide") {
+  if (
+    session.user.role !== "Guide" &&
+    session.user.role !== "Admin" &&
+    session.user.role !== "Super Guide" &&
+    session.user.role !== "Chef"
+  ) {
     throw new Error("Forbidden");
   }
   const id = await createTransaction(data);
@@ -95,7 +100,12 @@ export async function finishPendingExpenseAction(
   invoiceImageUrl?: string,
 ): Promise<void> {
   const session = await requireAuth();
-  if (session.user.role !== "Guide" && session.user.role !== "Admin" && session.user.role !== "Super Guide") {
+  if (
+    session.user.role !== "Guide" &&
+    session.user.role !== "Admin" &&
+    session.user.role !== "Super Guide" &&
+    session.user.role !== "Chef"
+  ) {
     throw new Error("Forbidden");
   }
   await updateTransaction(transactionId, {
@@ -130,7 +140,12 @@ export async function editExpenseAction(
   }
 ): Promise<void> {
   const session = await requireAuth();
-  if (session.user.role !== "Guide" && session.user.role !== "Admin" && session.user.role !== "Super Guide") {
+  if (
+    session.user.role !== "Guide" &&
+    session.user.role !== "Admin" &&
+    session.user.role !== "Super Guide" &&
+    session.user.role !== "Chef"
+  ) {
     throw new Error("Forbidden");
   }
   await updateTransaction(transactionId, {
@@ -179,7 +194,12 @@ export async function deleteExpenseAction(
   tourId: string,
 ): Promise<void> {
   const session = await requireAuth();
-  if (session.user.role !== "Guide" && session.user.role !== "Admin" && session.user.role !== "Super Guide") {
+  if (
+    session.user.role !== "Guide" &&
+    session.user.role !== "Admin" &&
+    session.user.role !== "Super Guide" &&
+    session.user.role !== "Chef"
+  ) {
     throw new Error("Forbidden");
   }
   await archiveTransaction(transactionId);
