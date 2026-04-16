@@ -35,30 +35,22 @@ export default async function GuideHome() {
         </div>
       </header>
 
-      <main className="max-w-lg mx-auto px-4 py-10 space-y-4">
-        <Link href="/guide/services">
-          <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex items-center gap-5 hover:shadow-md active:scale-[0.98] transition-all cursor-pointer">
-            <div className="w-14 h-14 rounded-2xl bg-[#667470]/10 flex items-center justify-center text-3xl shrink-0">
-              🗓️
-            </div>
-            <div>
-              <p className="font-bold text-[#32373c] text-base">Os meus Serviços</p>
-              <p className="text-sm text-gray-400 mt-0.5">Ver os teus serviços agendados</p>
-            </div>
-          </div>
-        </Link>
-
-        <Link href="/profile">
-          <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex items-center gap-5 hover:shadow-md active:scale-[0.98] transition-all cursor-pointer">
-            <div className="w-14 h-14 rounded-2xl bg-[#667470]/10 flex items-center justify-center text-3xl shrink-0">
-              👤
-            </div>
-            <div>
-              <p className="font-bold text-[#32373c] text-base">Perfil</p>
-              <p className="text-sm text-gray-400 mt-0.5">Ver e editar os teus dados</p>
-            </div>
-          </div>
-        </Link>
+      <main className="max-w-lg mx-auto px-4 py-10">
+        <div className="grid grid-cols-2 gap-3">
+          {[
+            { href: "/guide/services", icon: "🗓️", label: "Os meus Serviços" },
+            { href: "/profile",        icon: "👤", label: "Perfil" },
+          ].map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex flex-col items-center gap-3 hover:border-[#667470]/30 active:scale-[0.98] transition-all text-center"
+            >
+              <span className="text-3xl">{item.icon}</span>
+              <span className="text-sm font-semibold text-[#32373c]">{item.label}</span>
+            </Link>
+          ))}
+        </div>
       </main>
     </div>
   );

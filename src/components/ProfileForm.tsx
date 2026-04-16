@@ -15,6 +15,8 @@ const ROLE_COLORS: Record<string, string> = {
 export function ProfileForm({ member }: { member: TeamMember }) {
   const [name, setName]   = useState(member.name);
   const [phone, setPhone] = useState(member.phone ?? "");
+  const [nif,   setNif]   = useState(member.nif  ?? "");
+  const [iban,  setIban]  = useState(member.iban  ?? "");
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError]   = useState<string | null>(null);
@@ -34,6 +36,8 @@ export function ProfileForm({ member }: { member: TeamMember }) {
     const result = await updateTeamMemberProfileAction(member.id, {
       name: name.trim(),
       phone: phone.trim(),
+      nif:  nif.trim(),
+      iban: iban.trim(),
     });
     if (result.error) {
       setError(result.error);
@@ -44,7 +48,11 @@ export function ProfileForm({ member }: { member: TeamMember }) {
     setSaving(false);
   }
 
-  const dirty = name.trim() !== member.name || phone.trim() !== (member.phone ?? "");
+  const dirty =
+    name.trim()  !== member.name        ||
+    phone.trim() !== (member.phone ?? "") ||
+    nif.trim()   !== (member.nif  ?? "") ||
+    iban.trim()  !== (member.iban  ?? "");
 
   return (
     <div className="space-y-6">
@@ -91,6 +99,27 @@ export function ProfileForm({ member }: { member: TeamMember }) {
               className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#667470]/30"
             />
           </Field>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="NIF">
+              <input
+                type="text"
+                value={nif}
+                onChange={(e) => setNif(e.target.value)}
+                placeholder="123456789"
+                className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#667470]/30"
+              />
+            </Field>
+            <Field label="IBAN">
+              <input
+                type="text"
+                value={iban}
+                onChange={(e) => setIban(e.target.value)}
+                placeholder="PT50 0000 0000…"
+                className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#667470]/30"
+              />
+            </Field>
+          </div>
         </div>
       </div>
 

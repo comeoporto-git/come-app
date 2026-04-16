@@ -2,7 +2,8 @@ import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { signOut } from "@/lib/auth";
 import { getEBSessions } from "@/lib/enablebanking";
-import { getUnmatchedBankTransactions, getFlaggedTransactions } from "@/lib/notion";
+import { getUnmatchedBankTransactions, getFlaggedTransactions, getServicesWithMissingInfo } from "@/lib/notion";
+import type { Tour } from "@/lib/notion";
 import { EnableBankingConnectButton } from "@/components/EnableBankingConnectButton";
 import { DisconnectEnableBankingButton } from "@/components/DisconnectEnableBankingButton";
 import { BankSyncButton } from "@/components/BankSyncButton";
@@ -19,10 +20,11 @@ export default async function AdminPage({
 
   const params = await searchParams;
 
-  const [ebSessions, unmatched, flagged] = await Promise.all([
+  const [ebSessions, unmatched, flagged, incompleteServices] = await Promise.all([
     getEBSessions(),
     getUnmatchedBankTransactions(),
     getFlaggedTransactions(),
+    getServicesWithMissingInfo(),
   ]);
 
   const reconciliationCount = unmatched.length + flagged.length;
@@ -127,6 +129,32 @@ export default async function AdminPage({
           </section>
         )}
 
+        {/* Incomplete services */}
+        <section className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-50 flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-semibold text-[#32373c]">Serviços Incompletos</h2>
+              <p className="text-xs text-gray-400 mt-0.5">Próximos 7 dias · campos em falta</p>
+            </div>
+            {incompleteServices.length > 0 && (
+              <span className="text-xs bg-red-500 text-white font-bold px-2.5 py-1 rounded-full">
+                {incompleteServices.length}
+              </span>
+            )}
+          </div>
+          {incompleteServices.length === 0 ? (
+            <div className="px-5 py-6 text-center text-sm text-gray-400">
+              ✅ Tudo em ordem para os próximos 7 dias
+            </div>
+          ) : (
+            <ul className="divide-y divide-gray-50">
+              {incompleteServices.map((t) => (
+                <IncompleteServiceRow key={t.id} tour={t} />
+              ))}
+            </ul>
+          )}
+        </section>
+
         {/* Quick links */}
         <section className="grid grid-cols-2 gap-3">
           {[
@@ -158,5 +186,54 @@ export default async function AdminPage({
         </section>
       </main>
     </div>
+  );
+}
+
+function getMissingFields(tour: Tour): string[] {
+  const missing: string[] = [];
+  if (!tour.clientName)  missing.push("Cliente");
+  if (!tour.numGuests)   missing.push("Nº Pax");
+  if (!tour.names)       missing.push("Nomes");
+  if (!tour.phoneNumber) missing.push("Contacto");
+  return missing;
+}
+
+function IncompleteServiceRow({ tour }: { tour: Tour }) {
+  const missing = getMissingFields(tour);
+  const date = tour.date
+    ? new Date(tour.date).toLocaleDateString("pt-PT", {
+        weekday: "short", day: "numeric", month: "short",
+        hour: "2-digit", minute: "2-digit",
+        timeZone: "Europe/Lisbon",
+      })
+    : "—";
+
+  return (
+    <li className="px-5 py-3 flex items-start gap-3">
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Link
+            href={`/guide/tours/${tour.id}`}
+            className="text-sm font-semibold text-[#32373c] hover:underline"
+          >
+            {tour.saleId}
+          </Link>
+          {tour.serviceName && (
+            <span className="text-xs text-gray-400 truncate">{tour.serviceName}</span>
+          )}
+        </div>
+        <p className="text-xs text-gray-400 mt-0.5">{date}</p>
+        <div className="flex flex-wrap gap-1 mt-1.5">
+          {missing.map((f) => (
+            <span
+              key={f}
+              className="text-xs bg-red-50 text-red-600 border border-red-100 px-1.5 py-0.5 rounded-md font-medium"
+            >
+              {f}
+            </span>
+          ))}
+        </div>
+      </div>
+    </li>
   );
 }

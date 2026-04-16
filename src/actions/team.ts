@@ -7,7 +7,7 @@ import { auth } from "@/lib/auth";
 
 export async function updateTeamMemberProfileAction(
   memberId: string,
-  data: { name: string; phone: string },
+  data: { name: string; phone: string; nif: string; iban: string },
 ): Promise<{ error?: string }> {
   const session = await auth();
   if (!session) return { error: "Não autenticado" };

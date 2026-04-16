@@ -76,15 +76,19 @@ export type TeamMember = {
   name: string;
   email: string;
   phone: string;
+  nif: string;
+  iban: string;
   role: "Admin" | "Guide" | "Super Guide" | "Accountant" | "Chef";
 };
 
 function mapTeamMember(page: PageObjectResponse): TeamMember {
   return {
-    id: page.id,
+    id:   page.id,
     name: text(getProp(page, "Name")),
     email: text(getProp(page, "email")),
     phone: text(getProp(page, "Contact")),
+    nif:  text(getProp(page, "NIF")),
+    iban: text(getProp(page, "IBAN")),
     role: text(getProp(page, "Role")) as TeamMember["role"],
   };
 }
@@ -119,8 +123,9 @@ export async function getTeamMemberById(id: string): Promise<TeamMember | null> 
 
 export async function updateTeamMemberProfile(
   memberId: string,
-  data: { name: string; phone: string },
+  data: { name: string; phone: string; nif: string; iban: string },
 ): Promise<void> {
+  // Core fields (always exist)
   await notion.pages.update({
     page_id: memberId,
     properties: {
@@ -128,6 +133,43 @@ export async function updateTeamMemberProfile(
       Contact: { phone_number: data.phone || null },
     } as Parameters<typeof notion.pages.update>[0]["properties"],
   });
+  // Optional fields — wrapped separately so missing columns don't block the save
+  try {
+    await notion.pages.update({
+      page_id: memberId,
+      properties: {
+        NIF:  { rich_text: [{ text: { content: data.nif  } }] },
+        IBAN: { rich_text: [{ text: { content: data.iban } }] },
+      } as Parameters<typeof notion.pages.update>[0]["properties"],
+    });
+  } catch { /* columns may not exist in this workspace yet */ }
+}
+
+export async function getServicesWithMissingInfo(): Promise<Tour[]> {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const nextWeek = new Date(today);
+  nextWeek.setDate(nextWeek.getDate() + 7);
+
+  const res = await notion.databases.query({
+    database_id: TOURS_DB,
+    filter: {
+      and: [
+        { property: "Date", date: { on_or_after: today.toISOString() } },
+        { property: "Date", date: { before: nextWeek.toISOString() } },
+      ],
+    },
+    sorts: [{ property: "Date", direction: "ascending" }],
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any);
+
+  const tours = await resolveRelationNames(
+    (res.results as PageObjectResponse[]).map(mapTour)
+  );
+
+  return tours.filter(
+    (t) => !t.numGuests || !t.names || !t.phoneNumber || !t.clientName
+  );
 }
 
 export async function updateTeamMemberRole(
