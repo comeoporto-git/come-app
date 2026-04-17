@@ -11,15 +11,20 @@ export async function POST(req: Request) {
   if (!file) return NextResponse.json({ error: "No file" }, { status: 400 });
 
   const ext =
-    file.type === "image/png" ? "png" :
-    file.type === "image/webp" ? "webp" :
-    file.type === "application/pdf" ? "pdf" : "jpg";
+    file.type === "image/png"         ? "png"  :
+    file.type === "image/webp"        ? "webp" :
+    file.type === "application/pdf"   ? "pdf"  : "jpg";
   const filename = `invoices/${Date.now()}.${ext}`;
 
-  const blob = await put(filename, file, {
-    access: "public",
-    contentType: file.type,
-  });
-
-  return NextResponse.json({ url: blob.url });
+  try {
+    const blob = await put(filename, file, {
+      access: "public",
+      contentType: file.type,
+    });
+    return NextResponse.json({ url: blob.url });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[upload] Blob upload failed:", msg);
+    return NextResponse.json({ error: `Upload failed: ${msg}` }, { status: 500 });
+  }
 }

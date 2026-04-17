@@ -80,7 +80,12 @@ export function AddStandaloneExpenseButton({ fornecedores }: { fornecedores: For
         const fd = new FormData();
         fd.append("file", imageFile);
         const res = await fetch("/api/upload", { method: "POST", body: fd });
-        if (res.ok) invoiceImageUrl = (await res.json()).url;
+        if (res.ok) {
+          invoiceImageUrl = (await res.json()).url;
+        } else {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.error ?? `Upload falhou (${res.status})`);
+        }
       }
 
       let fornecedorId: string | null = null;
