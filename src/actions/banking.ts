@@ -58,16 +58,15 @@ export async function syncBankTransactions(): Promise<{
   const errors: string[] = [];
 
   // Build a set of already-known bank references to avoid duplicates
-  let existingUnmatched;
+  let existingUnmatched: Awaited<ReturnType<typeof getUnmatchedBankTransactions>> = [];
   try {
     existingUnmatched = await getUnmatchedBankTransactions();
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error("[BankSync] getUnmatchedBankTransactions failed:", msg);
-    existingUnmatched = [];
   }
   const knownRefs = new Set(
-    (existingUnmatched ?? []).map((t) => t.bankReference).filter(Boolean) as string[]
+    existingUnmatched.map((t) => t.bankReference).filter(Boolean) as string[]
   );
 
   for (const session of sessions) {
