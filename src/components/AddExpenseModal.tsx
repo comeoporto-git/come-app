@@ -137,6 +137,9 @@ export function AddExpenseModal({
         if (res.ok) {
           const json = await res.json();
           invoiceImageUrl = json.url;
+        } else {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.error ?? `Upload falhou (${res.status})`);
         }
       }
 
@@ -195,7 +198,8 @@ export function AddExpenseModal({
       router.refresh();
       onClose();
     } catch (e) {
-      setError("Erro ao guardar. Tenta novamente.");
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(`Erro ao guardar: ${msg}`);
       console.error(e);
     } finally {
       setSaving(false);
