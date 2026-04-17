@@ -140,8 +140,9 @@ export function AddExpenseModal({
         }
       }
 
+      // Fire-and-forget: AI correction logging should never block saving
       if (aiResult && mode === "review") {
-        await submitAiCorrection(imageDataUrl, aiResult, form);
+        submitAiCorrection(imageDataUrl, aiResult, form).catch(() => {});
       }
 
       if (pendingTransaction) {
