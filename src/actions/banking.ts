@@ -103,11 +103,17 @@ export async function syncBankTransactions(): Promise<{
 
       for (const txn of debits) {
         if (knownRefs.has(txn.transaction_id)) continue; // already processed
-        const result = await matchTransaction(txn);
-        if (result === "matched") matched++;
-        else if (result === "unmatched") {
-          unmatched++;
-          knownRefs.add(txn.transaction_id);
+        try {
+          const result = await matchTransaction(txn);
+          if (result === "matched") matched++;
+          else if (result === "unmatched") {
+            unmatched++;
+            knownRefs.add(txn.transaction_id);
+          }
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.error(`[BankSync] matchTransaction failed for ${txn.transaction_id}:`, msg);
+          errors.push(`Match failed (${txn.transaction_id}): ${msg}`);
         }
       }
     }
@@ -119,10 +125,13 @@ export async function syncBankTransactions(): Promise<{
 
   try { flagged += await flagMissingBankEntries(); } catch { /* non-critical */ }
 
-  revalidatePath("/admin");
-  revalidatePath("/admin/reconciliation");
-  revalidatePath("/accountant");
-  revalidatePath("/admin/bank-transactions");
+  try {
+    revalidatePath("/admin");
+    revalidatePath("/admin/reconciliation");
+    revalidatePath("/accountant");
+    revalidatePath("/admin/bank-transactions");
+  } catch { /* non-critical */ }
+
   return { matched, unmatched, flagged, fetched, errors };
 }
 
