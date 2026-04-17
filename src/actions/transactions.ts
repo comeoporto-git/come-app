@@ -124,27 +124,34 @@ export async function finishPendingExpenseAction(
   totalCost: number,
   tourId: string,
   invoiceImageUrl?: string,
-): Promise<void> {
-  const session = await requireAuth();
-  if (
-    session.user.role !== "Guide" &&
-    session.user.role !== "Admin" &&
-    session.user.role !== "Super Guide" &&
-    session.user.role !== "Chef"
-  ) {
-    throw new Error("Forbidden");
+): Promise<{ error?: string }> {
+  try {
+    const session = await requireAuth();
+    if (
+      session.user.role !== "Guide" &&
+      session.user.role !== "Admin" &&
+      session.user.role !== "Super Guide" &&
+      session.user.role !== "Chef"
+    ) {
+      return { error: "Forbidden" };
+    }
+    await updateTransaction(transactionId, {
+      invoiceId,
+      taxFree,
+      iva6,
+      iva13,
+      iva23,
+      totalCost,
+      status: "Paid",
+      ...(invoiceImageUrl ? { invoiceImageUrl } : {}),
+    });
+    revalidatePath(`/guide/tours/${tourId}`);
+    return {};
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("[finishPendingExpenseAction]", msg);
+    return { error: msg };
   }
-  await updateTransaction(transactionId, {
-    invoiceId,
-    taxFree,
-    iva6,
-    iva13,
-    iva23,
-    totalCost,
-    status: "Paid",
-    ...(invoiceImageUrl ? { invoiceImageUrl } : {}),
-  });
-  revalidatePath(`/guide/tours/${tourId}`);
 }
 
 export async function editExpenseAction(

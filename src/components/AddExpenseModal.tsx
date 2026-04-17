@@ -149,7 +149,7 @@ export function AddExpenseModal({
       }
 
       if (pendingTransaction) {
-        await finishPendingExpenseAction(
+        const result = await finishPendingExpenseAction(
           pendingTransaction.id,
           form.invoiceId,
           form.taxFree,
@@ -160,6 +160,7 @@ export function AddExpenseModal({
           tourId,
           invoiceImageUrl,
         );
+        if (result?.error) throw new Error(result.error);
       } else {
         // Determine the effective payment method for chefs
         const effectivePaymentMethod = isChef
