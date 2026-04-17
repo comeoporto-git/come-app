@@ -819,6 +819,7 @@ export async function createTransaction(
       "Pago Por":         { select: { name: data.whoPaid } },
       "Método de Pagamento": { select: { name: data.paymentMethod } },
       Status:             { select: { name: data.status } },
+      Type:               { select: { name: "Expense" } },
       "Conta de Pagamento": { select: { name: "COME" } },
       ...(data.tourId
         ? { "🎫 Sales": { relation: [{ id: data.tourId }] } }
