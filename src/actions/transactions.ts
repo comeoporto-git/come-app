@@ -99,19 +99,25 @@ export async function markInvoiceCollectedAction(
 
 export async function logExpenseAction(
   data: Omit<Transaction, "id" | "accountantVerified">
-): Promise<string> {
-  const session = await requireAuth();
-  if (
-    session.user.role !== "Guide" &&
-    session.user.role !== "Admin" &&
-    session.user.role !== "Super Guide" &&
-    session.user.role !== "Chef"
-  ) {
-    throw new Error("Forbidden");
+): Promise<{ id?: string; error?: string }> {
+  try {
+    const session = await requireAuth();
+    if (
+      session.user.role !== "Guide" &&
+      session.user.role !== "Admin" &&
+      session.user.role !== "Super Guide" &&
+      session.user.role !== "Chef"
+    ) {
+      return { error: "Forbidden" };
+    }
+    const id = await createTransaction(data);
+    revalidatePath(`/guide/tours/${data.tourId}`);
+    return { id };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("[logExpenseAction]", msg);
+    return { error: msg };
   }
-  const id = await createTransaction(data);
-  revalidatePath(`/guide/tours/${data.tourId}`);
-  return id;
 }
 
 export async function finishPendingExpenseAction(

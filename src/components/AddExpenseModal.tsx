@@ -174,7 +174,7 @@ export function AddExpenseModal({
         const effectiveFornecedorId =
           chefExpenseType === "service-invoice" ? null : (selectedFornecedor?.id ?? null);
 
-        await logExpenseAction({
+        const logResult = await logExpenseAction({
           supplier: form.supplier,
           fornecedorId: effectiveFornecedorId,
           date: form.date,
@@ -195,6 +195,7 @@ export function AddExpenseModal({
           invoiceImageUrl,
           precisaDeFatura: needsInvoice ? "Sim" : undefined,
         });
+        if (logResult?.error) throw new Error(logResult.error);
       }
       router.refresh();
       onClose();
@@ -267,12 +268,6 @@ export function AddExpenseModal({
               ? "Fatura de Serviço"
               : "Nova Despesa"}
           </h2>
-
-          {error && (
-            <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-600 mb-4">
-              {error}
-            </div>
-          )}
 
           {/* CHEF: choose expense type */}
           {mode === "chef-choose" && (
@@ -472,6 +467,12 @@ export function AddExpenseModal({
                   </div>
                   <span className="text-sm text-gray-700">Precisa de Fatura</span>
                 </label>
+              )}
+
+              {error && (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-600">
+                  {error}
+                </div>
               )}
 
               <div className="grid grid-cols-2 gap-3 pt-2">
