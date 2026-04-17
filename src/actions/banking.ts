@@ -7,6 +7,7 @@ import {
   updateEBLastFetched,
   removeEBSession,
   revokeSession,
+  writeSyncLog,
   type EBTransaction,
 } from "@/lib/enablebanking";
 import {
@@ -49,10 +50,14 @@ export async function syncBankTransactions(): Promise<{
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error("[BankSync] getEBSessions failed:", msg);
-    return { matched: 0, unmatched: 0, flagged: 0, fetched: 0, errors: [], fatalError: msg };
+    const result = { matched: 0, unmatched: 0, flagged: 0, fetched: 0, errors: [], fatalError: msg };
+    writeSyncLog({ trigger: "manual", ...result }).catch(() => {});
+    return result;
   }
   if (!sessions?.length) {
-    return { matched: 0, unmatched: 0, flagged: 0, fetched: 0, errors: [], fatalError: "Nenhuma sessão bancária encontrada. Liga a conta primeiro." };
+    const result = { matched: 0, unmatched: 0, flagged: 0, fetched: 0, errors: [], fatalError: "Nenhuma sessão bancária encontrada. Liga a conta primeiro." };
+    writeSyncLog({ trigger: "manual", ...result }).catch(() => {});
+    return result;
   }
   let matched = 0, unmatched = 0, flagged = 0, fetched = 0;
   const errors: string[] = [];
@@ -132,7 +137,9 @@ export async function syncBankTransactions(): Promise<{
     revalidatePath("/admin/bank-transactions");
   } catch { /* non-critical */ }
 
-  return { matched, unmatched, flagged, fetched, errors };
+  const result = { matched, unmatched, flagged, fetched, errors };
+  writeSyncLog({ trigger: "manual", ...result }).catch(() => {});
+  return result;
 }
 
 // ── Two-pass matching ─────────────────────────────────────────────────────────

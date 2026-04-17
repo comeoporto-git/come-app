@@ -1,7 +1,7 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { signOut } from "@/lib/auth";
-import { getEBSessions } from "@/lib/enablebanking";
+import { getEBSessions, getRecentSyncLogs } from "@/lib/enablebanking";
 import { EnableBankingConnectButton } from "@/components/EnableBankingConnectButton";
 import { DisconnectEnableBankingButton } from "@/components/DisconnectEnableBankingButton";
 import { BankSyncButton } from "@/components/BankSyncButton";
@@ -17,7 +17,10 @@ export default async function BancoPage({
   if (!session || session.user.role !== "Admin") redirect("/");
 
   const params = await searchParams;
-  const ebSessions = await getEBSessions();
+  const [ebSessions, syncLogs] = await Promise.all([
+    getEBSessions(),
+    getRecentSyncLogs(5),
+  ]);
 
   return (
     <div className="min-h-screen bg-[#667470] text-[#32373c]">
@@ -96,6 +99,56 @@ export default async function BancoPage({
               <p className="text-xs text-gray-400 mt-0.5">Sincroniza automaticamente todas as noites. Clica para forçar agora.</p>
             </div>
             <BankSyncButton />
+          </section>
+        )}
+
+        {/* Histórico de Sincronizações */}
+        {syncLogs.length > 0 && (
+          <section className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-50">
+              <h2 className="text-sm font-semibold text-[#32373c]">Histórico de Sincronizações</h2>
+              <p className="text-xs text-gray-400 mt-0.5">Últimas {syncLogs.length} sincronizações</p>
+            </div>
+            <ul className="divide-y divide-gray-50">
+              {syncLogs.map((log) => {
+                const hasError = !!log.fatal_error || log.errors.length > 0;
+                const date = new Date(log.ran_at).toLocaleString("pt-PT", {
+                  day: "2-digit", month: "2-digit", year: "numeric",
+                  hour: "2-digit", minute: "2-digit", timeZone: "Europe/Lisbon",
+                });
+                return (
+                  <li key={log.id} className="px-5 py-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full flex-shrink-0 ${hasError ? "bg-red-100 text-red-600" : "bg-green-100 text-green-700"}`}>
+                          {hasError ? "Erro" : "OK"}
+                        </span>
+                        <span className="text-xs text-gray-400 flex-shrink-0">{date}</span>
+                        <span className="text-xs text-gray-300">·</span>
+                        <span className="text-xs text-gray-400 capitalize">{log.trigger}</span>
+                      </div>
+                      {!hasError && (
+                        <div className="flex gap-3 text-xs text-gray-500 flex-shrink-0">
+                          <span><span className="font-medium text-blue-600">{log.fetched}</span> importados</span>
+                          <span><span className="font-medium text-green-600">{log.matched}</span> matched</span>
+                          {log.unmatched > 0 && <span><span className="font-medium text-orange-500">{log.unmatched}</span> sem fatura</span>}
+                        </div>
+                      )}
+                    </div>
+                    {log.fatal_error && (
+                      <p className="text-xs text-red-500 mt-1.5 font-mono break-all">{log.fatal_error}</p>
+                    )}
+                    {log.errors.length > 0 && (
+                      <ul className="mt-1.5 space-y-0.5">
+                        {log.errors.map((e, i) => (
+                          <li key={i} className="text-xs text-orange-500 font-mono break-all">• {e}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
           </section>
         )}
       </main>

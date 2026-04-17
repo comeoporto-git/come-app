@@ -285,6 +285,72 @@ export async function upsertBankTransactions(
   }
 }
 
+// ── Sync log ──────────────────────────────────────────────────────────────────
+
+export type SyncLog = {
+  id: number;
+  ran_at: string;
+  trigger: string;
+  fetched: number;
+  matched: number;
+  unmatched: number;
+  flagged: number;
+  errors: string[];
+  fatal_error: string | null;
+};
+
+/** Write a sync result to the persistent log table (creates table if needed) */
+export async function writeSyncLog(entry: {
+  trigger: string;
+  fetched: number;
+  matched: number;
+  unmatched: number;
+  flagged: number;
+  errors: string[];
+  fatalError?: string;
+}): Promise<void> {
+  const sql = getDb();
+  // Create table if it doesn't exist yet (idempotent)
+  await sql`
+    CREATE TABLE IF NOT EXISTS sync_logs (
+      id           SERIAL PRIMARY KEY,
+      ran_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      trigger      TEXT NOT NULL,
+      fetched      INT  NOT NULL DEFAULT 0,
+      matched      INT  NOT NULL DEFAULT 0,
+      unmatched    INT  NOT NULL DEFAULT 0,
+      flagged      INT  NOT NULL DEFAULT 0,
+      errors       JSONB NOT NULL DEFAULT '[]',
+      fatal_error  TEXT
+    )
+  `;
+  await sql`
+    INSERT INTO sync_logs (trigger, fetched, matched, unmatched, flagged, errors, fatal_error)
+    VALUES (
+      ${entry.trigger},
+      ${entry.fetched},
+      ${entry.matched},
+      ${entry.unmatched},
+      ${entry.flagged},
+      ${JSON.stringify(entry.errors)},
+      ${entry.fatalError ?? null}
+    )
+  `;
+}
+
+/** Read the most recent sync logs */
+export async function getRecentSyncLogs(limit = 5): Promise<SyncLog[]> {
+  const sql = getDb();
+  try {
+    const rows = await sql`
+      SELECT * FROM sync_logs ORDER BY ran_at DESC LIMIT ${limit}
+    `;
+    return rows as SyncLog[];
+  } catch {
+    return []; // table may not exist yet
+  }
+}
+
 /** Read stored transactions (newest first, up to limit) */
 export async function getStoredTransactions(
   days = 30,
