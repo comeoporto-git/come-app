@@ -7,10 +7,7 @@ const TRANSACTIONS_DB = process.env.NOTION_TRANSACTIONS_DB_ID!;
 
 /**
  * GET /api/admin/debug-transaction?tourId=<tour_id_from_url>
- *
- * Pass the tour ID from the browser URL (e.g. /guide/tours/31917fed-...).
- * Returns all transactions for that tour with their Notion property names
- * and any file field values so we can identify the correct field name.
+ * Returns ONLY the file-type fields + all property names for each transaction.
  * Admin only. Remove after debugging.
  */
 export async function GET(req: Request) {
@@ -22,51 +19,54 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const tourId = searchParams.get("tourId");
   if (!tourId) {
-    return NextResponse.json({ error: "Pass ?tourId=<id from the tour URL>" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Pass ?tourId=<id from the tour URL>" },
+      { status: 400 }
+    );
   }
 
-  try {
-    const res = await notion.databases.query({
-      database_id: TRANSACTIONS_DB,
-      filter: { property: "🎫 Sales", relation: { contains: tourId } },
-    } as Parameters<typeof notion.databases.query>[0]);
+  const res = await notion.databases.query({
+    database_id: TRANSACTIONS_DB,
+    filter: { property: "🎫 Sales", relation: { contains: tourId } },
+  } as Parameters<typeof notion.databases.query>[0]);
 
-    const transactions = (res.results as PageObjectResponse[]).map((page) => {
-      const props = page.properties as Record<string, unknown>;
+  const transactions = (res.results as PageObjectResponse[]).map((page) => {
+    const props = page.properties as Record<string, unknown>;
 
-      // Collect every property: just its type for most, full detail for files
-      const propSummary: Record<string, unknown> = {};
-      for (const [name, value] of Object.entries(props)) {
-        const v = value as Record<string, unknown>;
-        if (v?.type === "files") {
-          const files = (v.files as Array<Record<string, unknown>>) ?? [];
-          propSummary[name] = {
-            type: "files",
-            count: files.length,
-            files: files.map((f) => ({
-              name: f.name,
+    // Every property name in this DB (so we know all field names)
+    const allFieldNames = Object.keys(props).sort();
+
+    // Only the files fields with their content
+    const fileFields: Record<string, unknown> = {};
+    for (const [name, value] of Object.entries(props)) {
+      const v = value as Record<string, unknown>;
+      if (v?.type === "files") {
+        const files = (v.files as Array<Record<string, unknown>>) ?? [];
+        fileFields[name] = files.length === 0
+          ? "(empty)"
+          : files.map((f) => ({
               fileType: f.type,
               url: f.type === "external"
                 ? (f.external as Record<string, unknown>)?.url
-                : (f.file as Record<string, unknown>)?.url,
-            })),
-          };
-        } else {
-          propSummary[name] = String(v?.type ?? "unknown");
-        }
+                : "(notion-hosted)",
+            }));
       }
+    }
 
-      // Also pull the title for readability
-      const titleProp = Object.values(props).find(
-        (p) => (p as Record<string, unknown>)?.type === "title"
-      ) as Record<string, unknown> | undefined;
-      const title = (titleProp?.title as Array<{ plain_text: string }>)?.[0]?.plain_text ?? "";
+    // Supplier name from title
+    const titleProp = Object.values(props).find(
+      (p) => (p as Record<string, unknown>)?.type === "title"
+    ) as Record<string, unknown> | undefined;
+    const title =
+      (titleProp?.title as Array<{ plain_text: string }>)?.[0]?.plain_text ?? "(no title)";
 
-      return { id: page.id, title, properties: propSummary };
-    });
+    return {
+      id: page.id,
+      supplier: title,
+      allFieldNames,
+      fileFields,
+    };
+  });
 
-    return NextResponse.json({ tourId, count: transactions.length, transactions });
-  } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
-  }
+  return NextResponse.json({ tourId, count: transactions.length, transactions }, { status: 200 });
 }
