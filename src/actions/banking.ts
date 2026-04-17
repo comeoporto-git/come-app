@@ -39,15 +39,35 @@ export async function syncBankTransactions(): Promise<{
   flagged: number;
   fetched: number;
   errors: string[];
+  fatalError?: string;
 }> {
-  const sessions = await getEBSessions();
+  try { await requireAdmin(); } catch { return { matched: 0, unmatched: 0, flagged: 0, fetched: 0, errors: ["Forbidden"] }; }
+
+  let sessions;
+  try {
+    sessions = await getEBSessions();
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("[BankSync] getEBSessions failed:", msg);
+    return { matched: 0, unmatched: 0, flagged: 0, fetched: 0, errors: [], fatalError: msg };
+  }
+  if (!sessions?.length) {
+    return { matched: 0, unmatched: 0, flagged: 0, fetched: 0, errors: [], fatalError: "Nenhuma sessão bancária encontrada. Liga a conta primeiro." };
+  }
   let matched = 0, unmatched = 0, flagged = 0, fetched = 0;
   const errors: string[] = [];
 
   // Build a set of already-known bank references to avoid duplicates
-  const existingUnmatched = await getUnmatchedBankTransactions();
+  let existingUnmatched;
+  try {
+    existingUnmatched = await getUnmatchedBankTransactions();
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("[BankSync] getUnmatchedBankTransactions failed:", msg);
+    existingUnmatched = [];
+  }
   const knownRefs = new Set(
-    existingUnmatched.map((t) => t.bankReference).filter(Boolean) as string[]
+    (existingUnmatched ?? []).map((t) => t.bankReference).filter(Boolean) as string[]
   );
 
   for (const session of sessions) {
@@ -93,10 +113,12 @@ export async function syncBankTransactions(): Promise<{
       }
     }
 
-    await updateEBLastFetched(session.session_id);
+    try { await updateEBLastFetched(session.session_id); } catch (e) {
+      errors.push(`updateEBLastFetched: ${e instanceof Error ? e.message : String(e)}`);
+    }
   }
 
-  flagged += await flagMissingBankEntries();
+  try { flagged += await flagMissingBankEntries(); } catch { /* non-critical */ }
 
   revalidatePath("/admin");
   revalidatePath("/admin/reconciliation");

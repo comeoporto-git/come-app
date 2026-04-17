@@ -7,7 +7,7 @@ export function BankSyncButton() {
   const [syncing, setSyncing] = useState(false);
   const [result, setResult] = useState<{
     matched: number; unmatched: number; flagged: number;
-    fetched: number; errors: string[];
+    fetched: number; errors: string[]; fatalError?: string;
   } | null>(null);
 
   async function handleSync() {
@@ -16,6 +16,9 @@ export function BankSyncButton() {
     try {
       const res = await syncBankTransactions();
       setResult(res);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setResult({ matched: 0, unmatched: 0, flagged: 0, fetched: 0, errors: [], fatalError: msg });
     } finally {
       setSyncing(false);
     }
@@ -33,8 +36,11 @@ export function BankSyncButton() {
 
       {result && (
         <>
-          {result.errors.length > 0 && (
+          {(result.fatalError || result.errors.length > 0) && (
             <div className="bg-red-50 border border-red-200 rounded-xl p-3 space-y-1">
+              {result.fatalError && (
+                <p className="text-xs text-red-600 font-medium">{result.fatalError}</p>
+              )}
               {result.errors.map((e, i) => (
                 <p key={i} className="text-xs text-red-600">{e}</p>
               ))}
