@@ -128,16 +128,25 @@ export async function exchangeCode(code: string): Promise<{
 // ── Transactions ──────────────────────────────────────────────────────────────
 
 export type EBTransaction = {
-  transaction_id: string;
+  transaction_id: string | null; // null seen in practice for some credit entries
   transaction_amount: { amount: string; currency: string };
   credit_debit_indicator: "CRDT" | "DBIT";
   transaction_date: string;
   booking_date: string;
   creditor?: { name?: string };
   debtor?: { name?: string };
-  remittance_information?: string;
+  remittance_information?: string | string[]; // API may return array or string
   status: string;
 };
+
+/** Safely extract a plain string from remittance_information (string | string[]) */
+export function remittanceText(txn: EBTransaction): string {
+  if (!txn.remittance_information) return "";
+  if (Array.isArray(txn.remittance_information)) {
+    return txn.remittance_information.join(" ").trim();
+  }
+  return txn.remittance_information;
+}
 
 /** Fetch booked transactions for an account within a date range */
 export async function getAccountTransactions(
@@ -257,10 +266,12 @@ export async function upsertBankTransactions(
 ): Promise<void> {
   const sql = getDb();
   for (const t of txns) {
+    if (!t.transaction_id) continue; // skip entries with no ID (can't upsert)
+    const remit = remittanceText(t);
     const merchantName =
       t.credit_debit_indicator === "DBIT"
-        ? (t.creditor?.name ?? t.remittance_information ?? null)
-        : (t.debtor?.name ?? t.remittance_information ?? null);
+        ? (t.creditor?.name ?? (remit || null))
+        : (t.debtor?.name ?? (remit || null));
 
     await sql`
       INSERT INTO bank_transactions
@@ -277,7 +288,7 @@ export async function upsertBankTransactions(
         ${t.transaction_date},
         ${t.booking_date ?? null},
         ${merchantName},
-        ${t.remittance_information ?? null},
+        ${remit || null},
         ${JSON.stringify(t)}
       )
       ON CONFLICT (transaction_id) DO NOTHING

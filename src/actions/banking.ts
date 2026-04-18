@@ -8,6 +8,7 @@ import {
   removeEBSession,
   revokeSession,
   writeSyncLog,
+  remittanceText,
   type EBTransaction,
 } from "@/lib/enablebanking";
 import {
@@ -107,6 +108,7 @@ export async function syncBankTransactions(): Promise<{
       const debits = txns.filter((t) => t.credit_debit_indicator === "DBIT");
 
       for (const txn of debits) {
+        if (!txn.transaction_id) continue; // skip entries without an ID
         if (knownRefs.has(txn.transaction_id)) continue; // already processed
         try {
           const result = await matchTransaction(txn);
@@ -149,13 +151,11 @@ async function matchTransaction(
 ): Promise<"matched" | "unmatched"> {
   const bankDate   = new Date(txn.transaction_date);
   const bankAmount = Math.abs(parseFloat(txn.transaction_amount.amount));
-  const bankRef    = txn.transaction_id;
+  const bankRef    = txn.transaction_id ?? "";
 
   // Merchant name: for debits, the creditor is the payee
-  const merchantName =
-    txn.creditor?.name ??
-    txn.remittance_information ??
-    "Desconhecido";
+  const remit = remittanceText(txn);
+  const merchantName = txn.creditor?.name ?? (remit || "Desconhecido");
 
   // ── Pass 1: Cartão COME expenses (card purchase, ±3 days) ────────────────
   const comeExpenses = await getTransactionsForMatching();
@@ -182,6 +182,8 @@ async function matchTransaction(
   }
 
   // ── No match — create unmatched placeholder ───────────────────────────────
+  // NOTE: "Unmatched Bank Entry" must exist as a Status option in the Notion
+  // Transactions database. Add it manually in Notion if it's missing.
   await createTransaction({
     supplier:      merchantName,
     fornecedorId:  null,
@@ -196,7 +198,7 @@ async function matchTransaction(
     paymentMethod: "Cartão COME",
     status:        "Unmatched Bank Entry",
     tourId:        null,
-    bankReference: bankRef,
+    bankReference: bankRef ?? "",
   });
   return "unmatched";
 }
