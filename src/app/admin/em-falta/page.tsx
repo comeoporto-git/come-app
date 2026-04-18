@@ -4,7 +4,6 @@ import { signOut } from "@/lib/auth";
 import { getGuideExpenses } from "@/lib/notion";
 import Image from "next/image";
 import Link from "next/link";
-import { GuideExpensesList } from "@/components/GuideExpensesList";
 
 export default async function EmFaltaPage() {
   const session = await auth();
@@ -44,29 +43,22 @@ export default async function EmFaltaPage() {
           </div>
         </Link>
 
-        <div className="pt-2" />
-
         {/* Transferências em Falta */}
-        <section className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="px-5 py-4 border-b border-gray-50 flex items-center justify-between">
-            <div>
-              <h2 className="text-sm font-semibold text-[#32373c]">Transferências em Falta</h2>
-              <p className="text-xs text-gray-400 mt-0.5">Despesas pagas pelo guia · aguardam reembolso</p>
+        <Link href="/admin/transferencias">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex items-center gap-4 hover:border-[#667470]/30 active:scale-[0.98] transition-all cursor-pointer">
+            <div className="w-12 h-12 rounded-2xl bg-red-50 flex items-center justify-center text-2xl shrink-0">💸</div>
+            <div className="flex-1">
+              <p className="font-bold text-[#32373c]">Transferências em Falta</p>
+              <p className="text-sm text-gray-400">Despesas pagas pelo guia · aguardam reembolso</p>
             </div>
             {guideExpenses.length > 0 && (
-              <span className="text-xs bg-red-500 text-white font-bold px-2.5 py-1 rounded-full">
+              <span className="text-xs bg-red-500 text-white font-bold px-2.5 py-1 rounded-full flex-shrink-0">
                 {guideExpenses.length}
               </span>
             )}
+            <span className="text-gray-300 text-lg flex-shrink-0">→</span>
           </div>
-          {guideExpenses.length === 0 ? (
-            <div className="px-5 py-6 text-center text-sm text-gray-400">
-              ✅ Sem transferências pendentes
-            </div>
-          ) : (
-            <GuideExpensesList expenses={guideExpenses} />
-          )}
-        </section>
+        </Link>
 
       </main>
     </div>
