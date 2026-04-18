@@ -14,10 +14,10 @@ export default async function AnalyticsPage() {
 
   const backHref = role === "Admin" ? "/admin" : "/super-guide";
 
-  // Always fetch the full 12-month window — period filtering happens client-side
+  // Fetch full history — period filtering happens client-side instantly
   const [tours, transactions, teamMembers] = await Promise.all([
-    getAnalyticsTours(365),
-    getAnalyticsTransactions(365),
+    getAnalyticsTours(),
+    getAnalyticsTransactions(),
     getTeamMembers(),
   ]);
 

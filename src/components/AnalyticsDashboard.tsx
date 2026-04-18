@@ -25,7 +25,7 @@ function monthLabel(key: string) {
     .replace(".", "");
 }
 
-// ── Small UI pieces ───────────────────────────────────────────────────────────
+// ── UI components ─────────────────────────────────────────────────────────────
 
 function KpiCard({ label, value, sub, accent = false }: {
   label: string; value: string; sub?: string; accent?: boolean;
@@ -70,6 +70,44 @@ function SectionCard({ title, sub, children }: {
   );
 }
 
+function VBars({
+  entries,
+  max,
+  color,
+  formatValue,
+  barHeight = 88,
+}: {
+  entries: [string, number][];
+  max: number;
+  color: string;
+  formatValue?: (v: number) => string;
+  barHeight?: number;
+}) {
+  return (
+    <div className="flex items-end gap-2" style={{ height: `${barHeight + 32}px` }}>
+      {entries.map(([label, value]) => {
+        const pct = (value / max) * 100;
+        return (
+          <div key={label} className="flex-1 flex flex-col items-center gap-1 h-full justify-end">
+            {value > 0 && (
+              <span className="text-xs font-semibold text-gray-500 leading-none">
+                {formatValue ? formatValue(value) : fmt(value)}
+              </span>
+            )}
+            <div className="w-full relative" style={{ height: `${barHeight}px` }}>
+              <div
+                className={`absolute bottom-0 w-full ${color} rounded-t-lg`}
+                style={{ height: `${pct}%`, minHeight: value > 0 ? "4px" : "0" }}
+              />
+            </div>
+            <span className="text-xs text-gray-400 capitalize leading-none">{label}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export function AnalyticsDashboard({
@@ -83,13 +121,39 @@ export function AnalyticsDashboard({
 }) {
   const [period, setPeriod] = useState(180);
 
+  // ── By year (always uses full history, ignores period picker) ──────────────
+  const yearlyData = useMemo(() => {
+    const map: Record<number, { services: number; revenue: number }> = {};
+
+    for (const t of allTours) {
+      if (!t.date || isCancelled(t)) continue;
+      const y = new Date(t.date).getFullYear();
+      if (!map[y]) map[y] = { services: 0, revenue: 0 };
+      map[y].services++;
+    }
+    for (const t of allTransactions) {
+      if (!t.date || !t.supplier.startsWith("IN -")) continue;
+      const y = new Date(t.date).getFullYear();
+      if (!map[y]) map[y] = { services: 0, revenue: 0 };
+      map[y].revenue += t.totalCost;
+    }
+
+    return Object.entries(map)
+      .map(([year, d]) => ({ year: Number(year), ...d }))
+      .sort((a, b) => a.year - b.year);
+  }, [allTours, allTransactions]);
+
+  const maxYearlyServices = Math.max(...yearlyData.map((d) => d.services), 1);
+  const maxYearlyRevenue  = Math.max(...yearlyData.map((d) => d.revenue), 1);
+  const hasYearlyRevenue  = yearlyData.some((d) => d.revenue > 0);
+
+  // ── Period-filtered analytics ─────────────────────────────────────────────
   const analytics = useMemo(() => {
-    const cutoff = new Date(Date.now() - period * 86_400_000);
+    const cutoff = period === 0 ? new Date(0) : new Date(Date.now() - period * 86_400_000);
 
     const tours        = allTours.filter((t) => t.date && new Date(t.date) >= cutoff);
     const transactions = allTransactions.filter((t) => t.date && new Date(t.date) >= cutoff);
 
-    // Split tours
     const completed = tours.filter((t) => !isCancelled(t));
     const cancelled = tours.filter((t) => isCancelled(t));
 
@@ -98,13 +162,11 @@ export function AnalyticsDashboard({
     const avgGroup    = completed.length > 0 ? totalGuests / completed.length : 0;
     const cancelRate  = tours.length > 0 ? (cancelled.length / tours.length) * 100 : 0;
 
-    // Monthly trend
-    const numMonths = period <= 30 ? 1 : period <= 90 ? 3 : period <= 180 ? 6 : 12;
+    // Monthly trend (cap at 12 bars; for "Tudo" show last 12 months)
+    const numMonths = period === 0 ? 12 : period <= 30 ? 1 : period <= 90 ? 3 : period <= 180 ? 6 : 12;
     const monthlyMap: Record<string, number> = {};
     for (let i = numMonths - 1; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(1);
-      d.setMonth(d.getMonth() - i);
+      const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - i);
       monthlyMap[monthKey(d)] = 0;
     }
     for (const t of completed) {
@@ -139,7 +201,8 @@ export function AnalyticsDashboard({
       for (const t of completed) {
         const id = getId(t);
         if (!id) continue;
-        counts[teamMap[id] || "Desconhecido"] = (counts[teamMap[id] || "Desconhecido"] ?? 0) + 1;
+        const name = teamMap[id] || "Desconhecido";
+        counts[name] = (counts[name] ?? 0) + 1;
       }
       return Object.entries(counts).sort((a, b) => b[1] - a[1]);
     }
@@ -167,10 +230,12 @@ export function AnalyticsDashboard({
     const topMethods = Object.entries(byMethod).sort((a, b) => b[1] - a[1]);
     const maxMethod  = Math.max(...topMethods.map(([, v]) => v), 1);
 
-    // Date range label
+    // Range label
     const now      = new Date();
     const fromDate = new Date(Date.now() - period * 86_400_000);
-    const rangeLbl = `${fromDate.toLocaleDateString("pt-PT", { day: "numeric", month: "short", year: "numeric" })} – ${now.toLocaleDateString("pt-PT", { day: "numeric", month: "short", year: "numeric" })}`;
+    const rangeLbl = period === 0
+      ? `Todo o histórico · ${allTours.length} serviços carregados`
+      : `${fromDate.toLocaleDateString("pt-PT", { day: "numeric", month: "short", year: "numeric" })} – ${now.toLocaleDateString("pt-PT", { day: "numeric", month: "short", year: "numeric" })}`;
 
     return {
       completed, cancelled, totalGuests, avgGroup, cancelRate,
@@ -203,31 +268,49 @@ export function AnalyticsDashboard({
 
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <KpiCard label="Serviços"       value={fmt(completed.length)}      sub="realizados"           accent />
-        <KpiCard label="Hóspedes"       value={fmt(totalGuests)}           sub="total de pax" />
-        <KpiCard label="Média Pax"      value={fmt(avgGroup, 1)}           sub="por serviço" />
-        <KpiCard label="Cancelamentos"  value={`${fmt(cancelRate, 0)}%`}   sub={`${cancelled.length} serviços`} />
+        <KpiCard label="Serviços"      value={fmt(completed.length)}    sub="realizados"           accent />
+        <KpiCard label="Hóspedes"      value={fmt(totalGuests)}         sub="total de pax" />
+        <KpiCard label="Média Pax"     value={fmt(avgGroup, 1)}         sub="por serviço" />
+        <KpiCard label="Cancelamentos" value={`${fmt(cancelRate, 0)}%`} sub={`${cancelled.length} serviços`} />
       </div>
 
-      {/* Monthly trend */}
-      <SectionCard title="Tendência Mensal" sub="Serviços realizados por mês">
-        <div className="flex items-end gap-2" style={{ height: "120px" }}>
-          {monthlyEntries.map(([key, count]) => {
-            const pct = (count / maxMonthly) * 100;
-            return (
-              <div key={key} className="flex-1 flex flex-col items-center gap-1 h-full justify-end">
-                {count > 0 && <span className="text-xs font-semibold text-gray-500">{count}</span>}
-                <div className="w-full relative" style={{ height: "88px" }}>
-                  <div
-                    className="absolute bottom-0 w-full bg-[#667470] rounded-t-lg"
-                    style={{ height: `${pct}%`, minHeight: count > 0 ? "4px" : "0" }}
-                  />
-                </div>
-                <span className="text-xs text-gray-400 capitalize">{monthLabel(key)}</span>
+      {/* ── Por Ano (always full history) ── */}
+      <SectionCard title="Por Ano" sub="Todo o histórico disponível · independente do filtro">
+        <div className="space-y-8">
+          {/* Services per year */}
+          <div>
+            <p className="text-xs font-semibold text-[#667470] uppercase tracking-wide mb-3">Serviços realizados</p>
+            <VBars
+              entries={yearlyData.map((d) => [String(d.year), d.services])}
+              max={maxYearlyServices}
+              color="bg-[#667470]"
+            />
+          </div>
+
+          {/* Revenue per year — only if data exists */}
+          {hasYearlyRevenue && (
+            <>
+              <div className="border-t border-gray-50" />
+              <div>
+                <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wide mb-3">Receita</p>
+                <VBars
+                  entries={yearlyData.map((d) => [String(d.year), d.revenue])}
+                  max={maxYearlyRevenue}
+                  color="bg-emerald-400"
+                  formatValue={(v) => fmtEur(v)}
+                />
               </div>
-            );
-          })}
+            </>
+          )}
         </div>
+      </SectionCard>
+
+      {/* Monthly trend */}
+      <SectionCard
+        title="Tendência Mensal"
+        sub={period === 0 ? "Últimos 12 meses" : "Serviços realizados por mês"}
+      >
+        <VBars entries={monthlyEntries.map(([k, v]) => [monthLabel(k), v])} max={maxMonthly} color="bg-[#667470]" />
       </SectionCard>
 
       {/* Service type + Day of week */}
@@ -267,7 +350,7 @@ export function AnalyticsDashboard({
       </div>
 
       {/* Team workload */}
-      <SectionCard title="Carga da Equipa" sub={`Serviços por pessoa · últimos ${period} dias`}>
+      <SectionCard title="Carga da Equipa" sub={`Serviços por pessoa · ${period === 0 ? "todo o histórico" : `últimos ${period} dias`}`}>
         <div className="space-y-6">
           {guideWork.length > 0 && (
             <div>
@@ -307,7 +390,7 @@ export function AnalyticsDashboard({
 
       {/* Expenses & Revenue */}
       <div className="grid md:grid-cols-2 gap-6">
-        <SectionCard title="Despesas" sub={`Últimos ${period} dias · registadas no sistema`}>
+        <SectionCard title="Despesas" sub={`${period === 0 ? "Todo o histórico" : `Últimos ${period} dias`} · registadas no sistema`}>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <div className="bg-gray-50 rounded-xl p-3">
@@ -333,7 +416,7 @@ export function AnalyticsDashboard({
           </div>
         </SectionCard>
 
-        <SectionCard title="Receita" sub={`Últimos ${period} dias · registada no sistema`}>
+        <SectionCard title="Receita" sub={`${period === 0 ? "Todo o histórico" : `Últimos ${period} dias`} · registada no sistema`}>
           <div className="space-y-4">
             <div className="bg-gray-50 rounded-xl p-4 flex flex-col gap-1">
               <p className="text-xs text-gray-400">Total receita registada</p>

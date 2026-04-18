@@ -1023,30 +1023,26 @@ export const getFornecedores = unstable_cache(
 // ── Analytics ─────────────────────────────────────────────────────────────────
 
 /**
- * Fetches tours from the last `daysBack` days for analytics.
+ * Fetches ALL past tours for analytics, paginating until exhausted.
  * Resolves only service names (small unique set) — team member names
  * are resolved externally via getTeamMembers() which is cached.
  */
-export async function getAnalyticsTours(daysBack = 180): Promise<Tour[]> {
+export async function getAnalyticsTours(): Promise<Tour[]> {
   try {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const sixMonthsAgo = new Date(today);
-    sixMonthsAgo.setDate(sixMonthsAgo.getDate() - daysBack);
 
     const allTours: Tour[] = [];
     let cursor: string | undefined;
     let hasMore = true;
     let pages = 0;
 
-    while (hasMore && pages < 5) {
+    while (hasMore && pages < 50) { // safety cap: 5 000 tours
       const res = await notion.databases.query({
         database_id: TOURS_DB,
         filter: {
-          and: [
-            { property: "Date", date: { on_or_after: sixMonthsAgo.toISOString() } },
-            { property: "Date", date: { before: today.toISOString() } },
-          ],
+          property: "Date",
+          date: { before: today.toISOString() }, // only past tours
         },
         sorts: [{ property: "Date", direction: "descending" }],
         page_size: 100,
@@ -1082,26 +1078,19 @@ export async function getAnalyticsTours(daysBack = 180): Promise<Tour[]> {
 }
 
 /**
- * Fetches all expense transactions from the last `daysBack` days for analytics.
+ * Fetches ALL transactions for analytics, paginating until exhausted.
  * Does not resolve tour names to keep it fast.
  */
-export async function getAnalyticsTransactions(daysBack = 90): Promise<Transaction[]> {
+export async function getAnalyticsTransactions(): Promise<Transaction[]> {
   try {
-    const ninetyDaysAgo = new Date();
-    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - daysBack);
-
     const allTxns: Transaction[] = [];
     let cursor: string | undefined;
     let hasMore = true;
     let pages = 0;
 
-    while (hasMore && pages < 5) {
+    while (hasMore && pages < 50) { // safety cap: 5 000 transactions
       const res = await notion.databases.query({
         database_id: TRANSACTIONS_DB,
-        filter: {
-          property: "Data",
-          date: { on_or_after: ninetyDaysAgo.toISOString() },
-        },
         sorts: [{ property: "Data", direction: "descending" }],
         page_size: 100,
         ...(cursor ? { start_cursor: cursor } : {}),

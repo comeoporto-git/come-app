@@ -1,10 +1,11 @@
 "use client";
 
 const PERIODS = [
-  { value: 30,  label: "30 dias" },
-  { value: 90,  label: "3 meses" },
-  { value: 180, label: "6 meses" },
+  { value: 30,  label: "30 dias"  },
+  { value: 90,  label: "3 meses"  },
+  { value: 180, label: "6 meses"  },
   { value: 365, label: "12 meses" },
+  { value: 0,   label: "Tudo"     },
 ] as const;
 
 export function AnalyticsPeriodPicker({
