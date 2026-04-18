@@ -9,15 +9,17 @@ const ALL_ROLES: TeamMember["role"][] = [
   "Super Guide",
   "Guide",
   "Chef",
+  "Driver",
   "Accountant",
 ];
 
 const ROLE_COLORS: Record<TeamMember["role"], string> = {
-  Admin:       "bg-purple-100 text-purple-700",
+  Admin:         "bg-purple-100 text-purple-700",
   "Super Guide": "bg-blue-100 text-blue-700",
-  Guide:       "bg-green-100 text-green-700",
-  Chef:        "bg-orange-100 text-orange-700",
-  Accountant:  "bg-gray-100 text-gray-600",
+  Guide:         "bg-green-100 text-green-700",
+  Chef:          "bg-orange-100 text-orange-700",
+  Driver:        "bg-slate-100 text-slate-700",
+  Accountant:    "bg-gray-100 text-gray-600",
 };
 
 export function UserManagement({ members }: { members: TeamMember[] }) {
