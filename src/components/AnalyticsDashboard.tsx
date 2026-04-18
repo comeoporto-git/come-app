@@ -25,6 +25,13 @@ function monthLabel(key: string) {
     .replace(".", "");
 }
 
+const STATUS_COLORS: Record<string, string> = {
+  Confirmed:  "bg-green-400",
+  Pending:    "bg-yellow-400",
+  Paid:       "bg-blue-400",
+  Cancelled:  "bg-red-400",
+};
+
 // ── Categories ────────────────────────────────────────────────────────────────
 
 const CATEGORIES = [
@@ -198,6 +205,17 @@ export function AnalyticsDashboard({
     const monthlyEntries = Object.entries(monthlyMap);
     const maxMonthly     = Math.max(...monthlyEntries.map(([, v]) => v), 1);
 
+    // By status (all tours, including cancelled)
+    const byStatus: Record<string, number> = {};
+    for (const t of tours) {
+      const s = t.status || "Sem estado";
+      // Normalise the two spellings of Cancelled
+      const key = s === "Canceled" ? "Cancelled" : s;
+      byStatus[key] = (byStatus[key] ?? 0) + 1;
+    }
+    const topStatuses = Object.entries(byStatus).sort((a, b) => b[1] - a[1]);
+    const maxStatus   = Math.max(...topStatuses.map(([, v]) => v), 1);
+
     // By service name
     const byService: Record<string, number> = {};
     for (const t of completed) {
@@ -298,6 +316,7 @@ export function AnalyticsDashboard({
     return {
       completed, cancelled, totalGuests, avgGroup, cancelRate,
       monthlyEntries, maxMonthly,
+      topStatuses, maxStatus,
       topServices, maxService,
       topCategories, maxCategory,
       DAYS_PT, byDay, maxDay,
@@ -352,6 +371,23 @@ export function AnalyticsDashboard({
       {/* RESUMO */}
       {category === "resumo" && (
         <div className="space-y-6">
+          <SectionCard title="Por Estado" sub="Todos os serviços no período seleccionado">
+            {a.topStatuses.length === 0 ? <EmptyState /> : (
+              <div className="space-y-3">
+                {a.topStatuses.map(([status, count]) => (
+                  <HBar
+                    key={status}
+                    label={status}
+                    value={count}
+                    max={a.maxStatus}
+                    color={STATUS_COLORS[status] ?? "bg-gray-400"}
+                    labelWidth="w-24"
+                  />
+                ))}
+              </div>
+            )}
+          </SectionCard>
+
           <SectionCard title="Por Ano" sub="Todo o histórico disponível · independente do filtro de período">
             <div className="space-y-8">
               <div>
