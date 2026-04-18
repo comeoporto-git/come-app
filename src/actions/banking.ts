@@ -88,14 +88,22 @@ export async function syncBankTransactions(opts?: { fullSync?: boolean }): Promi
     const to = formatDate(new Date());
 
     for (const accountId of session.accountIds) {
-      let txns: EBTransaction[];
-      try {
-        txns = await getAccountTransactions(accountId, from, to);
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        console.error(`[BankSync] failed to fetch account ${accountId}:`, msg);
-        errors.push(msg);
-        continue;
+      // Crédito Agrícola (and PSD2 in general) caps each request at 89 days.
+      // For full sync we chunk the full window; for normal sync it's always ≤30 days so one call suffices.
+      const chunks = fullSync
+        ? dateChunks(from, to, 89)
+        : [[from, to]] as [string, string][];
+
+      const txns: EBTransaction[] = [];
+      for (const [chunkFrom, chunkTo] of chunks) {
+        try {
+          const page = await getAccountTransactions(accountId, chunkFrom, chunkTo);
+          txns.push(...page);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.error(`[BankSync] failed to fetch account ${accountId} (${chunkFrom}→${chunkTo}):`, msg);
+          errors.push(msg);
+        }
       }
 
       fetched += txns.length;
@@ -283,4 +291,19 @@ export async function manualMatchAction(
 
 function formatDate(d: Date): string {
   return d.toISOString().slice(0, 10); // YYYY-MM-DD
+}
+
+/** Split [from, to] into consecutive chunks of at most maxDays days each. */
+function dateChunks(from: string, to: string, maxDays: number): [string, string][] {
+  const chunks: [string, string][] = [];
+  let start = new Date(from);
+  const end = new Date(to);
+  while (start < end) {
+    const chunkEnd = new Date(start);
+    chunkEnd.setDate(chunkEnd.getDate() + maxDays);
+    chunks.push([formatDate(start), formatDate(chunkEnd > end ? end : chunkEnd)]);
+    start = new Date(chunkEnd);
+    start.setDate(start.getDate() + 1);
+  }
+  return chunks;
 }
