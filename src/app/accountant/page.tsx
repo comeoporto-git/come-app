@@ -142,6 +142,7 @@ export default async function AccountantPage({
                         <th className="text-left text-xs font-semibold text-gray-500 px-4 py-3">Fatura</th>
                         <th className="text-left text-xs font-semibold text-gray-500 px-4 py-3">Fornecedor</th>
                         <th className="text-left text-xs font-semibold text-gray-500 px-4 py-3">Nº Fatura</th>
+                        <th className="text-left text-xs font-semibold text-gray-500 px-4 py-3">ID Banco</th>
                         <th className="text-left text-xs font-semibold text-gray-500 px-4 py-3">Estado</th>
                       </tr>
                     </thead>
@@ -176,6 +177,18 @@ export default async function AccountantPage({
                             </td>
                             <td className="px-4 py-3 text-sm text-gray-700">{inv?.supplier ?? "—"}</td>
                             <td className="px-4 py-3 text-xs text-gray-500">{inv?.invoiceId || "—"}</td>
+                            <td className="px-4 py-3">
+                              <span
+                                className="font-mono text-xs text-gray-400"
+                                title={txn.transaction_id}
+                              >
+                                {txn.transaction_id
+                                  ? txn.transaction_id.startsWith("synth-")
+                                    ? txn.transaction_id.slice(0, 18) + "…"
+                                    : txn.transaction_id.slice(0, 18) + (txn.transaction_id.length > 18 ? "…" : "")
+                                  : "—"}
+                              </span>
+                            </td>
                             <td className="px-4 py-3">
                               {inv ? (
                                 <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">
@@ -293,7 +306,7 @@ export default async function AccountantPage({
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 border-b border-gray-100">
                   <tr>
-                    {["Fatura", "Data", "Fornecedor", "Nº Fatura", "Base S/ IVA", "IVA 6%", "IVA 13%", "IVA 23%", "Total", "Status", "Pag.", "Verificado"].map((h) => (
+                    {["Fatura", "Data", "Fornecedor", "Nº Fatura", "Base S/ IVA", "IVA 6%", "IVA 13%", "IVA 23%", "Total", "Status", "Pag.", "ID Banco", "Verificado"].map((h) => (
                       <th key={h} className="text-left text-xs font-semibold text-gray-500 px-3 py-2.5">{h}</th>
                     ))}
                   </tr>
@@ -327,6 +340,17 @@ export default async function AccountantPage({
                       </td>
                       <td className="px-3 py-2.5 text-[#32373c] text-xs">{tx.paymentMethod}</td>
                       <td className="px-3 py-2.5">
+                        {tx.bankReference ? (
+                          <span className="font-mono text-xs text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded" title={tx.bankReference}>
+                            {tx.bankReference.startsWith("synth-")
+                              ? tx.bankReference.slice(0, 20) + "…"
+                              : tx.bankReference}
+                          </span>
+                        ) : (
+                          <span className="text-gray-300 text-xs">—</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5">
                         <VerifyButton transactionId={tx.id} verified={tx.accountantVerified} disabled={false} />
                       </td>
                     </tr>
@@ -359,6 +383,11 @@ export default async function AccountantPage({
                     {tx.iva13 > 0 && <span>13%: {fmt(tx.iva13)}</span>}
                     {tx.iva23 > 0 && <span>23%: {fmt(tx.iva23)}</span>}
                   </div>
+                  {tx.bankReference && (
+                    <p className="font-mono text-xs text-blue-500 truncate" title={tx.bankReference}>
+                      🏦 {tx.bankReference}
+                    </p>
+                  )}
                   <div className="flex items-center justify-between">
                     <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">{tx.status}</span>
                     <VerifyButton transactionId={tx.id} verified={tx.accountantVerified} disabled={false} />

@@ -3,36 +3,53 @@
 import { useState } from "react";
 import { syncBankTransactions } from "@/actions/banking";
 
-export function BankSyncButton() {
-  const [syncing, setSyncing] = useState(false);
-  const [result, setResult] = useState<{
-    matched: number; unmatched: number; flagged: number;
-    fetched: number; errors: string[]; fatalError?: string;
-  } | null>(null);
+type SyncResult = {
+  matched: number; unmatched: number; flagged: number;
+  fetched: number; errors: string[]; fatalError?: string;
+};
 
-  async function handleSync() {
-    setSyncing(true);
+export function BankSyncButton() {
+  const [syncing, setSyncing]   = useState<"normal" | "full" | null>(null);
+  const [result, setResult]     = useState<SyncResult | null>(null);
+
+  async function handleSync(fullSync: boolean) {
+    setSyncing(fullSync ? "full" : "normal");
     setResult(null);
     try {
-      const res = await syncBankTransactions();
+      const res = await syncBankTransactions({ fullSync });
       setResult(res);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       setResult({ matched: 0, unmatched: 0, flagged: 0, fetched: 0, errors: [], fatalError: msg });
     } finally {
-      setSyncing(false);
+      setSyncing(null);
     }
   }
 
+  const busy = syncing !== null;
+
   return (
     <div className="space-y-3">
-      <button
-        onClick={handleSync}
-        disabled={syncing}
-        className="w-full bg-[#667470] text-white font-semibold py-3 rounded-xl text-sm hover:bg-[#597568] disabled:opacity-50 transition-colors"
-      >
-        {syncing ? "A sincronizar…" : "Sincronizar Agora"}
-      </button>
+      <div className="flex gap-2">
+        <button
+          onClick={() => handleSync(false)}
+          disabled={busy}
+          className="flex-1 bg-[#667470] text-white font-semibold py-3 rounded-xl text-sm hover:bg-[#597568] disabled:opacity-50 transition-colors"
+        >
+          {syncing === "normal" ? "A sincronizar…" : "Sincronizar Agora"}
+        </button>
+        <button
+          onClick={() => handleSync(true)}
+          disabled={busy}
+          title="Vai buscar todos os movimentos dos últimos 90 dias"
+          className="flex-1 bg-[#32373c] text-white font-semibold py-3 rounded-xl text-sm hover:bg-[#1a2018] disabled:opacity-50 transition-colors"
+        >
+          {syncing === "full" ? "A importar…" : "Importar 1 ano"}
+        </button>
+      </div>
+      <p className="text-xs text-gray-400">
+        &ldquo;Importar 1 ano&rdquo; traz todos os movimentos dos últimos 12 meses. O banco pode limitar a 90 dias se não tiver histórico mais antigo.
+      </p>
 
       {result && (
         <>

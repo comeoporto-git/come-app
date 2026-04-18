@@ -36,7 +36,7 @@ async function requireAdmin() {
 
 // ── Core sync ─────────────────────────────────────────────────────────────────
 
-export async function syncBankTransactions(): Promise<{
+export async function syncBankTransactions(opts?: { fullSync?: boolean }): Promise<{
   matched: number;
   unmatched: number;
   flagged: number;
@@ -45,6 +45,7 @@ export async function syncBankTransactions(): Promise<{
   fatalError?: string;
 }> {
   try { await requireAdmin(); } catch { return { matched: 0, unmatched: 0, flagged: 0, fetched: 0, errors: ["Forbidden"] }; }
+  const fullSync = opts?.fullSync ?? false;
 
   let sessions;
   try {
@@ -53,12 +54,12 @@ export async function syncBankTransactions(): Promise<{
     const msg = e instanceof Error ? e.message : String(e);
     console.error("[BankSync] getEBSessions failed:", msg);
     const result = { matched: 0, unmatched: 0, flagged: 0, fetched: 0, errors: [], fatalError: msg };
-    writeSyncLog({ trigger: "manual", ...result }).catch(() => {});
+    writeSyncLog({ trigger: fullSync ? "full" : "manual", ...result }).catch(() => {});
     return result;
   }
   if (!sessions?.length) {
     const result = { matched: 0, unmatched: 0, flagged: 0, fetched: 0, errors: [], fatalError: "Nenhuma sessão bancária encontrada. Liga a conta primeiro." };
-    writeSyncLog({ trigger: "manual", ...result }).catch(() => {});
+    writeSyncLog({ trigger: fullSync ? "full" : "manual", ...result }).catch(() => {});
     return result;
   }
   let matched = 0, unmatched = 0, flagged = 0, fetched = 0;
@@ -77,10 +78,13 @@ export async function syncBankTransactions(): Promise<{
   );
 
   for (const session of sessions) {
-    // Fetch from last sync date (with 1-day overlap) or last 30 days
-    const from = session.last_fetched_at
-      ? formatDate(new Date(new Date(session.last_fetched_at).getTime() - 86_400_000))
-      : formatDate(new Date(Date.now() - 30 * 86_400_000));
+    // Full sync: always fetch the maximum 90-day window, regardless of last sync.
+    // Normal sync: resume from last_fetched_at minus 1 day (overlap), or 30 days if never synced.
+    const from = fullSync
+      ? formatDate(new Date(Date.now() - 365 * 86_400_000))
+      : session.last_fetched_at
+        ? formatDate(new Date(new Date(session.last_fetched_at).getTime() - 86_400_000))
+        : formatDate(new Date(Date.now() - 30 * 86_400_000));
     const to = formatDate(new Date());
 
     for (const accountId of session.accountIds) {
@@ -141,7 +145,7 @@ export async function syncBankTransactions(): Promise<{
   } catch { /* non-critical */ }
 
   const result = { matched, unmatched, flagged, fetched, errors };
-  writeSyncLog({ trigger: "manual", ...result }).catch(() => {});
+  writeSyncLog({ trigger: fullSync ? "full" : "manual", ...result }).catch(() => {});
   return result;
 }
 
