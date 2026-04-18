@@ -29,7 +29,8 @@ export default async function EmFaltaPage() {
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-4 py-8 space-y-6">
+      <main className="max-w-2xl mx-auto px-4 py-8">
+        <div className="flex flex-col gap-4">
 
         {/* Faturas em Falta */}
         <Link href="/admin/invoices">
@@ -60,6 +61,7 @@ export default async function EmFaltaPage() {
           </div>
         </Link>
 
+        </div>
       </main>
     </div>
   );

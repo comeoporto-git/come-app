@@ -32,7 +32,8 @@ export default async function AdminUsersPage() {
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-4 py-8 space-y-4">
+      <main className="max-w-2xl mx-auto px-4 py-8">
+        <div className="flex flex-col gap-4">
         {/* Permissions link */}
         <Link href="/admin/permissoes">
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex items-center gap-4 hover:border-[#667470]/30 active:scale-[0.98] transition-all cursor-pointer">
@@ -60,6 +61,7 @@ export default async function AdminUsersPage() {
             <UserManagement members={teamMembers} />
           )}
         </section>
+        </div>
       </main>
 
     </div>

@@ -40,7 +40,7 @@ export default async function ContabilidadePage() {
       <main className="max-w-2xl mx-auto px-4 py-8 space-y-8">
 
         {/* Nav cards */}
-        <div className="space-y-4">
+        <div className="flex flex-col gap-4">
           {/* Banco */}
           <Link href="/admin/banco">
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex items-center gap-4 hover:border-[#667470]/30 active:scale-[0.98] transition-all cursor-pointer">

@@ -40,7 +40,7 @@ export default async function BancoPage({
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-4 py-8 space-y-6">
+      <main className="max-w-2xl mx-auto px-4 py-8 flex flex-col gap-4">
         {params.bank_connected && (
           <div className="bg-green-50 border border-green-200 rounded-2xl px-5 py-3 text-sm text-green-700 font-medium">
             ✅ Conta bancária ligada com sucesso!
