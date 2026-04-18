@@ -124,7 +124,10 @@ export default async function AccountantPage({
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-5 py-16 text-center text-gray-400">
                 <div className="text-4xl mb-3">🏦</div>
                 <p className="text-sm font-medium text-gray-600">Sem movimentos bancários importados</p>
-                <p className="text-xs mt-1">O Admin deve clicar em &quot;Sincronizar Agora&quot; para importar transações.</p>
+                <p className="text-xs mt-1">A sincronização corre automaticamente às 2h. Para forçar agora:</p>
+                <Link href="/admin/banco" className="mt-3 inline-block text-xs bg-[#32373c] text-white px-4 py-2 rounded-xl hover:bg-[#1a2018] transition-colors">
+                  Ir para Sincronização →
+                </Link>
               </div>
             ) : (
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
