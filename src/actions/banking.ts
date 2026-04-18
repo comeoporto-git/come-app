@@ -81,29 +81,24 @@ export async function syncBankTransactions(opts?: { fullSync?: boolean }): Promi
     // Full sync: always fetch the maximum 90-day window, regardless of last sync.
     // Normal sync: resume from last_fetched_at minus 1 day (overlap), or 30 days if never synced.
     const from = fullSync
-      ? formatDate(new Date(Date.now() - 365 * 86_400_000))
+      ? formatDate(new Date(Date.now() - 89 * 86_400_000))
       : session.last_fetched_at
         ? formatDate(new Date(new Date(session.last_fetched_at).getTime() - 86_400_000))
         : formatDate(new Date(Date.now() - 30 * 86_400_000));
     const to = formatDate(new Date());
 
     for (const accountId of session.accountIds) {
-      // Crédito Agrícola (and PSD2 in general) caps each request at 89 days.
-      // For full sync we chunk the full window; for normal sync it's always ≤30 days so one call suffices.
-      const chunks = fullSync
-        ? dateChunks(from, to, 89)
-        : [[from, to]] as [string, string][];
-
+      // PSD2 guarantees banks provide at most 90 days of history.
+      // Crédito Agrícola rejects any date_from older than ~90 days (WRONG_TRANSACTIONS_PERIOD).
+      // One 89-day request is the maximum supported — no chunking needed or useful.
       const txns: EBTransaction[] = [];
-      for (const [chunkFrom, chunkTo] of chunks) {
-        try {
-          const page = await getAccountTransactions(accountId, chunkFrom, chunkTo);
-          txns.push(...page);
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          console.error(`[BankSync] failed to fetch account ${accountId} (${chunkFrom}→${chunkTo}):`, msg);
-          errors.push(msg);
-        }
+      try {
+        const page = await getAccountTransactions(accountId, from, to);
+        txns.push(...page);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[BankSync] failed to fetch account ${accountId}:`, msg);
+        errors.push(msg);
       }
 
       fetched += txns.length;
@@ -293,17 +288,3 @@ function formatDate(d: Date): string {
   return d.toISOString().slice(0, 10); // YYYY-MM-DD
 }
 
-/** Split [from, to] into consecutive chunks of at most maxDays days each. */
-function dateChunks(from: string, to: string, maxDays: number): [string, string][] {
-  const chunks: [string, string][] = [];
-  let start = new Date(from);
-  const end = new Date(to);
-  while (start < end) {
-    const chunkEnd = new Date(start);
-    chunkEnd.setDate(chunkEnd.getDate() + maxDays);
-    chunks.push([formatDate(start), formatDate(chunkEnd > end ? end : chunkEnd)]);
-    start = new Date(chunkEnd);
-    start.setDate(start.getDate() + 1);
-  }
-  return chunks;
-}

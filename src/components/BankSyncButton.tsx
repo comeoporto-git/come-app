@@ -44,11 +44,11 @@ export function BankSyncButton() {
           title="Vai buscar todos os movimentos dos últimos 90 dias"
           className="flex-1 bg-[#32373c] text-white font-semibold py-3 rounded-xl text-sm hover:bg-[#1a2018] disabled:opacity-50 transition-colors"
         >
-          {syncing === "full" ? "A importar…" : "Importar 1 ano"}
+          {syncing === "full" ? "A importar…" : "Importar 90 dias"}
         </button>
       </div>
       <p className="text-xs text-gray-400">
-        &ldquo;Importar 1 ano&rdquo; traz todos os movimentos dos últimos 12 meses. O banco pode limitar a 90 dias se não tiver histórico mais antigo.
+        &ldquo;Importar 90 dias&rdquo; traz o máximo de histórico disponível via PSD2 (limite do Crédito Agrícola).
       </p>
 
       {result && (
