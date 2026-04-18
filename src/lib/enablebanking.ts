@@ -131,8 +131,8 @@ export type EBTransaction = {
   transaction_id: string | null; // null seen in practice for some credit entries
   transaction_amount: { amount: string; currency: string };
   credit_debit_indicator: "CRDT" | "DBIT";
-  transaction_date: string;
-  booking_date: string;
+  transaction_date: string | null; // some ASPSPs omit this
+  booking_date: string | null;
   creditor?: { name?: string };
   debtor?: { name?: string };
   remittance_information?: string | string[]; // API may return array or string
@@ -263,7 +263,7 @@ export type StoredTransaction = {
 export function syntheticId(t: EBTransaction, accountUid: string): string {
   const parts = [
     accountUid,
-    t.transaction_date,
+    t.transaction_date ?? t.booking_date ?? "",
     t.booking_date ?? "",
     t.transaction_amount.amount,
     t.transaction_amount.currency,
@@ -286,6 +286,8 @@ export async function upsertBankTransactions(
 ): Promise<void> {
   const sql = getDb();
   for (const t of txns) {
+    const txDate = t.transaction_date ?? t.booking_date;
+    if (!txDate) continue; // skip if we have no date at all
     const txId = t.transaction_id ?? syntheticId(t, accountUid);
     const remit = remittanceText(t);
     const merchantName =
@@ -305,8 +307,8 @@ export async function upsertBankTransactions(
         ${parseFloat(t.transaction_amount.amount)},
         ${t.transaction_amount.currency},
         ${t.credit_debit_indicator},
-        ${t.transaction_date},
-        ${t.booking_date ?? null},
+        ${txDate},
+        ${t.booking_date ?? t.transaction_date ?? null},
         ${merchantName},
         ${remit || null},
         ${JSON.stringify(t)}

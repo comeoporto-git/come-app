@@ -151,7 +151,8 @@ async function matchTransaction(
   txn: EBTransaction,
   accountId: string,
 ): Promise<"matched" | "unmatched"> {
-  const bankDate   = new Date(txn.transaction_date);
+  const txDate     = txn.transaction_date ?? txn.booking_date ?? new Date().toISOString().slice(0, 10);
+  const bankDate   = new Date(txDate);
   const bankAmount = Math.abs(parseFloat(txn.transaction_amount.amount));
   const bankRef    = txn.transaction_id ?? syntheticId(txn, accountId);
 
@@ -189,7 +190,7 @@ async function matchTransaction(
   await createTransaction({
     supplier:      merchantName,
     fornecedorId:  null,
-    date:          txn.transaction_date,
+    date:          txDate,
     invoiceId:     "",
     taxFree:       bankAmount,
     iva6:          0,
