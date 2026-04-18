@@ -100,6 +100,17 @@ export default async function AdminPage({
               </div>
             </div>
           </Link>
+
+          {/* Analytics */}
+          <Link href="/admin/analytics">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex flex-col gap-3 hover:border-[#667470]/30 active:scale-[0.98] transition-all cursor-pointer relative min-h-[120px]">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-2xl shrink-0">📈</div>
+              <div>
+                <p className="font-bold text-[#32373c] text-sm leading-tight">Analytics</p>
+                <p className="text-xs text-gray-400 mt-0.5 leading-tight">Serviços, equipa, despesas</p>
+              </div>
+            </div>
+          </Link>
         </div>
       </main>
     </div>

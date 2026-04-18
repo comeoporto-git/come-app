@@ -1020,3 +1020,100 @@ export const getFornecedores = unstable_cache(
   { revalidate: 300, tags: ["fornecedores"] }, // 5 min — changes rarely
 );
 
+// ── Analytics ─────────────────────────────────────────────────────────────────
+
+/**
+ * Fetches tours from the last 6 months for analytics.
+ * Resolves only service names (small unique set) — team member names
+ * are resolved externally via getTeamMembers() which is cached.
+ */
+export async function getAnalyticsTours(): Promise<Tour[]> {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const sixMonthsAgo = new Date(today);
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
+    const allTours: Tour[] = [];
+    let cursor: string | undefined;
+    let hasMore = true;
+    let pages = 0;
+
+    while (hasMore && pages < 5) {
+      const res = await notion.databases.query({
+        database_id: TOURS_DB,
+        filter: {
+          and: [
+            { property: "Date", date: { on_or_after: sixMonthsAgo.toISOString() } },
+            { property: "Date", date: { before: today.toISOString() } },
+          ],
+        },
+        sorts: [{ property: "Date", direction: "descending" }],
+        page_size: 100,
+        ...(cursor ? { start_cursor: cursor } : {}),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any);
+      allTours.push(...(res.results as PageObjectResponse[]).map(mapTour));
+      hasMore = res.has_more;
+      cursor = (res.next_cursor as string | null) ?? undefined;
+      pages++;
+    }
+
+    // Resolve only service names (typically 5–15 unique services)
+    const serviceIds = [...new Set(allTours.map((t) => t.service).filter(Boolean))];
+    const serviceNameMap: Record<string, string> = {};
+    const serviceTypeMap: Record<string, string> = {};
+    await Promise.all(
+      serviceIds.map(async (id) => {
+        try {
+          const page = (await notion.pages.retrieve({ page_id: id })) as PageObjectResponse;
+          serviceNameMap[id] = pageTitle(page);
+          serviceTypeMap[id] = text(getProp(page, "Type"));
+        } catch { /* ignore */ }
+      })
+    );
+
+    return allTours.map((t) => ({
+      ...t,
+      serviceName: serviceNameMap[t.service] ?? "",
+      serviceType: serviceTypeMap[t.service] ?? "",
+    }));
+  } catch { return []; }
+}
+
+/**
+ * Fetches all expense transactions from the last 90 days for analytics.
+ * Does not resolve tour names to keep it fast.
+ */
+export async function getAnalyticsTransactions(): Promise<Transaction[]> {
+  try {
+    const ninetyDaysAgo = new Date();
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+
+    const allTxns: Transaction[] = [];
+    let cursor: string | undefined;
+    let hasMore = true;
+    let pages = 0;
+
+    while (hasMore && pages < 5) {
+      const res = await notion.databases.query({
+        database_id: TRANSACTIONS_DB,
+        filter: {
+          property: "Data",
+          date: { on_or_after: ninetyDaysAgo.toISOString() },
+        },
+        sorts: [{ property: "Data", direction: "descending" }],
+        page_size: 100,
+        ...(cursor ? { start_cursor: cursor } : {}),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any);
+      allTxns.push(...(res.results as PageObjectResponse[]).map(mapTransaction));
+      hasMore = res.has_more;
+      cursor = (res.next_cursor as string | null) ?? undefined;
+      pages++;
+    }
+
+    return allTxns;
+  } catch { return []; }
+}
+
