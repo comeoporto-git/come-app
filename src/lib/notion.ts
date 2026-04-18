@@ -1054,10 +1054,8 @@ export async function getAnalyticsTours(): Promise<Tour[]> {
     while (hasMore && pages < 50) { // safety cap: 5 000 tours
       const res = await notion.databases.query({
         database_id: TOURS_DB,
-        filter: {
-          property: "Date",
-          date: { before: today.toISOString() }, // only past tours
-        },
+        // No date filter — includes past AND future tours.
+        // Sorted descending so future tours (most recent) come first.
         sorts: [{ property: "Date", direction: "descending" }],
         page_size: 100,
         ...(cursor ? { start_cursor: cursor } : {}),

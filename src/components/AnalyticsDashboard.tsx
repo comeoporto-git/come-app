@@ -6,6 +6,10 @@ import type { Tour, Transaction } from "@/lib/notion";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+const TODAY = (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; })();
+const CURRENT_YEAR  = TODAY.getFullYear();
+const CURRENT_MONTH = `${TODAY.getFullYear()}-${String(TODAY.getMonth() + 1).padStart(2, "0")}`;
+
 function fmt(n: number, decimals = 0) {
   return n.toLocaleString("pt-PT", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 }
@@ -14,6 +18,9 @@ function fmtEur(n: number) {
 }
 function isCancelled(t: Tour) {
   return t.status === "Cancelled" || t.status === "Canceled";
+}
+function isTourFuture(t: Tour) {
+  return !!t.date && new Date(t.date) >= TODAY;
 }
 function monthKey(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
@@ -46,8 +53,8 @@ type Category = typeof CATEGORIES[number]["id"];
 
 // ── UI components ─────────────────────────────────────────────────────────────
 
-function KpiCard({ label, value, sub, accent = false }: {
-  label: string; value: string; sub?: string; accent?: boolean;
+function KpiCard({ label, value, sub, accent = false, subAccent = false }: {
+  label: string; value: string; sub?: string; accent?: boolean; subAccent?: boolean;
 }) {
   return (
     <div className={`rounded-2xl border p-4 flex flex-col gap-1 ${
@@ -55,7 +62,11 @@ function KpiCard({ label, value, sub, accent = false }: {
     }`}>
       <p className={`text-xs font-medium uppercase tracking-wide ${accent ? "text-white/50" : "text-gray-400"}`}>{label}</p>
       <p className={`text-3xl font-bold ${accent ? "text-white" : "text-[#32373c]"}`}>{value}</p>
-      {sub && <p className={`text-xs ${accent ? "text-white/40" : "text-gray-400"}`}>{sub}</p>}
+      {sub && (
+        <p className={`text-xs ${
+          subAccent ? "text-amber-300 font-semibold" : accent ? "text-white/40" : "text-gray-400"
+        }`}>{sub}</p>
+      )}
     </div>
   );
 }
@@ -100,17 +111,20 @@ function SectionCard({ title, sub, children }: {
   );
 }
 
-function VBars({ entries, max, color, formatValue, barHeight = 88 }: {
+/** VBars — vertical bar chart. Pass `colors` for per-bar color overrides. */
+function VBars({ entries, max, color, colors, formatValue, barHeight = 88 }: {
   entries: [string, number][];
   max: number;
   color: string;
+  colors?: string[];       // per-bar colour override
   formatValue?: (v: number) => string;
   barHeight?: number;
 }) {
   return (
     <div className="flex items-end gap-2" style={{ height: `${barHeight + 32}px` }}>
-      {entries.map(([label, value]) => {
-        const pct = (value / max) * 100;
+      {entries.map(([label, value], i) => {
+        const pct      = (value / max) * 100;
+        const barColor = colors?.[i] ?? color;
         return (
           <div key={label} className="flex-1 flex flex-col items-center gap-1 h-full justify-end">
             {value > 0 && (
@@ -120,7 +134,7 @@ function VBars({ entries, max, color, formatValue, barHeight = 88 }: {
             )}
             <div className="w-full relative" style={{ height: `${barHeight}px` }}>
               <div
-                className={`absolute bottom-0 w-full ${color} rounded-t-lg`}
+                className={`absolute bottom-0 w-full ${barColor} rounded-t-lg`}
                 style={{ height: `${pct}%`, minHeight: value > 0 ? "4px" : "0" }}
               />
             </div>
@@ -128,6 +142,19 @@ function VBars({ entries, max, color, formatValue, barHeight = 88 }: {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+function ChartLegend({ items }: { items: { color: string; label: string }[] }) {
+  return (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-400 mt-3">
+      {items.map(({ color, label }) => (
+        <span key={label} className="flex items-center gap-1.5">
+          <span className={`inline-block w-3 h-2.5 rounded-sm ${color}`} />
+          {label}
+        </span>
+      ))}
     </div>
   );
 }
@@ -154,27 +181,44 @@ export function AnalyticsDashboard({
 
   // ── By year (always full history) ──────────────────────────────────────────
   const yearlyData = useMemo(() => {
-    const map: Record<number, { services: number; revenue: number }> = {};
+    const map: Record<number, { services: number; futureSvcs: number; revenue: number }> = {};
     for (const t of allTours) {
       if (!t.date || isCancelled(t)) continue;
       const y = new Date(t.date).getFullYear();
-      if (!map[y]) map[y] = { services: 0, revenue: 0 };
+      if (!map[y]) map[y] = { services: 0, futureSvcs: 0, revenue: 0 };
       map[y].services++;
+      if (isTourFuture(t)) map[y].futureSvcs++;
     }
     for (const t of allTransactions) {
       if (!t.date || !t.supplier.startsWith("IN -")) continue;
       const y = new Date(t.date).getFullYear();
-      if (!map[y]) map[y] = { services: 0, revenue: 0 };
+      if (!map[y]) map[y] = { services: 0, futureSvcs: 0, revenue: 0 };
       map[y].revenue += t.totalCost;
     }
     return Object.entries(map)
-      .map(([year, d]) => ({ year: Number(year), ...d }))
+      .map(([year, d]) => ({
+        year: Number(year),
+        ...d,
+        // A year is "future-dominant" if it's strictly beyond the current year
+        isFuture: Number(year) > CURRENT_YEAR,
+        // Current year has some future tours mixed in
+        hasFuturePartial: Number(year) === CURRENT_YEAR && d.futureSvcs > 0,
+      }))
       .sort((a, b) => a.year - b.year);
   }, [allTours, allTransactions]);
 
   const maxYearlyServices = Math.max(...yearlyData.map((d) => d.services), 1);
   const maxYearlyRevenue  = Math.max(...yearlyData.map((d) => d.revenue), 1);
   const hasYearlyRevenue  = yearlyData.some((d) => d.revenue > 0);
+  const yearlyHasFuture   = yearlyData.some((d) => d.isFuture || d.hasFuturePartial);
+
+  // Colours for yearly charts — future years get lighter bars
+  const yearlyServiceColors = yearlyData.map((d) =>
+    d.isFuture ? "bg-[#667470]/40" : "bg-[#667470]"
+  );
+  const yearlyRevenueColors = yearlyData.map((d) =>
+    d.isFuture ? "bg-emerald-400/40" : "bg-emerald-400"
+  );
 
   // ── Period-filtered analytics ─────────────────────────────────────────────
   const a = useMemo(() => {
@@ -182,34 +226,48 @@ export function AnalyticsDashboard({
     const tours  = allTours.filter((t) => t.date && new Date(t.date) >= cutoff);
     const txns   = allTransactions.filter((t) => t.date && new Date(t.date) >= cutoff);
 
-    const completed = tours.filter((t) => !isCancelled(t));
-    const cancelled = tours.filter((t) => isCancelled(t));
+    const completed       = tours.filter((t) => !isCancelled(t));
+    const cancelled       = tours.filter((t) => isCancelled(t));
+    const pastCompleted   = completed.filter((t) => !isTourFuture(t));
+    const futureCompleted = completed.filter((t) => isTourFuture(t));
+    const hasFuture       = futureCompleted.length > 0;
 
-    // KPIs
+    // KPIs — base on all completed (past + future)
     const totalGuests = completed.reduce((s, t) => s + t.numGuests, 0);
     const avgGroup    = completed.length > 0 ? totalGuests / completed.length : 0;
     const cancelRate  = tours.length > 0 ? (cancelled.length / tours.length) * 100 : 0;
 
-    // Monthly trend
+    // Monthly trend — past N months + any future months that have bookings
     const numMonths = period === 0 ? 12 : period <= 30 ? 1 : period <= 90 ? 3 : period <= 180 ? 6 : 12;
     const monthlyMap: Record<string, number> = {};
     for (let i = numMonths - 1; i >= 0; i--) {
       const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - i);
       monthlyMap[monthKey(d)] = 0;
     }
+    // Add any future months that aren't already in the window
+    for (const t of futureCompleted) {
+      if (!t.date) continue;
+      const k = monthKey(new Date(t.date));
+      if (!(k in monthlyMap)) monthlyMap[k] = 0;
+    }
+    // Count all completed tours
     for (const t of completed) {
       if (!t.date) continue;
       const k = monthKey(new Date(t.date));
       if (k in monthlyMap) monthlyMap[k]++;
     }
-    const monthlyEntries = Object.entries(monthlyMap);
-    const maxMonthly     = Math.max(...monthlyEntries.map(([, v]) => v), 1);
+    // Sort chronologically
+    const monthlyEntries  = Object.entries(monthlyMap).sort(([a], [b]) => a.localeCompare(b));
+    const maxMonthly      = Math.max(...monthlyEntries.map(([, v]) => v), 1);
+    // A month key > CURRENT_MONTH is definitively future
+    const monthlyIsFuture = monthlyEntries.map(([k]) => k > CURRENT_MONTH);
+    const monthlyColors   = monthlyIsFuture.map((f) => f ? "bg-[#667470]/40" : "bg-[#667470]");
+    const hasFutureMonths = monthlyIsFuture.some(Boolean);
 
     // By status (all tours, including cancelled)
     const byStatus: Record<string, number> = {};
     for (const t of tours) {
       const s = t.status || "Sem estado";
-      // Normalise the two spellings of Cancelled
       const key = s === "Canceled" ? "Cancelled" : s;
       byStatus[key] = (byStatus[key] ?? 0) + 1;
     }
@@ -292,12 +350,12 @@ export function AnalyticsDashboard({
       .map(([id, rev]) => [clientNameMap[id] || "—", rev] as [string, number]);
     const maxClientRevenue = Math.max(...topClientsByRevenue.map(([, v]) => v), 1);
 
-    // Expenses & revenue
+    // Expenses & revenue (past transactions only — future txns not expected)
     const expenses      = txns.filter((t) => !t.supplier.startsWith("IN -"));
     const earnings      = txns.filter((t) => t.supplier.startsWith("IN -"));
     const totalExpenses = expenses.reduce((s, t) => s + t.totalCost, 0);
     const totalEarnings = earnings.reduce((s, t) => s + t.totalCost, 0);
-    const expPerTour    = completed.length > 0 ? totalExpenses / completed.length : 0;
+    const expPerTour    = pastCompleted.length > 0 ? totalExpenses / pastCompleted.length : 0;
     const byMethod: Record<string, number> = {};
     for (const t of expenses) {
       const m = t.paymentMethod || "Outro";
@@ -314,8 +372,9 @@ export function AnalyticsDashboard({
       : `${fromDate.toLocaleDateString("pt-PT", { day: "numeric", month: "short", year: "numeric" })} – ${now.toLocaleDateString("pt-PT", { day: "numeric", month: "short", year: "numeric" })}`;
 
     return {
-      completed, cancelled, totalGuests, avgGroup, cancelRate,
-      monthlyEntries, maxMonthly,
+      completed, cancelled, pastCompleted, futureCompleted, hasFuture,
+      totalGuests, avgGroup, cancelRate,
+      monthlyEntries, maxMonthly, monthlyColors, hasFutureMonths,
       topStatuses, maxStatus,
       topServices, maxService,
       topCategories, maxCategory,
@@ -360,18 +419,35 @@ export function AnalyticsDashboard({
 
       {/* ── KPIs — always visible ── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <KpiCard label="Serviços"      value={fmt(a.completed.length)}    sub="realizados"           accent />
+        <KpiCard
+          label="Serviços"
+          value={fmt(a.pastCompleted.length)}
+          sub={a.hasFuture ? `+${a.futureCompleted.length} futuros` : "realizados"}
+          subAccent={a.hasFuture}
+          accent
+        />
         <KpiCard label="Hóspedes"      value={fmt(a.totalGuests)}         sub="total de pax" />
         <KpiCard label="Média Pax"     value={fmt(a.avgGroup, 1)}         sub="por serviço" />
         <KpiCard label="Cancelamentos" value={`${fmt(a.cancelRate, 0)}%`} sub={`${a.cancelled.length} serviços`} />
       </div>
+
+      {/* ── Future data notice banner ── */}
+      {a.hasFuture && (
+        <div className="flex items-center gap-2.5 bg-amber-400/15 border border-amber-400/30 rounded-xl px-4 py-2.5">
+          <span className="text-amber-300 text-base">🔮</span>
+          <p className="text-xs text-amber-200">
+            <span className="font-semibold">{a.futureCompleted.length} serviços futuros</span>
+            {" "}incluídos nos gráficos em barras mais claras · os KPIs de serviços excluem futuros
+          </p>
+        </div>
+      )}
 
       {/* ── Category content ── */}
 
       {/* RESUMO */}
       {category === "resumo" && (
         <div className="space-y-6">
-          <SectionCard title="Por Estado" sub="Todos os serviços no período seleccionado">
+          <SectionCard title="Por Estado" sub="Todos os serviços no período seleccionado (incluindo futuros)">
             {a.topStatuses.length === 0 ? <EmptyState /> : (
               <div className="space-y-3">
                 {a.topStatuses.map(([status, count]) => (
@@ -396,7 +472,14 @@ export function AnalyticsDashboard({
                   entries={yearlyData.map((d) => [String(d.year), d.services])}
                   max={maxYearlyServices}
                   color="bg-[#667470]"
+                  colors={yearlyServiceColors}
                 />
+                {yearlyHasFuture && (
+                  <ChartLegend items={[
+                    { color: "bg-[#667470]",    label: "Passado" },
+                    { color: "bg-[#667470]/40", label: "Futuro (estimado)" },
+                  ]} />
+                )}
               </div>
               {hasYearlyRevenue && (
                 <>
@@ -407,8 +490,15 @@ export function AnalyticsDashboard({
                       entries={yearlyData.map((d) => [String(d.year), d.revenue])}
                       max={maxYearlyRevenue}
                       color="bg-emerald-400"
+                      colors={yearlyRevenueColors}
                       formatValue={fmtEur}
                     />
+                    {yearlyHasFuture && (
+                      <ChartLegend items={[
+                        { color: "bg-emerald-400",    label: "Passado" },
+                        { color: "bg-emerald-400/40", label: "Futuro (estimado)" },
+                      ]} />
+                    )}
                   </div>
                 </>
               )}
@@ -422,13 +512,20 @@ export function AnalyticsDashboard({
         <div className="space-y-6">
           <SectionCard
             title="Tendência Mensal"
-            sub={period === 0 ? "Últimos 12 meses" : "Serviços realizados por mês"}
+            sub={period === 0 ? "Últimos 12 meses" : "Serviços por mês"}
           >
             <VBars
               entries={a.monthlyEntries.map(([k, v]) => [monthLabel(k), v])}
               max={a.maxMonthly}
               color="bg-[#667470]"
+              colors={a.monthlyColors}
             />
+            {a.hasFutureMonths && (
+              <ChartLegend items={[
+                { color: "bg-[#667470]",    label: "Passado" },
+                { color: "bg-[#667470]/40", label: "Futuro (estimado)" },
+              ]} />
+            )}
           </SectionCard>
 
           {/* By category */}
@@ -443,7 +540,7 @@ export function AnalyticsDashboard({
           </SectionCard>
 
           <div className="grid md:grid-cols-2 gap-6">
-            <SectionCard title="Por Serviço" sub="Serviços completados por nome">
+            <SectionCard title="Por Serviço" sub="Por nome de serviço">
               {a.topServices.length === 0 ? <EmptyState /> : (
                 <div className="space-y-3">
                   {a.topServices.map(([name, count]) => (
@@ -479,7 +576,7 @@ export function AnalyticsDashboard({
 
       {/* EQUIPA */}
       {category === "equipa" && (
-        <SectionCard title="Carga da Equipa" sub={`Serviços por pessoa · ${periodLabel}`}>
+        <SectionCard title="Carga da Equipa" sub={`Serviços por pessoa · ${periodLabel}${a.hasFuture ? " · inclui futuros" : ""}`}>
           <div className="space-y-6">
             {a.guideWork.length > 0 && (
               <div>
@@ -520,7 +617,7 @@ export function AnalyticsDashboard({
 
       {/* CLIENTES */}
       {category === "clientes" && (
-        <SectionCard title="Clientes" sub={`${periodLabel} · campo "💼 Client"`}>
+        <SectionCard title="Clientes" sub={`${periodLabel} · campo "💼 Client"${a.hasFuture ? " · inclui futuros" : ""}`}>
           <div className="space-y-6">
             {a.uniqueClientCount === 0 ? (
               <EmptyState message="Sem dados de clientes para este período" />
@@ -601,11 +698,11 @@ export function AnalyticsDashboard({
                   Receita não registada ou com prefixo diferente de &quot;IN -&quot;
                 </p>
               )}
-              {a.totalEarnings > 0 && a.completed.length > 0 && (
+              {a.totalEarnings > 0 && a.pastCompleted.length > 0 && (
                 <div className="bg-gray-50 rounded-xl p-3">
-                  <p className="text-xs text-gray-400">Receita média p/ serviço</p>
+                  <p className="text-xs text-gray-400">Receita média p/ serviço realizado</p>
                   <p className="text-lg font-bold text-[#32373c] mt-0.5">
-                    {fmtEur(a.totalEarnings / a.completed.length)}
+                    {fmtEur(a.totalEarnings / a.pastCompleted.length)}
                   </p>
                 </div>
               )}
