@@ -364,7 +364,7 @@ export async function updateTourServiceInfo(
       properties: {
         "Number of Guests": { number: data.numGuests ?? null },
         Names: { rich_text: data.names ? [{ text: { content: data.names } }] : [] },
-        "Phone Number": { phone_number: data.phoneNumber || null },
+        "Phone Number": { rich_text: data.phoneNumber ? [{ text: { content: data.phoneNumber } }] : [] },
         Notes: { rich_text: data.notes ? [{ text: { content: data.notes } }] : [] },
       } as Parameters<typeof notion.pages.update>[0]["properties"],
     });
