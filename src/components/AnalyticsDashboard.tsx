@@ -41,17 +41,19 @@ function KpiCard({ label, value, sub, accent = false }: {
   );
 }
 
-function HBar({ label, value, max, color = "bg-[#667470]", labelWidth = "w-36" }: {
+function HBar({ label, value, max, color = "bg-[#667470]", labelWidth = "w-36", formatValue }: {
   label: string; value: number; max: number; color?: string; labelWidth?: string;
+  formatValue?: (v: number) => string;
 }) {
   const pct = max > 0 ? Math.max(2, (value / max) * 100) : 0;
+  const displayed = formatValue ? formatValue(value) : fmt(value);
   return (
     <div className="flex items-center gap-3">
       <span className={`text-xs text-gray-500 shrink-0 ${labelWidth} truncate text-right`}>{label}</span>
       <div className="flex-1 bg-gray-100 rounded-full h-2">
         <div className={`${color} h-2 rounded-full`} style={{ width: `${pct}%` }} />
       </div>
-      <span className="text-xs font-semibold text-gray-700 w-8 text-right shrink-0">{fmt(value)}</span>
+      <span className="text-xs font-semibold text-gray-700 w-16 text-right shrink-0">{displayed}</span>
     </div>
   );
 }
@@ -256,6 +258,22 @@ export function AnalyticsDashboard({
       .map(([id, count]) => [clientNameMap[id] || "—", count] as [string, number]);
     const maxClientCount     = Math.max(...topClients.map(([, v]) => v), 1);
 
+    // Revenue by client — join earnings transactions to tours to get clientId
+    const tourClientMap: Record<string, string> = {};
+    for (const t of allTours) { if (t.id && t.client) tourClientMap[t.id] = t.client; }
+    const revenueByClient: Record<string, number> = {};
+    for (const tx of transactions) {
+      if (!tx.supplier.startsWith("IN -") || !tx.tourId) continue;
+      const cid = tourClientMap[tx.tourId];
+      if (!cid) continue;
+      revenueByClient[cid] = (revenueByClient[cid] ?? 0) + tx.totalCost;
+    }
+    const topClientsByRevenue = Object.entries(revenueByClient)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 10)
+      .map(([id, rev]) => [clientNameMap[id] || "—", rev] as [string, number]);
+    const maxClientRevenue = Math.max(...topClientsByRevenue.map(([, v]) => v), 1);
+
     // Range label
     const now      = new Date();
     const fromDate = new Date(Date.now() - period * 86_400_000);
@@ -270,7 +288,9 @@ export function AnalyticsDashboard({
       DAYS_PT, byDay, maxDay,
       guideWork, chefWork, driverWork, maxTeam,
       totalExpenses, totalEarnings, expPerTour, topMethods, maxMethod,
-      uniqueClientCount, repeatClientCount, repeatRate, topClients, maxClientCount,
+      uniqueClientCount, repeatClientCount, repeatRate,
+      topClients, maxClientCount,
+      topClientsByRevenue, maxClientRevenue,
       rangeLbl,
     };
   }, [allTours, allTransactions, teamMap, clientNameMap, period]);
@@ -282,7 +302,9 @@ export function AnalyticsDashboard({
     DAYS_PT, byDay, maxDay,
     guideWork, chefWork, driverWork, maxTeam,
     totalExpenses, totalEarnings, expPerTour, topMethods, maxMethod,
-    uniqueClientCount, repeatClientCount, repeatRate, topClients, maxClientCount,
+    uniqueClientCount, repeatClientCount, repeatRate,
+    topClients, maxClientCount,
+    topClientsByRevenue, maxClientRevenue,
     rangeLbl,
   } = analytics;
 
@@ -358,12 +380,30 @@ export function AnalyticsDashboard({
                 <MiniStat label="Taxa repetição" value={`${fmt(repeatRate, 0)}%`} />
               </div>
 
-              {/* Top clients */}
+              {/* Top by bookings */}
               {topClients.length > 0 && (
                 <div className="space-y-2.5">
                   <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Top clientes · por nº de serviços</p>
                   {topClients.map(([name, count]) => (
                     <HBar key={name} label={name} value={count} max={maxClientCount} color="bg-blue-400" labelWidth="w-32" />
+                  ))}
+                </div>
+              )}
+
+              {/* Top by revenue */}
+              {topClientsByRevenue.length > 0 && (
+                <div className="space-y-2.5">
+                  <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wide">Faturação por cliente</p>
+                  {topClientsByRevenue.map(([name, revenue]) => (
+                    <HBar
+                      key={name}
+                      label={name}
+                      value={revenue}
+                      max={maxClientRevenue}
+                      color="bg-emerald-400"
+                      labelWidth="w-32"
+                      formatValue={fmtEur}
+                    />
                   ))}
                 </div>
               )}

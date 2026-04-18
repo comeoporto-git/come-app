@@ -23,16 +23,29 @@ export default async function AnalyticsPage() {
 
   const teamMap = Object.fromEntries(teamMembers.map((m) => [m.id, m.name]));
 
-  // Resolve names only for the top-30 most frequent clients (fast: ~30 parallel calls)
+  // Top clients by booking count
   const clientFreq: Record<string, number> = {};
   for (const t of tours) {
     if (t.client) clientFreq[t.client] = (clientFreq[t.client] ?? 0) + 1;
   }
-  const topClientIds = Object.entries(clientFreq)
-    .sort(([, a], [, b]) => b - a)
-    .slice(0, 30)
-    .map(([id]) => id);
+  const topByBookings = Object.entries(clientFreq)
+    .sort(([, a], [, b]) => b - a).slice(0, 20).map(([id]) => id);
 
+  // Top clients by revenue (earnings transactions joined to tours via tourId)
+  const tourClientMap: Record<string, string> = {};
+  for (const t of tours) { if (t.id && t.client) tourClientMap[t.id] = t.client; }
+  const clientRevenue: Record<string, number> = {};
+  for (const tx of transactions) {
+    if (!tx.supplier.startsWith("IN -") || !tx.tourId) continue;
+    const cid = tourClientMap[tx.tourId];
+    if (!cid) continue;
+    clientRevenue[cid] = (clientRevenue[cid] ?? 0) + tx.totalCost;
+  }
+  const topByRevenue = Object.entries(clientRevenue)
+    .sort(([, a], [, b]) => b - a).slice(0, 20).map(([id]) => id);
+
+  // Resolve names for the union of both lists (max ~40 parallel calls)
+  const topClientIds = [...new Set([...topByBookings, ...topByRevenue])];
   const clientNameMap = await resolvePageTitles(topClientIds);
 
   return (
