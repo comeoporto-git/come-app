@@ -46,7 +46,7 @@ export default async function PermissoesPage() {
         {/* Role legend */}
         <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
           <h2 className="text-sm font-semibold text-gray-700 mb-4">Roles</h2>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
             {([
               { role: "Admin",       color: "bg-purple-100 text-purple-700", desc: "Acesso total à plataforma" },
               { role: "Guide",       color: "bg-[#667470]/10 text-[#667470]", desc: "Tour do dia e despesas" },
