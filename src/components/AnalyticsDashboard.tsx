@@ -198,7 +198,7 @@ export function AnalyticsDashboard({
     const monthlyEntries = Object.entries(monthlyMap);
     const maxMonthly     = Math.max(...monthlyEntries.map(([, v]) => v), 1);
 
-    // By service type
+    // By service name
     const byService: Record<string, number> = {};
     for (const t of completed) {
       const name = t.serviceName || t.type || "Outro";
@@ -206,6 +206,15 @@ export function AnalyticsDashboard({
     }
     const topServices = Object.entries(byService).sort((a, b) => b[1] - a[1]).slice(0, 8);
     const maxService  = Math.max(...topServices.map(([, v]) => v), 1);
+
+    // By service category (Type field from the linked Service page)
+    const byCategory: Record<string, number> = {};
+    for (const t of completed) {
+      const cat = t.serviceType || "Outro";
+      byCategory[cat] = (byCategory[cat] ?? 0) + 1;
+    }
+    const topCategories = Object.entries(byCategory).sort((a, b) => b[1] - a[1]);
+    const maxCategory   = Math.max(...topCategories.map(([, v]) => v), 1);
 
     // By day of week
     const DAYS_PT = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
@@ -290,6 +299,7 @@ export function AnalyticsDashboard({
       completed, cancelled, totalGuests, avgGroup, cancelRate,
       monthlyEntries, maxMonthly,
       topServices, maxService,
+      topCategories, maxCategory,
       DAYS_PT, byDay, maxDay,
       guideWork, chefWork, driverWork, maxTeam,
       uniqueClientCount, repeatClientCount, repeatRate,
@@ -385,8 +395,19 @@ export function AnalyticsDashboard({
             />
           </SectionCard>
 
+          {/* By category */}
+          <SectionCard title="Por Categoria" sub="Tour, Cooking Class, Evento, etc.">
+            {a.topCategories.length === 0 ? <EmptyState /> : (
+              <div className="space-y-3">
+                {a.topCategories.map(([cat, count]) => (
+                  <HBar key={cat} label={cat} value={count} max={a.maxCategory} color="bg-violet-400" labelWidth="w-32" />
+                ))}
+              </div>
+            )}
+          </SectionCard>
+
           <div className="grid md:grid-cols-2 gap-6">
-            <SectionCard title="Por Tipo de Serviço" sub="Serviços completados">
+            <SectionCard title="Por Serviço" sub="Serviços completados por nome">
               {a.topServices.length === 0 ? <EmptyState /> : (
                 <div className="space-y-3">
                   {a.topServices.map(([name, count]) => (
