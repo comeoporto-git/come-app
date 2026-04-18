@@ -90,7 +90,7 @@ export type TeamMember = {
   phone: string;
   nif: string;
   iban: string;
-  role: "Admin" | "Guide" | "Super Guide" | "Accountant" | "Chef";
+  role: "Admin" | "Guide" | "Super Guide" | "Accountant" | "Chef" | "Driver";
 };
 
 function mapTeamMember(page: PageObjectResponse): TeamMember {

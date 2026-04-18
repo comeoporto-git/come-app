@@ -13,8 +13,9 @@ export default async function LoginPage({
 
   if (session) {
     const role = session.user?.role;
-    if (role === "Guide") redirect("/guide");
-    if (role === "Chef") redirect("/guide");
+    if (role === "Guide")  redirect("/guide");
+    if (role === "Chef")   redirect("/guide");
+    if (role === "Driver") redirect("/guide");
     if (role === "Super Guide") redirect("/super-guide");
     if (role === "Accountant") redirect("/accountant");
     if (role === "Admin") redirect("/admin");
