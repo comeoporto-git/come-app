@@ -53,12 +53,17 @@ function TourCard({
   isMyTour?: boolean;
 }) {
   const ts = typeStyle(tour.serviceType);
+  const isCanceled = tour.status === "Canceled" || tour.status === "Cancelled";
   return (
     <Link href={`/guide/tours/${tour.id}`}>
       <li
         className={`rounded-2xl overflow-hidden shadow-sm border transition-all active:scale-[0.98] cursor-pointer ${
-          past ? "bg-white/60 border-white/20" : "bg-white border-gray-100"
-        } text-[#32373c] ${ts?.border ?? ""}`}
+          isCanceled
+            ? "bg-gray-100 border-gray-200 opacity-60"
+            : past
+              ? "bg-white/60 border-white/20"
+              : "bg-white border-gray-100"
+        } text-[#32373c] ${isCanceled ? "" : (ts?.border ?? "")}`}
       >
         <div className="flex items-start justify-between gap-3 p-5">
           <div className="flex-1 min-w-0 space-y-1">

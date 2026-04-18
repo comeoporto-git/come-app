@@ -82,16 +82,20 @@ export default async function AdminToursPage() {
                 const guideName = teamMap[tour.teamId ?? ""];
                 return (
                   <Link key={tour.id} href={`/guide/tours/${tour.id}`}>
-                    <li className="rounded-2xl p-5 shadow-sm border bg-[#32373c] border-[#32373c] text-white transition-all active:scale-[0.98] cursor-pointer">
+                    <li className={`rounded-2xl p-5 shadow-sm border transition-all active:scale-[0.98] cursor-pointer ${
+                      (tour.status === "Canceled" || tour.status === "Cancelled")
+                        ? "bg-gray-100 border-gray-200 opacity-60 text-[#32373c]"
+                        : "bg-[#32373c] border-[#32373c] text-white"
+                    }`}>
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0 space-y-1">
-                          <p className="font-semibold text-sm text-white">{tour.saleId}</p>
-                          <p className="text-xs text-white/60">{formatDate(tour.date)}</p>
+                          <p className="font-semibold text-sm">{tour.saleId}</p>
+                          <p className="text-xs opacity-60">{formatDate(tour.date)}</p>
                           {tour.serviceName && (
-                            <p className="text-xs text-white/60">{tour.serviceName}</p>
+                            <p className="text-xs opacity-60">{tour.serviceName}</p>
                           )}
                           {guideName && (
-                            <p className="text-xs text-white/50">
+                            <p className="text-xs opacity-50">
                               🧭 {guideName}{tour.numGuests > 0 ? ` · ${tour.numGuests} pax` : ""}
                             </p>
                           )}
