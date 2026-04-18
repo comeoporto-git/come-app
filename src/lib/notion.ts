@@ -220,6 +220,59 @@ export async function getPendingServices(): Promise<Tour[]> {
   } catch { return []; }
 }
 
+/**
+ * Maps Equipa multi-select values (Portuguese or English) to
+ * the corresponding Tour fields. Returns which roles are required
+ * but have no one assigned.
+ */
+function getMissingStaffRoles(tour: Tour): string[] {
+  const missing: string[] = [];
+  for (const role of tour.serviceEquipa) {
+    const r = role.toLowerCase();
+    if ((r.includes("guia") || r.includes("guide")) && !tour.guideId) {
+      missing.push(role);
+    } else if (r.includes("chef") && !tour.chefId) {
+      missing.push(role);
+    } else if ((r.includes("driver") || r.includes("condutor")) && !tour.driverId) {
+      missing.push(role);
+    }
+  }
+  return missing;
+}
+
+export type TourWithMissingStaff = Tour & { missingRoles: string[] };
+
+export async function getServicesWithMissingStaff(): Promise<TourWithMissingStaff[]> {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const nextWeek = new Date(today);
+    nextWeek.setDate(nextWeek.getDate() + 7);
+
+    const res = await notion.databases.query({
+      database_id: TOURS_DB,
+      filter: {
+        and: [
+          { property: "Date", date: { on_or_after: today.toISOString() } },
+          { property: "Date", date: { before: nextWeek.toISOString() } },
+        ],
+      },
+      sorts: [{ property: "Date", direction: "ascending" }],
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
+
+    const tours = await resolveRelationNames(
+      (res.results as PageObjectResponse[]).map(mapTour)
+    );
+
+    return tours
+      .filter((t) => t.status !== "Cancelled" && t.status !== "Canceled")
+      .filter((t) => t.serviceEquipa.length > 0) // only care if service defines required roles
+      .map((t) => ({ ...t, missingRoles: getMissingStaffRoles(t) }))
+      .filter((t) => t.missingRoles.length > 0);
+  } catch { return []; }
+}
+
 export async function updateTeamMemberRole(
   memberId: string,
   role: TeamMember["role"],
@@ -272,6 +325,8 @@ export type Tour = {
   // kept for backward-compat with guide-filter queries
   teamId: string | null;
   expensesClosed: boolean;
+  // Roles required by the linked Service (multi-select "Equipa" field)
+  serviceEquipa: string[];
 };
 
 function mapTour(page: PageObjectResponse): Tour {
@@ -303,6 +358,7 @@ function mapTour(page: PageObjectResponse): Tour {
     driverName:      "",
     teamId:          guideIds[0]  ?? null, // backward-compat
     expensesClosed:  text(getProp(page, "Expenses Closed")) === "Closed",
+    serviceEquipa:   [],
   };
 }
 
@@ -317,16 +373,18 @@ async function resolveRelationNames(tours: Tour[]): Promise<Tour[]> {
 
   if (!serviceIds.length && !otherIds.length) return tours;
 
-  const nameMap:        Record<string, string> = {};
-  const serviceTypeMap: Record<string, string> = {};
+  const nameMap:          Record<string, string>   = {};
+  const serviceTypeMap:   Record<string, string>   = {};
+  const serviceEquipaMap: Record<string, string[]> = {};
 
   await Promise.all([
-    // Service pages: grab title + Type
+    // Service pages: grab title + Type + Equipa
     ...serviceIds.map(async (id) => {
       try {
         const page = (await notion.pages.retrieve({ page_id: id })) as PageObjectResponse;
-        nameMap[id]        = pageTitle(page);
-        serviceTypeMap[id] = text(getProp(page, "Type"));
+        nameMap[id]          = pageTitle(page);
+        serviceTypeMap[id]   = text(getProp(page, "Type"));
+        serviceEquipaMap[id] = multiSelect(getProp(page, "Equipa"));
       } catch { /* ignore */ }
     }),
     // Everything else (client, guide, chef, driver): use title regardless of column name
@@ -340,12 +398,13 @@ async function resolveRelationNames(tours: Tour[]): Promise<Tour[]> {
 
   return tours.map((t) => ({
     ...t,
-    serviceName:  nameMap[t.service]        ?? "",
-    serviceType:  serviceTypeMap[t.service] ?? "",
-    clientName:   nameMap[t.client]         ?? "",
-    guideName:    nameMap[t.guideId!]       ?? "",
-    chefName:     nameMap[t.chefId!]        ?? "",
-    driverName:   nameMap[t.driverId!]      ?? "",
+    serviceName:   nameMap[t.service]          ?? "",
+    serviceType:   serviceTypeMap[t.service]   ?? "",
+    serviceEquipa: serviceEquipaMap[t.service] ?? [],
+    clientName:    nameMap[t.client]           ?? "",
+    guideName:     nameMap[t.guideId!]         ?? "",
+    chefName:      nameMap[t.chefId!]          ?? "",
+    driverName:    nameMap[t.driverId!]        ?? "",
   }));
 }
 

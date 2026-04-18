@@ -1,7 +1,7 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { getServicesWithMissingInfo, getPendingServices } from "@/lib/notion";
-import type { Tour } from "@/lib/notion";
+import { getServicesWithMissingInfo, getPendingServices, getServicesWithMissingStaff } from "@/lib/notion";
+import type { Tour, TourWithMissingStaff } from "@/lib/notion";
 import Image from "next/image";
 import Link from "next/link";
 import { signOut } from "@/lib/auth";
@@ -13,6 +13,14 @@ function formatDate(iso: string | null): string {
     hour: "2-digit", minute: "2-digit",
     timeZone: "Europe/Lisbon",
   });
+}
+
+function roleColor(role: string): string {
+  const r = role.toLowerCase();
+  if (r.includes("guia") || r.includes("guide")) return "bg-[#667470]/10 text-[#667470] border-[#667470]/20";
+  if (r.includes("chef"))                         return "bg-red-50 text-red-600 border-red-100";
+  if (r.includes("driver") || r.includes("condutor")) return "bg-slate-100 text-slate-600 border-slate-200";
+  return "bg-gray-50 text-gray-600 border-gray-100";
 }
 
 function getMissingFields(tour: Tour): string[] {
@@ -29,9 +37,10 @@ export default async function GestaoToursPage() {
   const session = await auth();
   if (!session || session.user.role !== "Admin") redirect("/");
 
-  const [incompleteServices, pendingServices] = await Promise.all([
+  const [incompleteServices, pendingServices, missingStaffServices] = await Promise.all([
     getServicesWithMissingInfo(),
     getPendingServices(),
+    getServicesWithMissingStaff(),
   ]);
 
   return (
@@ -72,6 +81,44 @@ export default async function GestaoToursPage() {
         <div className="pt-2" />
 
         <div className="space-y-6">
+        {/* Equipa em Falta */}
+        <section className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-50 flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-semibold text-[#32373c]">Equipa em Falta</h2>
+              <p className="text-xs text-gray-400 mt-0.5">Próximos 7 dias · funções por atribuir</p>
+            </div>
+            {missingStaffServices.length > 0 && (
+              <span className="text-xs bg-orange-500 text-white font-bold px-2.5 py-1 rounded-full">
+                {missingStaffServices.length}
+              </span>
+            )}
+          </div>
+          {missingStaffServices.length === 0 ? (
+            <div className="px-5 py-6 text-center text-sm text-gray-400">✅ Toda a equipa atribuída para os próximos 7 dias</div>
+          ) : (
+            <ul className="divide-y divide-gray-50">
+              {missingStaffServices.map((t: TourWithMissingStaff) => (
+                <li key={t.id} className="px-5 py-3">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Link href={`/guide/tours/${t.id}`} className="text-sm font-semibold text-[#32373c] hover:underline">
+                      {t.saleId}
+                    </Link>
+                    {t.serviceName && <span className="text-xs text-gray-400">{t.serviceName}</span>}
+                  </div>
+                  <p className="text-xs text-gray-400 mt-0.5">{formatDate(t.date)}</p>
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    {t.missingRoles.map((role) => (
+                      <span key={role} className={`text-xs border px-1.5 py-0.5 rounded-md font-medium ${roleColor(role)}`}>
+                        {role}
+                      </span>
+                    ))}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
         {/* Serviços Incompletos */}
         <section className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="px-5 py-4 border-b border-gray-50 flex items-center justify-between">
