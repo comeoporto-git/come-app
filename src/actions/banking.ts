@@ -9,6 +9,7 @@ import {
   revokeSession,
   writeSyncLog,
   remittanceText,
+  syntheticId,
   type EBTransaction,
 } from "@/lib/enablebanking";
 import {
@@ -108,19 +109,19 @@ export async function syncBankTransactions(): Promise<{
       const debits = txns.filter((t) => t.credit_debit_indicator === "DBIT");
 
       for (const txn of debits) {
-        if (!txn.transaction_id) continue; // skip entries without an ID
-        if (knownRefs.has(txn.transaction_id)) continue; // already processed
+        const txId = txn.transaction_id ?? syntheticId(txn, accountId);
+        if (knownRefs.has(txId)) continue; // already processed
         try {
-          const result = await matchTransaction(txn);
+          const result = await matchTransaction(txn, accountId);
           if (result === "matched") matched++;
           else if (result === "unmatched") {
             unmatched++;
-            knownRefs.add(txn.transaction_id);
+            knownRefs.add(txId);
           }
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
-          console.error(`[BankSync] matchTransaction failed for ${txn.transaction_id}:`, msg);
-          errors.push(`Match failed (${txn.transaction_id}): ${msg}`);
+          console.error(`[BankSync] matchTransaction failed for ${txId}:`, msg);
+          errors.push(`Match failed (${txId}): ${msg}`);
         }
       }
     }
@@ -148,10 +149,11 @@ export async function syncBankTransactions(): Promise<{
 
 async function matchTransaction(
   txn: EBTransaction,
+  accountId: string,
 ): Promise<"matched" | "unmatched"> {
   const bankDate   = new Date(txn.transaction_date);
   const bankAmount = Math.abs(parseFloat(txn.transaction_amount.amount));
-  const bankRef    = txn.transaction_id ?? "";
+  const bankRef    = txn.transaction_id ?? syntheticId(txn, accountId);
 
   // Merchant name: for debits, the creditor is the payee
   const remit = remittanceText(txn);

@@ -259,6 +259,26 @@ export type StoredTransaction = {
 };
 
 /** Upsert a batch of raw transactions fetched from Enable Banking */
+/** Generate a stable synthetic ID when the ASPSP doesn't provide one */
+export function syntheticId(t: EBTransaction, accountUid: string): string {
+  const parts = [
+    accountUid,
+    t.transaction_date,
+    t.booking_date ?? "",
+    t.transaction_amount.amount,
+    t.transaction_amount.currency,
+    t.credit_debit_indicator,
+    t.creditor?.name ?? "",
+    remittanceText(t),
+  ];
+  // Simple stable hash — good enough for dedup within an account
+  let h = 0;
+  for (const s of parts.join("|")) {
+    h = ((h << 5) - h + s.charCodeAt(0)) | 0;
+  }
+  return `synth-${accountUid.slice(0, 8)}-${(h >>> 0).toString(16)}`;
+}
+
 export async function upsertBankTransactions(
   txns: EBTransaction[],
   accountUid: string,
@@ -266,7 +286,7 @@ export async function upsertBankTransactions(
 ): Promise<void> {
   const sql = getDb();
   for (const t of txns) {
-    if (!t.transaction_id) continue; // skip entries with no ID (can't upsert)
+    const txId = t.transaction_id ?? syntheticId(t, accountUid);
     const remit = remittanceText(t);
     const merchantName =
       t.credit_debit_indicator === "DBIT"
@@ -279,7 +299,7 @@ export async function upsertBankTransactions(
          credit_debit, transaction_date, booking_date, merchant_name,
          remittance_info, raw)
       VALUES (
-        ${t.transaction_id},
+        ${txId},
         ${accountUid},
         ${institutionName},
         ${parseFloat(t.transaction_amount.amount)},
