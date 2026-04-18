@@ -15,6 +15,13 @@ const montserrat = Montserrat({
 export const metadata: Metadata = {
   title: "COME",
   description: "Porto Food Tours OS",
+  icons: {
+    icon: [
+      { url: "/favicon-32.png", sizes: "32x32", type: "image/png" },
+      { url: "/icon-192x192.png", sizes: "192x192", type: "image/png" },
+    ],
+    apple: { url: "/icon-192x192.png", sizes: "192x192", type: "image/png" },
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
