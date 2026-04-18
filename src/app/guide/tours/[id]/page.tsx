@@ -38,7 +38,7 @@ export default async function TourDetailPage({ params }: { params: Promise<{ id:
   const { id } = await params;
   const role = session.user.role;
   const email = session.user.email ?? "";
-  const backHref = role === "Admin" ? "/admin/tours" : "/guide/services";
+  const backHref = role === "Admin" ? "/admin/servicos" : "/guide/services";
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
