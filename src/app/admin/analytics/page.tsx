@@ -1,7 +1,7 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { signOut } from "@/lib/auth";
-import { getAnalyticsTours, getAnalyticsTransactions, getTeamMembers } from "@/lib/notion";
+import { getAnalyticsTours, getAnalyticsTransactions, getTeamMembers, resolvePageTitles } from "@/lib/notion";
 import { AnalyticsDashboard } from "@/components/AnalyticsDashboard";
 import Image from "next/image";
 import Link from "next/link";
@@ -23,6 +23,18 @@ export default async function AnalyticsPage() {
 
   const teamMap = Object.fromEntries(teamMembers.map((m) => [m.id, m.name]));
 
+  // Resolve names only for the top-30 most frequent clients (fast: ~30 parallel calls)
+  const clientFreq: Record<string, number> = {};
+  for (const t of tours) {
+    if (t.client) clientFreq[t.client] = (clientFreq[t.client] ?? 0) + 1;
+  }
+  const topClientIds = Object.entries(clientFreq)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 30)
+    .map(([id]) => id);
+
+  const clientNameMap = await resolvePageTitles(topClientIds);
+
   return (
     <div className="min-h-screen bg-[#667470] text-[#32373c]">
       <header className="bg-[#7b8b87] sticky top-0 z-10">
@@ -41,7 +53,12 @@ export default async function AnalyticsPage() {
       </header>
 
       <main className="max-w-3xl mx-auto px-4 py-6">
-        <AnalyticsDashboard tours={tours} transactions={transactions} teamMap={teamMap} />
+        <AnalyticsDashboard
+          tours={tours}
+          transactions={transactions}
+          teamMap={teamMap}
+          clientNameMap={clientNameMap}
+        />
       </main>
     </div>
   );

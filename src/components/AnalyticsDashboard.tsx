@@ -70,6 +70,15 @@ function SectionCard({ title, sub, children }: {
   );
 }
 
+function MiniStat({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="bg-gray-50 rounded-xl p-3 text-center">
+      <p className="text-xl font-bold text-[#32373c]">{value}</p>
+      <p className="text-xs text-gray-400 mt-0.5">{label}</p>
+    </div>
+  );
+}
+
 function VBars({
   entries,
   max,
@@ -114,10 +123,12 @@ export function AnalyticsDashboard({
   tours: allTours,
   transactions: allTransactions,
   teamMap,
+  clientNameMap,
 }: {
   tours: Tour[];
   transactions: Transaction[];
   teamMap: Record<string, string>;
+  clientNameMap: Record<string, string>;
 }) {
   const [period, setPeriod] = useState(180);
 
@@ -230,6 +241,21 @@ export function AnalyticsDashboard({
     const topMethods = Object.entries(byMethod).sort((a, b) => b[1] - a[1]);
     const maxMethod  = Math.max(...topMethods.map(([, v]) => v), 1);
 
+    // Client analytics
+    const byClient: Record<string, number> = {};
+    for (const t of completed) {
+      if (!t.client) continue;
+      byClient[t.client] = (byClient[t.client] ?? 0) + 1;
+    }
+    const uniqueClientCount  = Object.keys(byClient).length;
+    const repeatClientCount  = Object.values(byClient).filter((n) => n > 1).length;
+    const repeatRate         = uniqueClientCount > 0 ? (repeatClientCount / uniqueClientCount) * 100 : 0;
+    const topClients         = Object.entries(byClient)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 10)
+      .map(([id, count]) => [clientNameMap[id] || "—", count] as [string, number]);
+    const maxClientCount     = Math.max(...topClients.map(([, v]) => v), 1);
+
     // Range label
     const now      = new Date();
     const fromDate = new Date(Date.now() - period * 86_400_000);
@@ -244,9 +270,10 @@ export function AnalyticsDashboard({
       DAYS_PT, byDay, maxDay,
       guideWork, chefWork, driverWork, maxTeam,
       totalExpenses, totalEarnings, expPerTour, topMethods, maxMethod,
+      uniqueClientCount, repeatClientCount, repeatRate, topClients, maxClientCount,
       rangeLbl,
     };
-  }, [allTours, allTransactions, teamMap, period]);
+  }, [allTours, allTransactions, teamMap, clientNameMap, period]);
 
   const {
     completed, cancelled, totalGuests, avgGroup, cancelRate,
@@ -255,6 +282,7 @@ export function AnalyticsDashboard({
     DAYS_PT, byDay, maxDay,
     guideWork, chefWork, driverWork, maxTeam,
     totalExpenses, totalEarnings, expPerTour, topMethods, maxMethod,
+    uniqueClientCount, repeatClientCount, repeatRate, topClients, maxClientCount,
     rangeLbl,
   } = analytics;
 
@@ -311,6 +339,37 @@ export function AnalyticsDashboard({
         sub={period === 0 ? "Últimos 12 meses" : "Serviços realizados por mês"}
       >
         <VBars entries={monthlyEntries.map(([k, v]) => [monthLabel(k), v])} max={maxMonthly} color="bg-[#667470]" />
+      </SectionCard>
+
+      {/* Clients */}
+      <SectionCard
+        title="Clientes"
+        sub={`${period === 0 ? "Todo o histórico" : `Últimos ${period} dias`} · campo "💼 Client"`}
+      >
+        <div className="space-y-5">
+          {uniqueClientCount === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-4">Sem dados de clientes</p>
+          ) : (
+            <>
+              {/* Summary stats */}
+              <div className="grid grid-cols-3 gap-3">
+                <MiniStat label="Únicos" value={fmt(uniqueClientCount)} />
+                <MiniStat label="Recorrentes" value={fmt(repeatClientCount)} />
+                <MiniStat label="Taxa repetição" value={`${fmt(repeatRate, 0)}%`} />
+              </div>
+
+              {/* Top clients */}
+              {topClients.length > 0 && (
+                <div className="space-y-2.5">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Top clientes · por nº de serviços</p>
+                  {topClients.map(([name, count]) => (
+                    <HBar key={name} label={name} value={count} max={maxClientCount} color="bg-blue-400" labelWidth="w-32" />
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </SectionCard>
 
       {/* Service type + Day of week */}

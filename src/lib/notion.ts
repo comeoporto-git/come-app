@@ -1022,6 +1022,20 @@ export const getFornecedores = unstable_cache(
 
 // ── Analytics ─────────────────────────────────────────────────────────────────
 
+/** Resolve page titles for an arbitrary list of Notion page IDs. */
+export async function resolvePageTitles(ids: string[]): Promise<Record<string, string>> {
+  const map: Record<string, string> = {};
+  await Promise.all(
+    ids.map(async (id) => {
+      try {
+        const page = (await notion.pages.retrieve({ page_id: id })) as PageObjectResponse;
+        map[id] = pageTitle(page);
+      } catch { /* ignore missing/archived pages */ }
+    })
+  );
+  return map;
+}
+
 /**
  * Fetches ALL past tours for analytics, paginating until exhausted.
  * Resolves only service names (small unique set) — team member names
