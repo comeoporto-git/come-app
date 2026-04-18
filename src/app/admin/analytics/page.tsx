@@ -9,6 +9,8 @@ import {
 import type { Tour } from "@/lib/notion";
 import Image from "next/image";
 import Link from "next/link";
+import { Suspense } from "react";
+import { AnalyticsPeriodPicker } from "@/components/AnalyticsPeriodPicker";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -30,6 +32,8 @@ function monthLabel(key: string) {
     .toLocaleDateString("pt-PT", { month: "short" })
     .replace(".", "");
 }
+
+const VALID_PERIODS = [30, 90, 180, 365];
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
@@ -60,21 +64,14 @@ function HBar({ label, value, max, color = "bg-[#667470]", labelWidth = "w-36" }
   );
 }
 
-function SectionCard({ title, sub, badge, badgeColor = "bg-[#667470]", children }: {
-  title: string; sub?: string; badge?: number; badgeColor?: string; children: React.ReactNode;
+function SectionCard({ title, sub, children }: {
+  title: string; sub?: string; children: React.ReactNode;
 }) {
   return (
     <section className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-      <div className="px-5 py-4 border-b border-gray-50 flex items-center justify-between">
-        <div>
-          <h2 className="text-sm font-semibold text-[#32373c]">{title}</h2>
-          {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
-        </div>
-        {badge !== undefined && badge > 0 && (
-          <span className={`text-xs text-white font-bold px-2.5 py-1 rounded-full ${badgeColor}`}>
-            {badge}
-          </span>
-        )}
+      <div className="px-5 py-4 border-b border-gray-50">
+        <h2 className="text-sm font-semibold text-[#32373c]">{title}</h2>
+        {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
       </div>
       <div className="px-5 py-4">{children}</div>
     </section>
@@ -83,7 +80,11 @@ function SectionCard({ title, sub, badge, badgeColor = "bg-[#667470]", children 
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
-export default async function AnalyticsPage() {
+export default async function AnalyticsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ period?: string }>;
+}) {
   const session = await auth();
   if (!session) redirect("/login");
   const role = session.user.role;
@@ -91,9 +92,12 @@ export default async function AnalyticsPage() {
 
   const backHref = role === "Admin" ? "/admin" : "/super-guide";
 
+  const params  = await searchParams;
+  const period  = VALID_PERIODS.includes(Number(params.period)) ? Number(params.period) : 180;
+
   const [tours, transactions, teamMembers] = await Promise.all([
-    getAnalyticsTours(),
-    getAnalyticsTransactions(),
+    getAnalyticsTours(period),
+    getAnalyticsTransactions(period),
     getTeamMembers(),
   ]);
 
@@ -108,9 +112,10 @@ export default async function AnalyticsPage() {
   const avgGroup    = completed.length > 0 ? totalGuests / completed.length : 0;
   const cancelRate  = tours.length > 0 ? (cancelled.length / tours.length) * 100 : 0;
 
-  // ── Monthly trend (last 6 months) ─────────────────────────────────────────
+  // ── Monthly trend (scaled to period) ──────────────────────────────────────
+  const numMonths   = period <= 30 ? 1 : period <= 90 ? 3 : period <= 180 ? 6 : 12;
   const monthlyMap: Record<string, number> = {};
-  for (let i = 5; i >= 0; i--) {
+  for (let i = numMonths - 1; i >= 0; i--) {
     const d = new Date();
     d.setDate(1);
     d.setMonth(d.getMonth() - i);
@@ -119,7 +124,7 @@ export default async function AnalyticsPage() {
   }
   for (const t of completed) {
     if (!t.date) continue;
-    const d = new Date(t.date);
+    const d   = new Date(t.date);
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
     if (key in monthlyMap) monthlyMap[key]++;
   }
@@ -182,10 +187,10 @@ export default async function AnalyticsPage() {
   const maxMethod  = Math.max(...topMethods.map(([, v]) => v), 1);
 
   // ── Date range label ──────────────────────────────────────────────────────
-  const now = new Date();
-  const sixMonthsAgo = new Date(now);
-  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-  const rangeLbl = `${sixMonthsAgo.toLocaleDateString("pt-PT", { month: "short", year: "numeric" })} – ${now.toLocaleDateString("pt-PT", { month: "short", year: "numeric" })}`;
+  const now      = new Date();
+  const fromDate = new Date(now);
+  fromDate.setDate(fromDate.getDate() - period);
+  const rangeLbl = `${fromDate.toLocaleDateString("pt-PT", { day: "numeric", month: "short", year: "numeric" })} – ${now.toLocaleDateString("pt-PT", { day: "numeric", month: "short", year: "numeric" })}`;
 
   return (
     <div className="min-h-screen bg-[#667470] text-[#32373c]">
@@ -205,10 +210,15 @@ export default async function AnalyticsPage() {
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-4 py-8 space-y-6">
+      <main className="max-w-3xl mx-auto px-4 py-6 space-y-6">
 
-        {/* Period label */}
-        <p className="text-xs text-white/50 uppercase tracking-widest font-medium">{rangeLbl}</p>
+        {/* ── Period picker ── */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <Suspense>
+            <AnalyticsPeriodPicker current={period} />
+          </Suspense>
+          <p className="text-xs text-white/40 font-medium">{rangeLbl}</p>
+        </div>
 
         {/* ── KPIs ── */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -281,12 +291,11 @@ export default async function AnalyticsPage() {
         </div>
 
         {/* ── Team workload ── */}
-        <SectionCard title="Carga da Equipa" sub="Serviços por pessoa · últimos 6 meses">
+        <SectionCard title="Carga da Equipa" sub={`Serviços por pessoa · últimos ${period} dias`}>
           <div className="space-y-6">
-            {/* Guides */}
             {guideWork.length > 0 && (
-              <div className="space-y-1">
-                <p className="text-xs font-semibold text-[#667470] uppercase tracking-wide mb-2">Guias</p>
+              <div>
+                <p className="text-xs font-semibold text-[#667470] uppercase tracking-wide mb-2.5">Guias</p>
                 <div className="space-y-2.5">
                   {guideWork.map(([name, count]) => (
                     <HBar key={name} label={name} value={count} max={maxTeam} color="bg-[#667470]" />
@@ -294,11 +303,9 @@ export default async function AnalyticsPage() {
                 </div>
               </div>
             )}
-
-            {/* Chefs */}
             {chefWork.length > 0 && (
-              <div className="space-y-1">
-                <p className="text-xs font-semibold text-red-500 uppercase tracking-wide mb-2">Chefs</p>
+              <div>
+                <p className="text-xs font-semibold text-red-500 uppercase tracking-wide mb-2.5">Chefs</p>
                 <div className="space-y-2.5">
                   {chefWork.map(([name, count]) => (
                     <HBar key={name} label={name} value={count} max={maxTeam} color="bg-red-400" />
@@ -306,11 +313,9 @@ export default async function AnalyticsPage() {
                 </div>
               </div>
             )}
-
-            {/* Drivers */}
             {driverWork.length > 0 && (
-              <div className="space-y-1">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Drivers</p>
+              <div>
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2.5">Drivers</p>
                 <div className="space-y-2.5">
                   {driverWork.map(([name, count]) => (
                     <HBar key={name} label={name} value={count} max={maxTeam} color="bg-slate-400" />
@@ -318,7 +323,6 @@ export default async function AnalyticsPage() {
                 </div>
               </div>
             )}
-
             {guideWork.length === 0 && chefWork.length === 0 && driverWork.length === 0 && (
               <p className="text-sm text-gray-400 text-center py-4">Sem dados de equipa</p>
             )}
@@ -328,9 +332,8 @@ export default async function AnalyticsPage() {
         {/* ── Expenses & Revenue ── */}
         <div className="grid md:grid-cols-2 gap-6">
 
-          <SectionCard title="Despesas" sub="Últimos 90 dias · registadas no sistema">
+          <SectionCard title="Despesas" sub={`Últimos ${period} dias · registadas no sistema`}>
             <div className="space-y-4">
-              {/* Summary */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-gray-50 rounded-xl p-3">
                   <p className="text-xs text-gray-400">Total despesas</p>
@@ -341,31 +344,21 @@ export default async function AnalyticsPage() {
                   <p className="text-lg font-bold text-[#32373c] mt-0.5">{fmtEur(expPerTour)}</p>
                 </div>
               </div>
-
-              {/* By method */}
               {topMethods.length > 0 && (
                 <div className="space-y-2.5">
                   <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Por método</p>
                   {topMethods.map(([method, total]) => (
-                    <HBar
-                      key={method}
-                      label={method}
-                      value={total}
-                      max={maxMethod}
-                      color="bg-orange-400"
-                      labelWidth="w-28"
-                    />
+                    <HBar key={method} label={method} value={total} max={maxMethod} color="bg-orange-400" labelWidth="w-28" />
                   ))}
                 </div>
               )}
-
               {totalExpenses === 0 && (
                 <p className="text-sm text-gray-400 text-center py-2">Sem despesas registadas</p>
               )}
             </div>
           </SectionCard>
 
-          <SectionCard title="Receita" sub="Últimos 90 dias · registada no sistema">
+          <SectionCard title="Receita" sub={`Últimos ${period} dias · registada no sistema`}>
             <div className="space-y-4">
               <div className="bg-gray-50 rounded-xl p-4 flex flex-col gap-1">
                 <p className="text-xs text-gray-400">Total receita registada</p>
@@ -379,14 +372,11 @@ export default async function AnalyticsPage() {
                   </p>
                 )}
               </div>
-
               {totalEarnings === 0 && (
                 <p className="text-sm text-gray-400 text-center py-2">
                   Receita não registada no sistema ou com prefixo diferente de &quot;IN -&quot;
                 </p>
               )}
-
-              {/* Receipts per tour when available */}
               {totalEarnings > 0 && completed.length > 0 && (
                 <div className="bg-gray-50 rounded-xl p-3">
                   <p className="text-xs text-gray-400">Receita média p/ serviço</p>
@@ -399,7 +389,6 @@ export default async function AnalyticsPage() {
           </SectionCard>
         </div>
 
-        {/* Footer note */}
         <p className="text-xs text-white/30 text-center pb-4">
           Dados calculados a partir do Notion · atualizado a cada página carregada
         </p>

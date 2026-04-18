@@ -1023,16 +1023,16 @@ export const getFornecedores = unstable_cache(
 // ── Analytics ─────────────────────────────────────────────────────────────────
 
 /**
- * Fetches tours from the last 6 months for analytics.
+ * Fetches tours from the last `daysBack` days for analytics.
  * Resolves only service names (small unique set) — team member names
  * are resolved externally via getTeamMembers() which is cached.
  */
-export async function getAnalyticsTours(): Promise<Tour[]> {
+export async function getAnalyticsTours(daysBack = 180): Promise<Tour[]> {
   try {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const sixMonthsAgo = new Date(today);
-    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+    sixMonthsAgo.setDate(sixMonthsAgo.getDate() - daysBack);
 
     const allTours: Tour[] = [];
     let cursor: string | undefined;
@@ -1082,13 +1082,13 @@ export async function getAnalyticsTours(): Promise<Tour[]> {
 }
 
 /**
- * Fetches all expense transactions from the last 90 days for analytics.
+ * Fetches all expense transactions from the last `daysBack` days for analytics.
  * Does not resolve tour names to keep it fast.
  */
-export async function getAnalyticsTransactions(): Promise<Transaction[]> {
+export async function getAnalyticsTransactions(daysBack = 90): Promise<Transaction[]> {
   try {
     const ninetyDaysAgo = new Date();
-    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - daysBack);
 
     const allTxns: Transaction[] = [];
     let cursor: string | undefined;
