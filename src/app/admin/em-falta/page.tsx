@@ -33,7 +33,7 @@ export default async function EmFaltaPage() {
       <main className="max-w-2xl mx-auto px-4 py-8 space-y-6">
 
         {/* Faturas em Falta */}
-        <Link href="/super-guide/invoices">
+        <Link href="/admin/invoices">
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex items-center gap-4 hover:border-[#667470]/30 active:scale-[0.98] transition-all cursor-pointer">
             <div className="w-12 h-12 rounded-2xl bg-orange-50 flex items-center justify-center text-2xl shrink-0">🧾</div>
             <div>

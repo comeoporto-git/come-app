@@ -32,7 +32,19 @@ export default async function AdminUsersPage() {
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-4 py-8">
+      <main className="max-w-2xl mx-auto px-4 py-8 space-y-4">
+        {/* Permissions link */}
+        <Link href="/admin/permissoes">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex items-center gap-4 hover:border-[#667470]/30 active:scale-[0.98] transition-all cursor-pointer">
+            <div className="w-10 h-10 rounded-2xl bg-purple-50 flex items-center justify-center text-xl shrink-0">🔐</div>
+            <div className="flex-1">
+              <p className="font-semibold text-[#32373c] text-sm">Permissões</p>
+              <p className="text-xs text-gray-400 mt-0.5">Ver e editar o que cada role pode aceder</p>
+            </div>
+            <span className="text-gray-300 text-lg">→</span>
+          </div>
+        </Link>
+
         <section className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="px-5 py-4 border-b border-gray-50">
             <h2 className="text-sm font-semibold text-[#32373c]">Equipa</h2>
@@ -49,6 +61,7 @@ export default async function AdminUsersPage() {
           )}
         </section>
       </main>
+
     </div>
   );
 }
