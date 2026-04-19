@@ -882,9 +882,41 @@ export async function getMatchedTransactionMap(): Promise<Record<string, Transac
 }
 
 /**
+ * Notion earnings ("IN - ...") with no bank reference — for matching against
+ * bank credit (CRDT) transactions.
+ */
+export async function getLinkableEarnings(): Promise<Transaction[]> {
+  try {
+    const results: Transaction[] = [];
+    let cursor: string | undefined;
+    let pages = 0;
+    do {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const res: any = await notion.databases.query({
+        database_id: TRANSACTIONS_DB,
+        filter: { property: "ID do Banco", rich_text: { is_empty: true } },
+        sorts: [{ property: "Data", direction: "descending" }],
+        page_size: 100,
+        ...(cursor ? { start_cursor: cursor } : {}),
+      } as any);
+      results.push(
+        ...(res.results as PageObjectResponse[])
+          .map(mapTransaction)
+          .filter((t) => t.supplier.startsWith("IN -") && t.status !== "Unmatched Bank Entry")
+      );
+      cursor = res.next_cursor ?? undefined;
+    } while (cursor && ++pages < 10);
+    return results;
+  } catch (err) {
+    console.error("[getLinkableEarnings] failed:", err);
+    return [];
+  }
+}
+
+/**
  * Notion expenses that have no bank reference yet and can be linked manually.
  * Fetches all records with an empty ID do Banco field; filters out sync
- * placeholders and cancelled records client-side.
+ * placeholders, cancelled records, and earnings client-side.
  */
 export async function getLinkableExpenses(): Promise<Transaction[]> {
   try {

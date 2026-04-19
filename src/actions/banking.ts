@@ -16,10 +16,14 @@ import {
   getTransactionsForMatching,
   getPeloGuiaTransactionsForMatching,
   getUnmatchedBankTransactions,
+  getMatchedTransactionMap,
+  getLinkableExpenses,
+  getLinkableEarnings,
   createTransaction,
   updateTransaction,
   archiveTransaction,
 } from "@/lib/notion";
+import { getStoredTransactions } from "@/lib/enablebanking";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 
@@ -300,6 +304,72 @@ export async function linkBankTransactionAction(
     await archiveTransaction(placeholderNotionId);
   }
   revalidatePath("/admin/reconciliation");
+}
+
+/**
+ * Run matching on ALL unmatched bank transactions against ALL unmatched Notion
+ * records. Debits matched against expenses; credits matched against earnings
+ * ("IN - ..."). Uses same tolerance as the nightly sync.
+ * Returns { matched, skipped, errors }.
+ */
+export async function runManualMatchAction(): Promise<{
+  matched: number; skipped: number; errors: string[];
+}> {
+  await requireAdmin();
+
+  const [bankTxns, matchedMap, existingUnmatched, expenses, earnings] = await Promise.all([
+    getStoredTransactions(0),
+    getMatchedTransactionMap(),
+    getUnmatchedBankTransactions(),
+    getLinkableExpenses(),
+    getLinkableEarnings(),
+  ]);
+
+  const knownRefs    = new Set(Object.keys(matchedMap));
+  const placeholderByRef: Record<string, string> = {};
+  for (const t of existingUnmatched) {
+    if (t.bankReference) placeholderByRef[t.bankReference] = t.id;
+  }
+
+  // Mutable candidate arrays to prevent double-matching
+  const expCandidates = [...expenses];
+  const earCandidates = [...earnings];
+
+  let matched = 0; let skipped = 0;
+  const errors: string[] = [];
+
+  for (const txn of bankTxns) {
+    if (knownRefs.has(txn.transaction_id)) { skipped++; continue; }
+
+    const amount    = Math.abs(txn.amount);
+    const txnDate   = new Date(txn.transaction_date).getTime();
+    const windowMs  = CARD_MATCH_WINDOW_MS; // 3 days for both directions
+    const candidates = txn.credit_debit === "DBIT" ? expCandidates : earCandidates;
+
+    const idx = candidates.findIndex((e) => {
+      if (!e.date || !e.totalCost) return false;
+      if (Math.abs(Math.abs(e.totalCost) - amount) > AMOUNT_TOLERANCE) return false;
+      return Math.abs(new Date(e.date).getTime() - txnDate) <= windowMs;
+    });
+
+    if (idx >= 0) {
+      const expense = candidates[idx];
+      try {
+        await updateTransaction(expense.id, { status: "Paid", bankReference: txn.transaction_id });
+        if (placeholderByRef[txn.transaction_id]) {
+          await archiveTransaction(placeholderByRef[txn.transaction_id]);
+        }
+        knownRefs.add(txn.transaction_id);
+        candidates.splice(idx, 1);
+        matched++;
+      } catch (err) {
+        errors.push(`${txn.transaction_id}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+  }
+
+  revalidatePath("/admin/reconciliation");
+  return { matched, skipped, errors };
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

@@ -5,6 +5,7 @@ import {
   getUnmatchedBankTransactions,
   getMatchedTransactionMap,
   getLinkableExpenses,
+  getLinkableEarnings,
 } from "@/lib/notion";
 import { getStoredTransactions } from "@/lib/enablebanking";
 import { BankLedger } from "@/components/BankLedger";
@@ -16,11 +17,12 @@ export default async function ReconciliationPage() {
   if (!session || session.user.role !== "Admin") redirect("/");
 
   // Fetch all data in parallel — individual failures return empty defaults
-  const [bankTxns, matchedMap, unmatchedPlaceholders, linkable] = await Promise.all([
+  const [bankTxns, matchedMap, unmatchedPlaceholders, linkableExpenses, linkableEarnings] = await Promise.all([
     getStoredTransactions(0).catch((e) => { console.error("[reconciliation] bankTxns:", e); return []; }),
-    getMatchedTransactionMap(),   // has internal try/catch
+    getMatchedTransactionMap(),
     getUnmatchedBankTransactions().catch((e) => { console.error("[reconciliation] unmatched:", e); return []; }),
-    getLinkableExpenses(),         // has internal try/catch
+    getLinkableExpenses(),
+    getLinkableEarnings(),
   ]);
 
   // Build a map: bankRef → Notion placeholder ID (for archiving on manual link)
@@ -29,9 +31,14 @@ export default async function ReconciliationPage() {
     if (t.bankReference) unmatchedPlaceholderMap[t.bankReference] = t.id;
   }
 
-  const totalDebits   = bankTxns.filter((t) => t.credit_debit === "DBIT").length;
-  const matchedCount  = bankTxns.filter((t) => t.credit_debit === "DBIT" && !!matchedMap[t.transaction_id]).length;
-  const pendingCount  = totalDebits - matchedCount;
+  const totalAll     = bankTxns.length;
+  const matchedCount = bankTxns.filter((t) => !!matchedMap[t.transaction_id]).length;
+  const pendingCount = totalAll - matchedCount;
+
+  // Oldest transaction date for the footer
+  const oldestDate = bankTxns.length > 0
+    ? bankTxns.reduce((min, t) => t.transaction_date < min ? t.transaction_date : min, bankTxns[0].transaction_date)
+    : undefined;
 
   return (
     <div className="min-h-screen bg-[#667470] text-[#32373c]">
@@ -57,12 +64,12 @@ export default async function ReconciliationPage() {
         {/* Summary KPIs */}
         <div className="grid grid-cols-3 gap-3">
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 text-center">
-            <p className="text-2xl font-bold text-[#32373c]">{totalDebits}</p>
-            <p className="text-xs text-gray-400 mt-1">Débitos (90 dias)</p>
+            <p className="text-2xl font-bold text-[#32373c]">{totalAll}</p>
+            <p className="text-xs text-gray-400 mt-1">Transações no banco</p>
           </div>
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 text-center">
             <p className="text-2xl font-bold text-green-600">{matchedCount}</p>
-            <p className="text-xs text-gray-400 mt-1">Com despesa</p>
+            <p className="text-xs text-gray-400 mt-1">Com registo Notion</p>
           </div>
           <div className={`rounded-2xl border shadow-sm p-4 text-center ${pendingCount > 0 ? "bg-orange-50 border-orange-100" : "bg-white border-gray-100"}`}>
             <p className={`text-2xl font-bold ${pendingCount > 0 ? "text-orange-500" : "text-gray-400"}`}>{pendingCount}</p>
@@ -75,7 +82,9 @@ export default async function ReconciliationPage() {
           bankTxns={bankTxns}
           matchedMap={matchedMap}
           unmatchedPlaceholderMap={unmatchedPlaceholderMap}
-          linkable={linkable}
+          linkableExpenses={linkableExpenses}
+          linkableEarnings={linkableEarnings}
+          oldestDate={oldestDate}
         />
       </main>
     </div>
