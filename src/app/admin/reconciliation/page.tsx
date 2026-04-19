@@ -1,36 +1,82 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { getUnmatchedBankTransactions, getFlaggedTransactions } from "@/lib/notion";
+import { signOut } from "@/lib/auth";
+import {
+  getUnmatchedBankTransactions,
+  getMatchedTransactionMap,
+  getLinkableExpenses,
+} from "@/lib/notion";
+import { getStoredTransactions } from "@/lib/enablebanking";
+import { BankLedger } from "@/components/BankLedger";
+import Image from "next/image";
 import Link from "next/link";
-import { ReconciliationPanel } from "@/components/ReconciliationPanel";
 
 export default async function ReconciliationPage() {
   const session = await auth();
   if (!session || session.user.role !== "Admin") redirect("/");
 
-  const [unmatched, flagged] = await Promise.all([
+  // Fetch all data in parallel
+  const [bankTxns, matchedMap, unmatchedPlaceholders, linkable] = await Promise.all([
+    getStoredTransactions(90, 1000),
+    getMatchedTransactionMap(),
     getUnmatchedBankTransactions(),
-    getFlaggedTransactions(),
+    getLinkableExpenses(),
   ]);
 
+  // Build a map: bankRef → Notion placeholder ID (for archiving on manual link)
+  const unmatchedPlaceholderMap: Record<string, string> = {};
+  for (const t of unmatchedPlaceholders) {
+    if (t.bankReference) unmatchedPlaceholderMap[t.bankReference] = t.id;
+  }
+
+  const totalDebits   = bankTxns.filter((t) => t.credit_debit === "DBIT").length;
+  const matchedCount  = bankTxns.filter((t) => t.credit_debit === "DBIT" && !!matchedMap[t.transaction_id]).length;
+  const pendingCount  = totalDebits - matchedCount;
+
   return (
-    <div className="min-h-screen bg-gray-50 pb-24">
-      <header className="bg-white border-b border-gray-100 sticky top-0 z-10">
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
-          <Link href="/admin" className="text-gray-400 hover:text-gray-700">←</Link>
-          <div className="flex-1">
-            <h1 className="text-base font-semibold text-gray-900">Reconciliação Bancária</h1>
-            <p className="text-xs text-gray-400">
-              {unmatched.length + flagged.length === 0
-                ? "Tudo reconciliado ✓"
-                : `${unmatched.length + flagged.length} item${unmatched.length + flagged.length !== 1 ? "s" : ""} para rever`}
-            </p>
-          </div>
+    <div className="min-h-screen bg-[#667470] text-[#32373c]">
+      <header className="bg-[#7b8b87] sticky top-0 z-10">
+        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-3">
+          <Link href="/admin/contabilidade" className="text-white/40 hover:text-white transition-colors text-lg leading-none">←</Link>
+          <Link href="/">
+            <Image
+              src="https://comeoporto.com/wp-content/uploads/2023/08/cropped-COME-Porto-Food-Tours-Logo-Black-.png"
+              alt="COME" width={72} height={28} className="object-contain invert" unoptimized
+            />
+          </Link>
+          <div className="flex-1" />
+          <span className="text-xs text-white/50 font-medium uppercase tracking-widest">Reconciliação</span>
+          <form action={async () => { "use server"; await signOut({ redirectTo: "/login" }); }}>
+            <button className="text-xs text-white/40 hover:text-white transition-colors">Sair</button>
+          </form>
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-4 py-5 space-y-6">
-        <ReconciliationPanel unmatched={unmatched} flagged={flagged} />
+      <main className="max-w-4xl mx-auto px-4 py-6 space-y-6">
+
+        {/* Summary KPIs */}
+        <div className="grid grid-cols-3 gap-3">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 text-center">
+            <p className="text-2xl font-bold text-[#32373c]">{totalDebits}</p>
+            <p className="text-xs text-gray-400 mt-1">Débitos (90 dias)</p>
+          </div>
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 text-center">
+            <p className="text-2xl font-bold text-green-600">{matchedCount}</p>
+            <p className="text-xs text-gray-400 mt-1">Com despesa</p>
+          </div>
+          <div className={`rounded-2xl border shadow-sm p-4 text-center ${pendingCount > 0 ? "bg-orange-50 border-orange-100" : "bg-white border-gray-100"}`}>
+            <p className={`text-2xl font-bold ${pendingCount > 0 ? "text-orange-500" : "text-gray-400"}`}>{pendingCount}</p>
+            <p className="text-xs text-gray-400 mt-1">Sem correspondência</p>
+          </div>
+        </div>
+
+        {/* Unified ledger */}
+        <BankLedger
+          bankTxns={bankTxns}
+          matchedMap={matchedMap}
+          unmatchedPlaceholderMap={unmatchedPlaceholderMap}
+          linkable={linkable}
+        />
       </main>
     </div>
   );

@@ -844,6 +844,68 @@ export async function getFlaggedTransactions(): Promise<Transaction[]> {
   } catch { return []; }
 }
 
+/**
+ * All Notion transactions that already have a bank reference (matched).
+ * Returns a map: bankReference → Transaction for O(1) lookup.
+ */
+export async function getMatchedTransactionMap(): Promise<Record<string, Transaction>> {
+  const map: Record<string, Transaction> = {};
+  let cursor: string | undefined;
+  let pages = 0;
+  do {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const res: any = await notion.databases.query({
+      database_id: TRANSACTIONS_DB,
+      filter: {
+        and: [
+          { property: "ID do Banco", rich_text: { is_not_empty: true } },
+          // Exclude the "Unmatched Bank Entry" placeholders themselves
+          { property: "Status", select: { does_not_equal: "Unmatched Bank Entry" } },
+        ],
+      },
+      sorts: [{ property: "Data", direction: "descending" }],
+      page_size: 100,
+      ...(cursor ? { start_cursor: cursor } : {}),
+    } as any);
+    for (const page of res.results as PageObjectResponse[]) {
+      const tx = mapTransaction(page);
+      if (tx.bankReference) map[tx.bankReference] = tx;
+    }
+    cursor = res.next_cursor ?? undefined;
+  } while (cursor && ++pages < 20);
+  return map;
+}
+
+/**
+ * Notion expenses that have no bank reference yet and can be linked manually.
+ * Excludes placeholders created by the sync ("Unmatched Bank Entry") and
+ * excludes cancelled/archived entries.
+ */
+export async function getLinkableExpenses(): Promise<Transaction[]> {
+  const results: Transaction[] = [];
+  let cursor: string | undefined;
+  let pages = 0;
+  do {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const res: any = await notion.databases.query({
+      database_id: TRANSACTIONS_DB,
+      filter: {
+        and: [
+          { property: "ID do Banco", rich_text: { is_empty: true } },
+          { property: "Status", select: { does_not_equal: "Unmatched Bank Entry" } },
+          { property: "Status", select: { does_not_equal: "Cancelled" } },
+        ],
+      },
+      sorts: [{ property: "Data", direction: "descending" }],
+      page_size: 100,
+      ...(cursor ? { start_cursor: cursor } : {}),
+    } as any);
+    results.push(...(res.results as PageObjectResponse[]).map(mapTransaction));
+    cursor = res.next_cursor ?? undefined;
+  } while (cursor && ++pages < 10);
+  return results;
+}
+
 export async function getTransactionsTreated(): Promise<Transaction[]> {
   const res = await notion.databases.query({
     database_id: TRANSACTIONS_DB,

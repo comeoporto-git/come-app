@@ -282,6 +282,26 @@ export async function manualMatchAction(
   revalidatePath("/admin/reconciliation");
 }
 
+/**
+ * Link a raw bank transaction (by its transaction_id from Neon) to a Notion
+ * expense. Automatically archives any "Unmatched Bank Entry" placeholder that
+ * was created for this bank transaction during auto-matching.
+ */
+export async function linkBankTransactionAction(
+  bankTxnId: string,        // transaction_id from Neon bank_transactions table
+  notionExpenseId: string,  // Notion page ID of the expense to link
+  placeholderNotionId?: string, // Notion ID of the "Unmatched Bank Entry" placeholder, if known
+): Promise<void> {
+  await requireAdmin();
+  // Link the bank reference to the chosen Notion expense
+  await updateTransaction(notionExpenseId, { status: "Paid", bankReference: bankTxnId });
+  // Archive the unmatched placeholder if one exists
+  if (placeholderNotionId) {
+    await archiveTransaction(placeholderNotionId);
+  }
+  revalidatePath("/admin/reconciliation");
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function formatDate(d: Date): string {
