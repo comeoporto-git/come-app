@@ -15,12 +15,12 @@ export default async function ReconciliationPage() {
   const session = await auth();
   if (!session || session.user.role !== "Admin") redirect("/");
 
-  // Fetch all data in parallel
+  // Fetch all data in parallel — individual failures return empty defaults
   const [bankTxns, matchedMap, unmatchedPlaceholders, linkable] = await Promise.all([
-    getStoredTransactions(90, 1000),
-    getMatchedTransactionMap(),
-    getUnmatchedBankTransactions(),
-    getLinkableExpenses(),
+    getStoredTransactions(90, 1000).catch((e) => { console.error("[reconciliation] bankTxns:", e); return []; }),
+    getMatchedTransactionMap(),   // has internal try/catch
+    getUnmatchedBankTransactions().catch((e) => { console.error("[reconciliation] unmatched:", e); return []; }),
+    getLinkableExpenses(),         // has internal try/catch
   ]);
 
   // Build a map: bankRef → Notion placeholder ID (for archiving on manual link)
