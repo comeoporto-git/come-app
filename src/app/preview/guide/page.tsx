@@ -64,7 +64,7 @@ export default function PreviewGuidePage() {
             width={72}
             height={28}
             className="object-contain invert"
-            unoptimized
+           
           />
           <div className="flex items-center gap-4">
             <span className="text-sm text-white/70 font-medium">Ana</span>

@@ -59,7 +59,7 @@ export default async function AdminToursPage() {
               width={72}
               height={28}
               className="object-contain invert"
-              unoptimized
+             
             />
             </Link>
           </div>

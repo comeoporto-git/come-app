@@ -38,7 +38,7 @@ export default async function SuperGuidePage() {
             width={72}
             height={28}
             className="object-contain invert"
-            unoptimized
+           
           />
           </Link>
           <div className="flex-1" />

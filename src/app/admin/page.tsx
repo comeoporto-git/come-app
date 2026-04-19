@@ -37,7 +37,7 @@ export default async function AdminPage({
             width={72}
             height={28}
             className="object-contain invert"
-            unoptimized
+           
           />
           </Link>
           <div className="flex items-center gap-4">

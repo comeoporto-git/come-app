@@ -24,7 +24,7 @@ export default async function AdminInvoicesPage() {
           <Link href="/">
             <Image
             src="https://comeoporto.com/wp-content/uploads/2023/08/cropped-COME-Porto-Food-Tours-Logo-Black-.png"
-            alt="COME" width={72} height={28} className="object-contain invert" unoptimized
+            alt="COME" width={72} height={28} className="object-contain invert"
           />
           </Link>
           <div className="flex-1" />

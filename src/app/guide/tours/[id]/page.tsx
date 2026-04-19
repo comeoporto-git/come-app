@@ -1,12 +1,10 @@
 import { auth } from "@/lib/auth";
 import {
   getTourById,
-  getTransactionsForTour,
   getChefTransactionsForTour,
-  getEarningsForTour,
+  getExpensesAndEarningsForTour,
   getFornecedores,
   getTeamMembers,
-  getTeamMemberByEmail,
 } from "@/lib/notion";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
@@ -89,14 +87,19 @@ async function TourPageContent({
   const canEditTeam = role === "Super Guide" || role === "Admin";
   const canSeeFinancials = role === "Super Guide" || role === "Admin";
 
-  const [tour, transactions, earnings, fornecedores, teamMembers, chefMember] = await Promise.all([
+  const [tour, txResult, fornecedores, teamMembers] = await Promise.all([
     getTourById(id),
-    isChef ? getChefTransactionsForTour(id) : getTransactionsForTour(id),
-    canSeeFinancials ? getEarningsForTour(id) : Promise.resolve([]),
+    isChef
+      ? getChefTransactionsForTour(id).then((t) => ({ expenses: t, earnings: [] }))
+      : getExpensesAndEarningsForTour(id),  // single Notion query instead of two
     getFornecedores(),
     getTeamMembers(),
-    isChef ? getTeamMemberByEmail(email) : Promise.resolve(null),
   ]);
+
+  const transactions = canSeeFinancials ? txResult.expenses : txResult.expenses;
+  const earnings     = canSeeFinancials ? txResult.earnings : [];
+  // Derive chefMember from the already-fetched team list — no extra Notion call needed
+  const chefMember   = isChef ? (teamMembers.find((m) => m.email === email) ?? null) : null;
 
   if (!tour) notFound();
 

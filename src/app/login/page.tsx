@@ -33,7 +33,7 @@ export default async function LoginPage({
               width={140}
               height={56}
               className="object-contain"
-              unoptimized
+             
             />
             <p className="text-xs tracking-widest uppercase text-gray-400 font-semibold">
               Business OS

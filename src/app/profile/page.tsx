@@ -35,7 +35,7 @@ export default async function ProfilePage() {
             width={72}
             height={28}
             className="object-contain invert"
-            unoptimized
+           
           />
           </Link>
           <span className="ml-auto text-xs text-white/50 font-medium uppercase tracking-widest">

@@ -30,7 +30,7 @@ export default async function BancoPage({
             <Link href="/admin/contabilidade" className="text-white/40 hover:text-white transition-colors text-lg leading-none">←</Link>
             <Link href="/">
               <Image src="https://comeoporto.com/wp-content/uploads/2023/08/cropped-COME-Porto-Food-Tours-Logo-Black-.png"
-              alt="COME" width={72} height={28} className="object-contain invert" unoptimized />
+              alt="COME" width={72} height={28} className="object-contain invert" />
             </Link>
           </div>
           <div className="flex items-center gap-4">

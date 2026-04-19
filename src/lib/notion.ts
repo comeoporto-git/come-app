@@ -362,6 +362,20 @@ function mapTour(page: PageObjectResponse): Tour {
   };
 }
 
+/**
+ * Cache individual Notion page retrievals for 5 minutes.
+ * Service names, client names, and team member names rarely change, and are
+ * fetched on every tour list page load. Caching them eliminates the most
+ * expensive repeated API calls in the app.
+ */
+const getCachedPage = unstable_cache(
+  async (pageId: string): Promise<PageObjectResponse> => {
+    return (await notion.pages.retrieve({ page_id: pageId })) as PageObjectResponse;
+  },
+  ["notion-page"],
+  { revalidate: 300, tags: ["notion-pages"] }, // 5 min
+);
+
 async function resolveRelationNames(tours: Tour[]): Promise<Tour[]> {
   const serviceIds = [...new Set(tours.map((t) => t.service).filter(Boolean) as string[])];
   const otherIds   = [...new Set([
@@ -378,19 +392,19 @@ async function resolveRelationNames(tours: Tour[]): Promise<Tour[]> {
   const serviceEquipaMap: Record<string, string[]> = {};
 
   await Promise.all([
-    // Service pages: grab title + Type + Equipa
+    // Service pages: grab title + Type + Equipa (cached 5 min)
     ...serviceIds.map(async (id) => {
       try {
-        const page = (await notion.pages.retrieve({ page_id: id })) as PageObjectResponse;
+        const page = await getCachedPage(id);
         nameMap[id]          = pageTitle(page);
         serviceTypeMap[id]   = text(getProp(page, "Type"));
         serviceEquipaMap[id] = multiSelect(getProp(page, "Equipa"));
       } catch { /* ignore */ }
     }),
-    // Everything else (client, guide, chef, driver): use title regardless of column name
+    // Client, guide, chef, driver: just the title (cached 5 min)
     ...otherIds.map(async (id) => {
       try {
-        const page = (await notion.pages.retrieve({ page_id: id })) as PageObjectResponse;
+        const page = await getCachedPage(id);
         nameMap[id] = pageTitle(page);
       } catch { /* ignore */ }
     }),
@@ -737,6 +751,21 @@ export async function getTransactionsForTour(tourId: string): Promise<Transactio
 
 export async function getEarningsForTour(tourId: string): Promise<Transaction[]> {
   return (await getRawTransactionsForTour(tourId)).filter((t) => t.supplier.startsWith("IN -"));
+}
+
+/**
+ * Fetch expenses and earnings for a tour in a single Notion query.
+ * Use this instead of calling getTransactionsForTour + getEarningsForTour
+ * separately — they share the same underlying query.
+ */
+export async function getExpensesAndEarningsForTour(
+  tourId: string,
+): Promise<{ expenses: Transaction[]; earnings: Transaction[] }> {
+  const all = await getRawTransactionsForTour(tourId);
+  return {
+    expenses: all.filter((t) => !t.supplier.startsWith("IN -")),
+    earnings: all.filter((t) =>  t.supplier.startsWith("IN -")),
+  };
 }
 
 export async function getTransactionsForMatching(): Promise<Transaction[]> {
