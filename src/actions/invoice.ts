@@ -15,6 +15,13 @@ export type InvoiceData = {
   supplier: string;
   date: string; // ISO yyyy-mm-dd
   invoiceId: string;
+  /** Base amount (incidência) subject to 6% IVA */
+  base6: number;
+  /** Base amount (incidência) subject to 13% IVA */
+  base13: number;
+  /** Base amount (incidência) subject to 23% IVA */
+  base23: number;
+  /** Total pre-tax base = base6 + base13 + base23 */
   taxFree: number;
   iva6: number;
   iva13: number;
@@ -29,19 +36,23 @@ Portuguese IVA (VAT) rates are: 6% (reduced – food, books), 13% (intermediate 
 Extract these fields:
 - supplier: business name — match to the KNOWN SUPPLIERS list when possible, and use LEARNED MAPPINGS to correct abbreviations or typos
 - date: date of purchase in ISO format (yyyy-mm-dd)
-- invoiceId: invoice/receipt number (look for "Nº Fatura", "Recibo Nº", "Documento Nº")
-- taxFree: base amount before tax (sum of all tax-free bases)
-- iva6: IVA amount at 6% rate (not the base, the actual tax amount)
-- iva13: IVA amount at 13% rate
-- iva23: IVA amount at 23% rate
-- totalCost: grand total paid
+- invoiceId: invoice/receipt number (look for "Nº Fatura", "Recibo Nº", "Documento Nº", "Fatura-Recibo N")
+- base6: base amount (incidência/base tributável) subject to 6% IVA — find the row with "6%" or "6.00%" in the tax breakdown table and read the "Base", "Incid.", "Incidência" or "Valor" column
+- base13: base amount subject to 13% IVA (same — read from the 13% row)
+- base23: base amount subject to 23% IVA (same — read from the 23% row)
+- taxFree: total pre-tax base = base6 + base13 + base23 (or "Total Incidências" if shown)
+- iva6: IVA tax amount at 6% (the tax itself, not the base — i.e., base6 × 0.06)
+- iva13: IVA tax amount at 13% (base13 × 0.13)
+- iva23: IVA tax amount at 23% (base23 × 0.23)
+- totalCost: grand total paid ("Total pagar", "Total liq.", "TOTAL")
 
 Rules:
-1. If a rate is not present, set it to 0
-2. totalCost = taxFree + iva6 + iva13 + iva23
-3. Return ONLY a JSON object with these exact keys, no markdown fences, no explanation
-4. If you cannot read a value clearly, use 0 for numbers and "" for strings
-5. For supplier: always prefer an exact match from the KNOWN SUPPLIERS list over raw receipt text`;
+1. If a rate is not present in the document, set base and IVA for that rate to 0
+2. taxFree = base6 + base13 + base23
+3. totalCost = taxFree + iva6 + iva13 + iva23
+4. Return ONLY a JSON object with these exact keys, no markdown fences, no explanation
+5. If you cannot read a value clearly, use 0 for numbers and "" for strings
+6. For supplier: always prefer an exact match from the KNOWN SUPPLIERS list over raw receipt text`;
 
 export async function analyzeInvoice(
   imageBase64: string,

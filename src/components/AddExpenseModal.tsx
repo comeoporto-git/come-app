@@ -12,6 +12,9 @@ const EMPTY_FORM: InvoiceData = {
   supplier: "",
   date: new Date().toISOString().slice(0, 10),
   invoiceId: "",
+  base6: 0,
+  base13: 0,
+  base23: 0,
   taxFree: 0,
   iva6: 0,
   iva13: 0,
@@ -108,7 +111,10 @@ export function AddExpenseModal({
   function update(field: keyof InvoiceData, value: string | number) {
     setForm((f) => {
       const updated = { ...f, [field]: value };
-      if (["taxFree", "iva6", "iva13", "iva23"].includes(field as string)) {
+      if (["base6", "base13", "base23"].includes(field as string)) {
+        updated.taxFree = Number(updated.base6) + Number(updated.base13) + Number(updated.base23);
+      }
+      if (["base6", "base13", "base23", "taxFree", "iva6", "iva13", "iva23"].includes(field as string)) {
         updated.totalCost =
           Number(updated.taxFree) +
           Number(updated.iva6) +
@@ -627,48 +633,7 @@ function InvoiceForm({
           />
         </Field>
       </div>
-      <Field label="Base tributável (s/ IVA)">
-        <input
-          type="number"
-          step="0.01"
-          min="0"
-          value={form.taxFree || ""}
-          onChange={(e) => update("taxFree", parseFloat(e.target.value) || 0)}
-          className="input"
-        />
-      </Field>
-      <div className="grid grid-cols-3 gap-2">
-        <Field label="IVA 6%">
-          <input
-            type="number"
-            step="0.01"
-            min="0"
-            value={form.iva6 || ""}
-            onChange={(e) => update("iva6", parseFloat(e.target.value) || 0)}
-            className="input"
-          />
-        </Field>
-        <Field label="IVA 13%">
-          <input
-            type="number"
-            step="0.01"
-            min="0"
-            value={form.iva13 || ""}
-            onChange={(e) => update("iva13", parseFloat(e.target.value) || 0)}
-            className="input"
-          />
-        </Field>
-        <Field label="IVA 23%">
-          <input
-            type="number"
-            step="0.01"
-            min="0"
-            value={form.iva23 || ""}
-            onChange={(e) => update("iva23", parseFloat(e.target.value) || 0)}
-            className="input"
-          />
-        </Field>
-      </div>
+      <IvaBreakdown form={form} update={update} />
       <Field label="Total">
         <input
           type="number"
@@ -720,48 +685,7 @@ function ServiceInvoiceForm({
           />
         </Field>
       </div>
-      <Field label="Base tributável (s/ IVA)">
-        <input
-          type="number"
-          step="0.01"
-          min="0"
-          value={form.taxFree || ""}
-          onChange={(e) => update("taxFree", parseFloat(e.target.value) || 0)}
-          className="input"
-        />
-      </Field>
-      <div className="grid grid-cols-3 gap-2">
-        <Field label="IVA 6%">
-          <input
-            type="number"
-            step="0.01"
-            min="0"
-            value={form.iva6 || ""}
-            onChange={(e) => update("iva6", parseFloat(e.target.value) || 0)}
-            className="input"
-          />
-        </Field>
-        <Field label="IVA 13%">
-          <input
-            type="number"
-            step="0.01"
-            min="0"
-            value={form.iva13 || ""}
-            onChange={(e) => update("iva13", parseFloat(e.target.value) || 0)}
-            className="input"
-          />
-        </Field>
-        <Field label="IVA 23%">
-          <input
-            type="number"
-            step="0.01"
-            min="0"
-            value={form.iva23 || ""}
-            onChange={(e) => update("iva23", parseFloat(e.target.value) || 0)}
-            className="input"
-          />
-        </Field>
-      </div>
+      <IvaBreakdown form={form} update={update} />
       <Field label="Total">
         <input
           type="number"
@@ -772,6 +696,43 @@ function ServiceInvoiceForm({
           className="input font-semibold"
         />
       </Field>
+    </div>
+  );
+}
+
+function IvaBreakdown({
+  form,
+  update,
+}: {
+  form: InvoiceData;
+  update: (field: keyof InvoiceData, value: string | number) => void;
+}) {
+  return (
+    <div>
+      <label className="text-xs text-gray-500 mb-1.5 block">IVA</label>
+      <div className="rounded-xl border border-gray-200 overflow-hidden text-sm">
+        <div className="grid grid-cols-3 bg-gray-50 text-xs text-gray-400 font-medium px-3 py-2">
+          <span>Taxa</span>
+          <span className="text-right">Incidência</span>
+          <span className="text-right">IVA</span>
+        </div>
+        {(["6", "13", "23"] as const).map((rate) => {
+          const bk = `base${rate}` as "base6" | "base13" | "base23";
+          const ik = `iva${rate}` as "iva6" | "iva13" | "iva23";
+          return (
+            <div key={rate} className="grid grid-cols-3 gap-1 px-2 py-1.5 border-t border-gray-100">
+              <span className="flex items-center text-xs text-gray-500 font-medium pl-1">{rate}%</span>
+              <input type="number" step="0.01" min="0" value={form[bk] || ""} onChange={(e) => update(bk, parseFloat(e.target.value) || 0)} className="input text-right text-sm py-1 px-2" placeholder="0.00" />
+              <input type="number" step="0.01" min="0" value={form[ik] || ""} onChange={(e) => update(ik, parseFloat(e.target.value) || 0)} className="input text-right text-sm py-1 px-2" placeholder="0.00" />
+            </div>
+          );
+        })}
+        <div className="grid grid-cols-3 px-3 py-2 border-t border-gray-200 bg-gray-50">
+          <span className="text-xs font-semibold text-gray-600">Total base</span>
+          <span className="text-right text-sm font-semibold text-gray-800">€{(form.taxFree || 0).toFixed(2)}</span>
+          <span />
+        </div>
+      </div>
     </div>
   );
 }

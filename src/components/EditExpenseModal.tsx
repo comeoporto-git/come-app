@@ -9,6 +9,9 @@ type FormState = {
   supplier: string;
   date: string;
   invoiceId: string;
+  base6: number;
+  base13: number;
+  base23: number;
   taxFree: number;
   iva6: number;
   iva13: number;
@@ -44,6 +47,10 @@ export function EditExpenseModal({
     supplier: transaction.supplier,
     date: transaction.date ?? new Date().toISOString().slice(0, 10),
     invoiceId: transaction.invoiceId,
+    // Derive per-rate bases from IVA amounts (base = iva / rate)
+    base6:  transaction.iva6  ? Math.abs(transaction.iva6)  / 0.06 : 0,
+    base13: transaction.iva13 ? Math.abs(transaction.iva13) / 0.13 : 0,
+    base23: transaction.iva23 ? Math.abs(transaction.iva23) / 0.23 : 0,
     taxFree: Math.abs(transaction.taxFree),
     iva6: Math.abs(transaction.iva6),
     iva13: Math.abs(transaction.iva13),
@@ -62,7 +69,10 @@ export function EditExpenseModal({
   function update(field: keyof FormState, value: string | number) {
     setForm((f) => {
       const updated = { ...f, [field]: value };
-      if (["taxFree", "iva6", "iva13", "iva23"].includes(field as string)) {
+      if (["base6", "base13", "base23"].includes(field as string)) {
+        updated.taxFree = Number(updated.base6) + Number(updated.base13) + Number(updated.base23);
+      }
+      if (["base6", "base13", "base23", "taxFree", "iva6", "iva13", "iva23"].includes(field as string)) {
         updated.totalCost =
           Number(updated.taxFree) + Number(updated.iva6) +
           Number(updated.iva13) + Number(updated.iva23);
@@ -248,20 +258,32 @@ export function EditExpenseModal({
               </div>
             </div>
 
-            {/* Tax free */}
+            {/* IVA breakdown */}
             <div>
-              <label className="text-xs text-gray-500 mb-1 block">Base tributável (s/ IVA)</label>
-              <input type="number" step="0.01" min="0" value={form.taxFree || ""} onChange={(e) => update("taxFree", parseFloat(e.target.value) || 0)} className="input" />
-            </div>
-
-            {/* IVA */}
-            <div className="grid grid-cols-3 gap-2">
-              {(["iva6", "iva13", "iva23"] as const).map((k) => (
-                <div key={k}>
-                  <label className="text-xs text-gray-500 mb-1 block">IVA {k === "iva6" ? "6" : k === "iva13" ? "13" : "23"}%</label>
-                  <input type="number" step="0.01" min="0" value={form[k] || ""} onChange={(e) => update(k, parseFloat(e.target.value) || 0)} className="input" />
+              <label className="text-xs text-gray-500 mb-1.5 block">IVA</label>
+              <div className="rounded-xl border border-gray-200 overflow-hidden text-sm">
+                <div className="grid grid-cols-3 bg-gray-50 text-xs text-gray-400 font-medium px-3 py-2">
+                  <span>Taxa</span>
+                  <span className="text-right">Incidência</span>
+                  <span className="text-right">IVA</span>
                 </div>
-              ))}
+                {(["6", "13", "23"] as const).map((rate) => {
+                  const bk = `base${rate}` as "base6" | "base13" | "base23";
+                  const ik = `iva${rate}` as "iva6" | "iva13" | "iva23";
+                  return (
+                    <div key={rate} className="grid grid-cols-3 gap-1 px-2 py-1.5 border-t border-gray-100">
+                      <span className="flex items-center text-xs text-gray-500 font-medium pl-1">{rate}%</span>
+                      <input type="number" step="0.01" min="0" value={form[bk] || ""} onChange={(e) => update(bk, parseFloat(e.target.value) || 0)} className="input text-right text-sm py-1 px-2" placeholder="0.00" />
+                      <input type="number" step="0.01" min="0" value={form[ik] || ""} onChange={(e) => update(ik, parseFloat(e.target.value) || 0)} className="input text-right text-sm py-1 px-2" placeholder="0.00" />
+                    </div>
+                  );
+                })}
+                <div className="grid grid-cols-3 px-3 py-2 border-t border-gray-200 bg-gray-50">
+                  <span className="text-xs font-semibold text-gray-600">Total base</span>
+                  <span className="text-right text-sm font-semibold text-gray-800">€{(form.taxFree || 0).toFixed(2)}</span>
+                  <span />
+                </div>
+              </div>
             </div>
 
             {/* Total */}
