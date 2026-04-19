@@ -32,7 +32,7 @@ export default async function ReconciliationPage() {
   }
 
   const totalAll     = bankTxns.length;
-  const matchedCount = bankTxns.filter((t) => !!matchedMap[t.transaction_id]).length;
+  const matchedCount = bankTxns.filter((t) => (matchedMap[t.transaction_id] ?? []).length > 0).length;
   const pendingCount = totalAll - matchedCount;
 
   // Oldest transaction date for the footer

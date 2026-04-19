@@ -846,14 +846,13 @@ export async function getFlaggedTransactions(): Promise<Transaction[]> {
 
 /**
  * All Notion transactions that already have a bank reference (matched).
- * Returns a map: bankReference → Transaction for O(1) lookup.
- * Only fetches records where ID do Banco is non-empty; filters out
- * "Unmatched Bank Entry" placeholders client-side to avoid Notion
- * compound-select-filter quirks.
+ * Returns a map: bankReference → Transaction[] to support multiple Notion
+ * records linked to a single bank transaction (e.g. a client pays several
+ * services in one wire transfer).
  */
-export async function getMatchedTransactionMap(): Promise<Record<string, Transaction>> {
+export async function getMatchedTransactionMap(): Promise<Record<string, Transaction[]>> {
   try {
-    const map: Record<string, Transaction> = {};
+    const map: Record<string, Transaction[]> = {};
     let cursor: string | undefined;
     let pages = 0;
     do {
@@ -867,9 +866,9 @@ export async function getMatchedTransactionMap(): Promise<Record<string, Transac
       } as any);
       for (const page of res.results as PageObjectResponse[]) {
         const tx = mapTransaction(page);
-        // Exclude the placeholder entries the sync creates
         if (tx.bankReference && tx.status !== "Unmatched Bank Entry") {
-          map[tx.bankReference] = tx;
+          if (!map[tx.bankReference]) map[tx.bankReference] = [];
+          map[tx.bankReference].push(tx);
         }
       }
       cursor = res.next_cursor ?? undefined;

@@ -15,7 +15,7 @@ function fmtEur(n: number) {
   return n.toLocaleString("pt-PT", { style: "currency", currency: "EUR" });
 }
 
-type Filter = "all" | "matched" | "unmatched";
+type Filter     = "all" | "matched" | "unmatched" | "partial";
 type TypeFilter = "all" | "debit" | "credit";
 
 // ── Inline expense picker ─────────────────────────────────────────────────────
@@ -30,14 +30,13 @@ function ExpensePicker({
 }) {
   const [search, setSearch] = useState("");
   const [pending, startTransition] = useTransition();
-  const [linked, setLinked] = useState(false);
+  const [linked, setLinked] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   useEffect(() => { inputRef.current?.focus(); }, []);
 
   const filtered = useMemo(() => {
-    const q = search.toLowerCase().trim();
+    const q    = search.toLowerCase().trim();
     if (!q) return linkable;
-    // Normalise: "9,00" → "9.00" so it matches the raw number
     const qDot = q.replace(",", ".");
     return linkable.filter((e) =>
       e.supplier.toLowerCase().includes(q) ||
@@ -45,19 +44,17 @@ function ExpensePicker({
       (e.tourName ?? "").toLowerCase().includes(q) ||
       (e.paymentMethod ?? "").toLowerCase().includes(q) ||
       String(Math.abs(e.totalCost)).includes(qDot) ||
-      fmtEur(Math.abs(e.totalCost)).includes(q)        // matches "128,45 €" etc.
+      fmtEur(Math.abs(e.totalCost)).includes(q)
     );
   }, [linkable, search]);
 
   function pick(expense: Transaction) {
     startTransition(async () => {
       await linkBankTransactionAction(bankTxn.transaction_id, expense.id, placeholderId);
-      setLinked(true);
+      setLinked(expense.id);
       setTimeout(onDone, 500);
     });
   }
-
-  if (linked) return <div className="text-xs text-green-600 font-semibold py-2 px-3">✓ Ligado</div>;
 
   return (
     <div className="mt-2 border border-gray-200 rounded-xl overflow-hidden shadow-md bg-white" onClick={(e) => e.stopPropagation()}>
@@ -79,10 +76,12 @@ function ExpensePicker({
               key={e.id}
               disabled={pending}
               onClick={() => pick(e)}
-              className="w-full text-left px-3 py-2 hover:bg-blue-50 transition-colors flex items-start justify-between gap-3"
+              className={`w-full text-left px-3 py-2 hover:bg-blue-50 transition-colors flex items-start justify-between gap-3 ${linked === e.id ? "bg-green-50" : ""}`}
             >
               <div className="min-w-0">
-                <p className="text-xs font-semibold text-gray-800 truncate">{e.supplier || "—"}</p>
+                <p className="text-xs font-semibold text-gray-800 truncate">
+                  {linked === e.id ? "✓ " : ""}{e.supplier || "—"}
+                </p>
                 <p className="text-[10px] text-gray-400 truncate">
                   {e.date ? fmtDate(e.date) : ""}
                   {e.invoiceId ? ` · Fatura ${e.invoiceId}` : ""}
@@ -115,7 +114,7 @@ function LedgerRow({
   bankTxn, matched, placeholderId, linkableExpenses, linkableEarnings,
 }: {
   bankTxn: StoredTransaction;
-  matched?: Transaction;
+  matched: Transaction[];          // may be empty; may have multiple
   placeholderId?: string;
   linkableExpenses: Transaction[];
   linkableEarnings: Transaction[];
@@ -126,9 +125,16 @@ function LedgerRow({
 
   if (dismissed) return null;
 
-  const isCredit  = bankTxn.credit_debit === "CRDT";
-  const isMatched = !!matched;
-  const linkable  = isCredit ? linkableEarnings : linkableExpenses;
+  const isCredit   = bankTxn.credit_debit === "CRDT";
+  const bankAmount = Math.abs(bankTxn.amount);
+  const linkable   = isCredit ? linkableEarnings : linkableExpenses;
+
+  // Sum of all linked Notion records
+  const matchedTotal = matched.reduce((s, t) => s + Math.abs(t.totalCost), 0);
+  const remaining    = bankAmount - matchedTotal;
+  const isMatched    = matched.length > 0;
+  const isFullMatch  = isMatched && Math.abs(remaining) <= 0.05;
+  const isPartial    = isMatched && !isFullMatch;
 
   function dismiss() {
     if (!placeholderId) return;
@@ -136,7 +142,10 @@ function LedgerRow({
   }
 
   return (
-    <div className={`border-b border-gray-100 last:border-0 ${!isMatched ? (isCredit ? "bg-blue-50/30" : "bg-orange-50/30") : ""}`}>
+    <div className={`border-b border-gray-100 last:border-0 ${
+      !isMatched  ? (isCredit ? "bg-blue-50/30" : "bg-orange-50/30") :
+      isPartial   ? "bg-yellow-50/40" : ""
+    }`}>
       <div className="grid grid-cols-[1fr_auto] md:grid-cols-[160px_1fr_100px_1fr_auto] gap-x-4 items-start px-4 py-3">
 
         {/* Date */}
@@ -170,79 +179,101 @@ function LedgerRow({
         {/* Amount */}
         <div className="text-right">
           <p className={`text-xs font-bold ${isCredit ? "text-green-600" : "text-gray-800"}`}>
-            {isCredit ? "+" : ""}{fmtEur(Math.abs(bankTxn.amount))}
+            {isCredit ? "+" : ""}{fmtEur(bankAmount)}
           </p>
+          {isPartial && (
+            <p className="text-[10px] text-yellow-600 font-semibold mt-0.5">
+              {fmtEur(remaining)} por ligar
+            </p>
+          )}
         </div>
 
-        {/* Notion side */}
-        <div className="min-w-0 col-span-1">
-          {isMatched ? (
-            <div className="space-y-0.5">
-              <p className="text-xs font-semibold text-gray-800 truncate">{matched.supplier || "—"}</p>
+        {/* Notion side — list of all linked records */}
+        <div className="min-w-0 col-span-1 space-y-2">
+          {matched.map((m, idx) => (
+            <div key={m.id} className={`${idx > 0 ? "border-t border-gray-100 pt-2" : ""}`}>
+              <p className="text-xs font-semibold text-gray-800 truncate">{m.supplier || "—"}</p>
               <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-gray-500">
-                <span className="font-semibold text-gray-700">{fmtEur(Math.abs(matched.totalCost))}</span>
-                {matched.date && <span>{fmtDate(matched.date)}</span>}
-                {matched.invoiceId && <span>Fatura {matched.invoiceId}</span>}
-                {matched.tourName && <span>· {matched.tourName}</span>}
+                <span className="font-semibold text-gray-700">{fmtEur(Math.abs(m.totalCost))}</span>
+                {m.date && <span>{fmtDate(m.date)}</span>}
+                {m.invoiceId && <span>Fatura {m.invoiceId}</span>}
+                {m.tourName && <span>· {m.tourName}</span>}
               </div>
-              {(matched.iva6 > 0 || matched.iva13 > 0 || matched.iva23 > 0) && (
+              {(m.iva6 > 0 || m.iva13 > 0 || m.iva23 > 0) && (
                 <div className="flex gap-x-2 text-[10px] text-gray-400">
-                  {matched.iva6  > 0 && <span>IVA 6% {fmtEur(matched.iva6)}</span>}
-                  {matched.iva13 > 0 && <span>IVA 13% {fmtEur(matched.iva13)}</span>}
-                  {matched.iva23 > 0 && <span>IVA 23% {fmtEur(matched.iva23)}</span>}
-                  {matched.taxFree > 0 && <span>S/IVA {fmtEur(matched.taxFree)}</span>}
+                  {m.iva6  > 0 && <span>IVA 6% {fmtEur(m.iva6)}</span>}
+                  {m.iva13 > 0 && <span>IVA 13% {fmtEur(m.iva13)}</span>}
+                  {m.iva23 > 0 && <span>IVA 23% {fmtEur(m.iva23)}</span>}
+                  {m.taxFree > 0 && <span>S/IVA {fmtEur(m.taxFree)}</span>}
                 </div>
               )}
-              {matched.invoiceImageUrl && (
-                <a
-                  href={matched.invoiceImageUrl}
-                  target="_blank" rel="noopener noreferrer"
+              {m.invoiceImageUrl && (
+                <a href={m.invoiceImageUrl} target="_blank" rel="noopener noreferrer"
                   className="inline-flex items-center gap-1 text-[10px] text-blue-500 hover:text-blue-700"
-                  onClick={(e) => e.stopPropagation()}
-                >
+                  onClick={(e) => e.stopPropagation()}>
                   📄 Ver fatura
                 </a>
               )}
             </div>
-          ) : (
-            <div>
-              <p className="text-[10px] text-orange-500 font-semibold">
-                Sem correspondência · {isCredit ? "receita" : "despesa"}
-              </p>
-              {open && (
-                <ExpensePicker
-                  bankTxn={bankTxn}
-                  placeholderId={placeholderId}
-                  linkable={linkable}
-                  onDone={() => setOpen(false)}
-                />
-              )}
+          ))}
+
+          {/* Total bar when multiple records linked */}
+          {matched.length > 1 && (
+            <div className={`flex items-center justify-between text-[10px] font-semibold pt-1 border-t border-gray-100 ${isFullMatch ? "text-green-600" : "text-yellow-600"}`}>
+              <span>Total ligado ({matched.length} registos)</span>
+              <span>{fmtEur(matchedTotal)} / {fmtEur(bankAmount)}</span>
             </div>
+          )}
+
+          {!isMatched && (
+            <p className="text-[10px] text-orange-500 font-semibold">
+              Sem correspondência · {isCredit ? "receita" : "despesa"}
+            </p>
+          )}
+
+          {open && (
+            <ExpensePicker
+              bankTxn={bankTxn}
+              placeholderId={placeholderId}
+              linkable={linkable}
+              onDone={() => setOpen(false)}
+            />
           )}
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-2 shrink-0">
-          {isMatched ? (
+        <div className="flex flex-col items-end gap-1.5 shrink-0">
+          {isFullMatch ? (
             <span className="text-[10px] font-semibold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">✓</span>
           ) : (
-            <>
-              <button
-                onClick={() => setOpen((o) => !o)}
-                className="text-[10px] font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded-full transition-colors"
-              >
-                {open ? "Fechar" : "🔗 Ligar"}
-              </button>
-              {placeholderId && (
-                <button
-                  disabled={dismissPending}
-                  onClick={dismiss}
-                  className="text-[10px] text-gray-400 hover:text-red-500 transition-colors"
-                >
-                  Dispensar
-                </button>
-              )}
-            </>
+            <button
+              onClick={() => setOpen((o) => !o)}
+              className={`text-[10px] font-semibold px-2 py-1 rounded-full transition-colors ${
+                isPartial
+                  ? "text-yellow-700 bg-yellow-100 hover:bg-yellow-200"
+                  : "text-blue-600 bg-blue-50 hover:bg-blue-100"
+              }`}
+            >
+              {open ? "Fechar" : isPartial ? "🔗 Ligar mais" : "🔗 Ligar"}
+            </button>
+          )}
+          {/* Always allow adding more links even on fully matched rows */}
+          {isFullMatch && (
+            <button
+              onClick={() => setOpen((o) => !o)}
+              className="text-[10px] text-gray-400 hover:text-blue-500 transition-colors"
+            >
+              {open ? "Fechar" : "+ Ligar mais"}
+            </button>
+          )}
+          {!isMatched && placeholderId && (
+            <button
+              disabled={dismissPending}
+              onClick={dismiss}
+              className="text-[10px] text-gray-400 hover:text-red-500 transition-colors"
+            >
+              Dispensar
+            </button>
           )}
         </div>
       </div>
@@ -268,22 +299,13 @@ function AutoMatchButton() {
 
   return (
     <div className="flex flex-col gap-1">
-      <button
-        onClick={run}
-        disabled={pending}
-        className="flex items-center gap-2 px-4 py-2 bg-[#32373c] hover:bg-[#32373c]/80 text-white text-xs font-semibold rounded-xl transition-colors disabled:opacity-50"
-      >
-        {pending ? (
-          <><span className="animate-spin">⚙️</span> A processar…</>
-        ) : (
-          <>🤖 Correspondência Automática</>
-        )}
+      <button onClick={run} disabled={pending}
+        className="flex items-center gap-2 px-4 py-2 bg-[#32373c] hover:bg-[#32373c]/80 text-white text-xs font-semibold rounded-xl transition-colors disabled:opacity-50">
+        {pending ? <><span className="animate-spin">⚙️</span> A processar…</> : <>🤖 Correspondência Automática</>}
       </button>
       {result && (
         <p className={`text-[10px] font-semibold ${result.matched > 0 ? "text-green-600" : "text-gray-400"}`}>
-          {result.matched > 0
-            ? `✓ ${result.matched} novas correspondências encontradas`
-            : "Sem novas correspondências"}
+          {result.matched > 0 ? `✓ ${result.matched} novas correspondências` : "Sem novas correspondências"}
           {result.errors.length > 0 && ` · ${result.errors.length} erros`}
         </p>
       )}
@@ -294,15 +316,10 @@ function AutoMatchButton() {
 // ── Main component ────────────────────────────────────────────────────────────
 
 export function BankLedger({
-  bankTxns,
-  matchedMap,
-  unmatchedPlaceholderMap,
-  linkableExpenses,
-  linkableEarnings,
-  oldestDate,
+  bankTxns, matchedMap, unmatchedPlaceholderMap, linkableExpenses, linkableEarnings, oldestDate,
 }: {
   bankTxns: StoredTransaction[];
-  matchedMap: Record<string, Transaction>;
+  matchedMap: Record<string, Transaction[]>;
   unmatchedPlaceholderMap: Record<string, string>;
   linkableExpenses: Transaction[];
   linkableEarnings: Transaction[];
@@ -312,64 +329,80 @@ export function BankLedger({
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [search,     setSearch]     = useState("");
 
+  function matchStatus(t: StoredTransaction): "full" | "partial" | "none" {
+    const list = matchedMap[t.transaction_id] ?? [];
+    if (list.length === 0) return "none";
+    const total   = list.reduce((s, m) => s + Math.abs(m.totalCost), 0);
+    const bankAmt = Math.abs(t.amount);
+    return Math.abs(total - bankAmt) <= 0.05 ? "full" : "partial";
+  }
+
   const rows = useMemo(() => {
-    const q = search.toLowerCase();
+    const q    = search.toLowerCase().trim();
+    const qDot = q.replace(",", ".");
     return bankTxns.filter((t) => {
-      const isMatched = !!matchedMap[t.transaction_id];
-      if (filter === "matched"   && !isMatched) return false;
-      if (filter === "unmatched" && isMatched)  return false;
+      const status = matchStatus(t);
+      if (filter === "matched"   && status === "none") return false;
+      if (filter === "unmatched" && status !== "none") return false;
+      if (filter === "partial"   && status !== "partial") return false;
       if (typeFilter === "debit"  && t.credit_debit !== "DBIT") return false;
       if (typeFilter === "credit" && t.credit_debit !== "CRDT") return false;
       if (!q) return true;
-      const qDot = q.replace(",", ".");
-      const m = matchedMap[t.transaction_id];
+      const matches = matchedMap[t.transaction_id] ?? [];
       return (
         (t.merchant_name   ?? "").toLowerCase().includes(q) ||
         (t.remittance_info ?? "").toLowerCase().includes(q) ||
         t.transaction_id.toLowerCase().includes(q) ||
         String(Math.abs(t.amount)).includes(qDot) ||
         fmtEur(Math.abs(t.amount)).includes(q) ||
-        (m?.supplier  ?? "").toLowerCase().includes(q) ||
-        (m?.invoiceId ?? "").toLowerCase().includes(q)
+        matches.some((m) =>
+          (m.supplier ?? "").toLowerCase().includes(q) ||
+          (m.invoiceId ?? "").toLowerCase().includes(q)
+        )
       );
     });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bankTxns, filter, typeFilter, search, matchedMap]);
 
-  const matchedCount   = bankTxns.filter((t) => !!matchedMap[t.transaction_id]).length;
-  const unmatchedCount = bankTxns.length - matchedCount;
-  const debitCount     = bankTxns.filter((t) => t.credit_debit === "DBIT").length;
-  const creditCount    = bankTxns.filter((t) => t.credit_debit === "CRDT").length;
+  const fullCount    = bankTxns.filter((t) => matchStatus(t) === "full").length;
+  const partialCount = bankTxns.filter((t) => matchStatus(t) === "partial").length;
+  const noneCount    = bankTxns.filter((t) => matchStatus(t) === "none").length;
+  const debitCount   = bankTxns.filter((t) => t.credit_debit === "DBIT").length;
+  const creditCount  = bankTxns.filter((t) => t.credit_debit === "CRDT").length;
 
   return (
     <div className="space-y-4">
-
-      {/* Controls row */}
+      {/* Controls */}
       <div className="flex flex-wrap gap-3 items-start">
         <AutoMatchButton />
         <div className="flex-1 min-w-0">
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Pesquisar…"
-            className="w-full text-xs bg-white border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-[#667470] transition-colors"
-          />
+          <input value={search} onChange={(e) => setSearch(e.target.value)}
+            placeholder="Pesquisar por descrição, fornecedor, fatura, valor…"
+            className="w-full text-xs bg-white border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-[#667470] transition-colors" />
         </div>
       </div>
 
       {/* Filter pills */}
       <div className="flex flex-wrap gap-2">
-        {/* Match filter */}
         <div className="flex bg-gray-100 rounded-xl p-1 gap-1 text-xs font-semibold">
-          {([["all", `Todos (${bankTxns.length})`], ["matched", `Matched (${matchedCount})`], ["unmatched", `Sem match (${unmatchedCount})`]] as [Filter, string][]).map(([f, label]) => (
+          {([
+            ["all",       `Todos (${bankTxns.length})`],
+            ["matched",   `✓ Completo (${fullCount})`],
+            ["partial",   `◑ Parcial (${partialCount})`],
+            ["unmatched", `○ Sem match (${noneCount})`],
+          ] as [Filter, string][]).map(([f, label]) => (
             <button key={f} onClick={() => setFilter(f)}
               className={`px-3 py-1.5 rounded-lg transition-all ${filter === f ? "bg-white text-gray-800 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
               {label}
             </button>
           ))}
         </div>
-        {/* Type filter */}
         <div className="flex bg-gray-100 rounded-xl p-1 gap-1 text-xs font-semibold">
-          {([["all", "Ambos"], ["debit", `Débitos (${debitCount})`], ["credit", `Créditos (${creditCount})`]] as [TypeFilter, string][]).map(([f, label]) => (
+          {([
+            ["all",    "Ambos"],
+            ["debit",  `Débitos (${debitCount})`],
+            ["credit", `Créditos (${creditCount})`],
+          ] as [TypeFilter, string][]).map(([f, label]) => (
             <button key={f} onClick={() => setTypeFilter(f)}
               className={`px-3 py-1.5 rounded-lg transition-all ${typeFilter === f ? "bg-white text-gray-800 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
               {label}
@@ -384,7 +417,7 @@ export function BankLedger({
           <span>Data</span>
           <span>Transação Banco</span>
           <span className="text-right">Valor</span>
-          <span>Registo Notion</span>
+          <span>Registo(s) Notion</span>
           <span />
         </div>
         {rows.length === 0 ? (
@@ -394,7 +427,7 @@ export function BankLedger({
             <LedgerRow
               key={t.transaction_id}
               bankTxn={t}
-              matched={matchedMap[t.transaction_id]}
+              matched={matchedMap[t.transaction_id] ?? []}
               placeholderId={unmatchedPlaceholderMap[t.transaction_id]}
               linkableExpenses={linkableExpenses}
               linkableEarnings={linkableEarnings}
