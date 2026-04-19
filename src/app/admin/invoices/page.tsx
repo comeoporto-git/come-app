@@ -21,10 +21,12 @@ export default async function AdminInvoicesPage() {
       <header className="bg-[#7b8b87] sticky top-0 z-10">
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center gap-3">
           <Link href="/admin/em-falta" className="text-white/40 hover:text-white transition-colors text-lg leading-none">←</Link>
-          <Image
+          <Link href="/">
+            <Image
             src="https://comeoporto.com/wp-content/uploads/2023/08/cropped-COME-Porto-Food-Tours-Logo-Black-.png"
             alt="COME" width={72} height={28} className="object-contain invert" unoptimized
           />
+          </Link>
           <div className="flex-1" />
           <div className="flex items-center gap-4">
             <span className="text-xs text-white/50 font-medium uppercase tracking-widest">Faturas em Falta</span>

@@ -18,10 +18,12 @@ export default async function TransferenciasPage() {
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link href="/admin/em-falta" className="text-white/40 hover:text-white transition-colors text-lg leading-none">←</Link>
-            <Image
+            <Link href="/">
+              <Image
               src="https://comeoporto.com/wp-content/uploads/2023/08/cropped-COME-Porto-Food-Tours-Logo-Black-.png"
               alt="COME" width={72} height={28} className="object-contain invert" unoptimized
             />
+            </Link>
           </div>
           <div className="flex items-center gap-4">
             <span className="text-xs text-white/50 font-medium uppercase tracking-widest">Transferências em Falta</span>

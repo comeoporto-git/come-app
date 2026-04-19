@@ -76,7 +76,8 @@ export default async function GuideDashboard() {
           {isChef && (
             <span className="text-xs text-white/50 font-semibold uppercase tracking-widest">Chef</span>
           )}
-          <Image
+          <Link href="/">
+            <Image
             src="https://comeoporto.com/wp-content/uploads/2023/08/cropped-COME-Porto-Food-Tours-Logo-Black-.png"
             alt="COME"
             width={72}
@@ -84,6 +85,7 @@ export default async function GuideDashboard() {
             className="object-contain invert"
             unoptimized
           />
+          </Link>
           <div className="flex items-center gap-4 ml-auto">
             <span className="text-sm text-white/70 font-medium">{session.user?.name?.split(" ")[0]}</span>
             <form

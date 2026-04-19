@@ -31,7 +31,8 @@ export default async function SuperGuidePage() {
           <Link href="/super-guide" className="text-white/40 hover:text-white transition-colors text-lg leading-none">
             ←
           </Link>
-          <Image
+          <Link href="/">
+            <Image
             src="https://comeoporto.com/wp-content/uploads/2023/08/cropped-COME-Porto-Food-Tours-Logo-Black-.png"
             alt="COME"
             width={72}
@@ -39,6 +40,7 @@ export default async function SuperGuidePage() {
             className="object-contain invert"
             unoptimized
           />
+          </Link>
           <div className="flex-1" />
           <div className="flex items-center gap-4">
             <span className="text-sm text-white/70 font-medium">
