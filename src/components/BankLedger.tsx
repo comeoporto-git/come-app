@@ -83,7 +83,7 @@ function ExpensePicker({
               key={e.id}
               disabled={pending}
               onClick={() => pick(e)}
-              className="w-full text-left px-3 py-2 hover:bg-blue-50 transition-colors flex items-center justify-between gap-3"
+              className="w-full text-left px-3 py-2 hover:bg-blue-50 transition-colors flex items-start justify-between gap-3"
             >
               <div className="min-w-0">
                 <p className="text-xs font-semibold text-gray-800 truncate">{e.supplier || "—"}</p>
@@ -93,8 +93,18 @@ function ExpensePicker({
                   {e.tourName ? ` · ${e.tourName}` : ""}
                   {e.paymentMethod ? ` · ${e.paymentMethod}` : ""}
                 </p>
+                {(e.iva6 > 0 || e.iva13 > 0 || e.iva23 > 0) && (
+                  <p className="text-[10px] text-gray-300 truncate">
+                    {e.iva6 > 0 && `IVA 6% ${fmtEur(e.iva6)} `}
+                    {e.iva13 > 0 && `IVA 13% ${fmtEur(e.iva13)} `}
+                    {e.iva23 > 0 && `IVA 23% ${fmtEur(e.iva23)}`}
+                  </p>
+                )}
               </div>
-              <span className="text-xs font-bold text-gray-700 shrink-0">{fmtEur(e.totalCost)}</span>
+              <div className="shrink-0 text-right">
+                <p className="text-xs font-bold text-gray-700">{fmtEur(e.totalCost)}</p>
+                {e.invoiceImageUrl && <p className="text-[10px] text-blue-400">📄 fatura</p>}
+              </div>
             </button>
           ))
         )}
@@ -165,13 +175,35 @@ function LedgerRow({
         {/* ── Notion side ── */}
         <div className="min-w-0 col-span-1">
           {isMatched ? (
-            <div>
+            <div className="space-y-0.5">
               <p className="text-xs font-semibold text-gray-800 truncate">{matched.supplier || "—"}</p>
-              <p className="text-[10px] text-gray-400 mt-0.5 truncate">
-                {matched.invoiceId ? `Fatura ${matched.invoiceId}` : "Sem fatura"}
-                {matched.tourName ? ` · ${matched.tourName}` : ""}
-                {matched.paymentMethod ? ` · ${matched.paymentMethod}` : ""}
-              </p>
+              <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-gray-500">
+                <span className="font-semibold text-gray-700">{fmtEur(matched.totalCost)}</span>
+                {matched.date && <span>{fmtDate(matched.date)}</span>}
+                {matched.invoiceId && <span>Fatura {matched.invoiceId}</span>}
+                {matched.tourName && <span>· {matched.tourName}</span>}
+              </div>
+              {/* IVA breakdown — only if any IVA is non-zero */}
+              {(matched.iva6 > 0 || matched.iva13 > 0 || matched.iva23 > 0) && (
+                <div className="flex gap-x-2 text-[10px] text-gray-400">
+                  {matched.iva6  > 0 && <span>IVA 6% {fmtEur(matched.iva6)}</span>}
+                  {matched.iva13 > 0 && <span>IVA 13% {fmtEur(matched.iva13)}</span>}
+                  {matched.iva23 > 0 && <span>IVA 23% {fmtEur(matched.iva23)}</span>}
+                  {matched.taxFree > 0 && <span>S/IVA {fmtEur(matched.taxFree)}</span>}
+                </div>
+              )}
+              {/* Invoice image link */}
+              {matched.invoiceImageUrl && (
+                <a
+                  href={matched.invoiceImageUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-[10px] text-blue-500 hover:text-blue-700 mt-0.5"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  📄 Ver fatura
+                </a>
+              )}
             </div>
           ) : (
             <div>
@@ -191,7 +223,7 @@ function LedgerRow({
         {/* ── Actions ── */}
         <div className="flex items-center gap-2 shrink-0">
           {isMatched ? (
-            <span className="text-[10px] font-semibold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">Matched</span>
+            <span className="text-[10px] font-semibold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">✓ Matched</span>
           ) : (
             <>
               <button

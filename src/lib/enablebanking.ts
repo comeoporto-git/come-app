@@ -384,20 +384,23 @@ export async function getRecentSyncLogs(limit = 5): Promise<SyncLog[]> {
   }
 }
 
-/** Read stored transactions (newest first, up to limit) */
+/** Read stored transactions (newest first). Pass days=0 to fetch all rows. */
 export async function getStoredTransactions(
   days = 30,
-  limit = 500,
+  limit = 5000,
 ): Promise<StoredTransaction[]> {
   const sql = getDb();
-  const dateFrom = new Date(Date.now() - days * 86_400_000)
-    .toISOString()
-    .slice(0, 10);
-  const rows = await sql`
-    SELECT * FROM bank_transactions
-    WHERE transaction_date >= ${dateFrom}
-    ORDER BY transaction_date DESC, id DESC
-    LIMIT ${limit}
-  `;
+  const rows = days === 0
+    ? await sql`
+        SELECT * FROM bank_transactions
+        ORDER BY transaction_date DESC, id DESC
+        LIMIT ${limit}
+      `
+    : await sql`
+        SELECT * FROM bank_transactions
+        WHERE transaction_date >= ${new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10)}
+        ORDER BY transaction_date DESC, id DESC
+        LIMIT ${limit}
+      `;
   return rows as StoredTransaction[];
 }

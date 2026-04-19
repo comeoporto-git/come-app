@@ -17,7 +17,7 @@ export default async function ReconciliationPage() {
 
   // Fetch all data in parallel — individual failures return empty defaults
   const [bankTxns, matchedMap, unmatchedPlaceholders, linkable] = await Promise.all([
-    getStoredTransactions(90, 1000).catch((e) => { console.error("[reconciliation] bankTxns:", e); return []; }),
+    getStoredTransactions(0).catch((e) => { console.error("[reconciliation] bankTxns:", e); return []; }),
     getMatchedTransactionMap(),   // has internal try/catch
     getUnmatchedBankTransactions().catch((e) => { console.error("[reconciliation] unmatched:", e); return []; }),
     getLinkableExpenses(),         // has internal try/catch

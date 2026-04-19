@@ -904,7 +904,7 @@ export async function getLinkableExpenses(): Promise<Transaction[]> {
       results.push(
         ...(res.results as PageObjectResponse[])
           .map(mapTransaction)
-          .filter((t) => !EXCLUDED.has(t.status))
+          .filter((t) => !EXCLUDED.has(t.status) && !t.supplier.startsWith("IN -"))
       );
       cursor = res.next_cursor ?? undefined;
     } while (cursor && ++pages < 10);
