@@ -35,15 +35,18 @@ function ExpensePicker({
   useEffect(() => { inputRef.current?.focus(); }, []);
 
   const filtered = useMemo(() => {
-    const q = search.toLowerCase();
-    return q
-      ? linkable.filter((e) =>
-          e.supplier.toLowerCase().includes(q) ||
-          e.invoiceId.toLowerCase().includes(q) ||
-          (e.tourName ?? "").toLowerCase().includes(q) ||
-          String(e.totalCost).includes(q)
-        )
-      : linkable;
+    const q = search.toLowerCase().trim();
+    if (!q) return linkable;
+    // Normalise: "9,00" → "9.00" so it matches the raw number
+    const qDot = q.replace(",", ".");
+    return linkable.filter((e) =>
+      e.supplier.toLowerCase().includes(q) ||
+      e.invoiceId.toLowerCase().includes(q) ||
+      (e.tourName ?? "").toLowerCase().includes(q) ||
+      (e.paymentMethod ?? "").toLowerCase().includes(q) ||
+      String(Math.abs(e.totalCost)).includes(qDot) ||
+      fmtEur(Math.abs(e.totalCost)).includes(q)        // matches "128,45 €" etc.
+    );
   }, [linkable, search]);
 
   function pick(expense: Transaction) {
@@ -318,11 +321,14 @@ export function BankLedger({
       if (typeFilter === "debit"  && t.credit_debit !== "DBIT") return false;
       if (typeFilter === "credit" && t.credit_debit !== "CRDT") return false;
       if (!q) return true;
+      const qDot = q.replace(",", ".");
       const m = matchedMap[t.transaction_id];
       return (
         (t.merchant_name   ?? "").toLowerCase().includes(q) ||
         (t.remittance_info ?? "").toLowerCase().includes(q) ||
         t.transaction_id.toLowerCase().includes(q) ||
+        String(Math.abs(t.amount)).includes(qDot) ||
+        fmtEur(Math.abs(t.amount)).includes(q) ||
         (m?.supplier  ?? "").toLowerCase().includes(q) ||
         (m?.invoiceId ?? "").toLowerCase().includes(q)
       );
