@@ -4,14 +4,20 @@ import type { Transaction } from "@/lib/notion";
 
 export function ExportCSVButton({ transactions }: { transactions: Transaction[] }) {
   function download() {
+    const inc = (iva: number, rate: number) =>
+      iva ? (Math.round((iva / rate) * 100) / 100).toFixed(2) : "0.00";
+
     const headers = [
       "Data",
       "Fornecedor",
       "Nº Fatura",
-      "Base S/ IVA",
+      "Inc. 6%",
       "IVA 6%",
+      "Inc. 13%",
       "IVA 13%",
+      "Inc. 23%",
       "IVA 23%",
+      "Base Total",
       "Total",
       "Método Pag.",
       "Status",
@@ -23,10 +29,13 @@ export function ExportCSVButton({ transactions }: { transactions: Transaction[] 
         t.date ?? "",
         `"${t.supplier.replace(/"/g, '""')}"`,
         t.invoiceId,
-        t.taxFree.toFixed(2),
+        inc(t.iva6,  0.06),
         t.iva6.toFixed(2),
+        inc(t.iva13, 0.13),
         t.iva13.toFixed(2),
+        inc(t.iva23, 0.23),
         t.iva23.toFixed(2),
+        t.taxFree.toFixed(2),
         t.totalCost.toFixed(2),
         t.paymentMethod,
         t.status,

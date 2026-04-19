@@ -11,6 +11,12 @@ function fmt(n: number) {
   return `€${n.toFixed(2)}`;
 }
 
+/** Derive the tax base (incidência) from a stored IVA amount */
+function inc(iva: number, rate: number): number {
+  if (!iva) return 0;
+  return Math.round((iva / rate) * 100) / 100;
+}
+
 export default async function AccountantPage({
   searchParams,
 }: {
@@ -306,8 +312,8 @@ export default async function AccountantPage({
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 border-b border-gray-100">
                   <tr>
-                    {["Fatura", "Data", "Fornecedor", "Nº Fatura", "Base S/ IVA", "IVA 6%", "IVA 13%", "IVA 23%", "Total", "Status", "Pag.", "ID Banco", "Verificado"].map((h) => (
-                      <th key={h} className="text-left text-xs font-semibold text-gray-500 px-3 py-2.5">{h}</th>
+                    {["Fatura", "Data", "Fornecedor", "Nº Fatura", "Inc. 6%", "IVA 6%", "Inc. 13%", "IVA 13%", "Inc. 23%", "IVA 23%", "Base Total", "Total", "Status", "Pag.", "ID Banco", "Verificado"].map((h) => (
+                      <th key={h} className="text-left text-xs font-semibold text-gray-500 px-3 py-2.5 whitespace-nowrap">{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -328,10 +334,13 @@ export default async function AccountantPage({
                       <td className="px-3 py-2.5 text-[#32373c] whitespace-nowrap">{tx.date ?? "—"}</td>
                       <td className="px-3 py-2.5 font-medium text-[#32373c]">{tx.supplier}</td>
                       <td className="px-3 py-2.5 text-[#32373c]">{tx.invoiceId || "—"}</td>
-                      <td className="px-3 py-2.5 text-right text-[#32373c]">{fmt(tx.taxFree)}</td>
-                      <td className="px-3 py-2.5 text-right text-[#32373c]">{tx.iva6 ? fmt(tx.iva6) : "—"}</td>
+                      <td className="px-3 py-2.5 text-right text-gray-500">{tx.iva6  ? fmt(inc(tx.iva6,  0.06)) : "—"}</td>
+                      <td className="px-3 py-2.5 text-right text-[#32373c]">{tx.iva6  ? fmt(tx.iva6)  : "—"}</td>
+                      <td className="px-3 py-2.5 text-right text-gray-500">{tx.iva13 ? fmt(inc(tx.iva13, 0.13)) : "—"}</td>
                       <td className="px-3 py-2.5 text-right text-[#32373c]">{tx.iva13 ? fmt(tx.iva13) : "—"}</td>
+                      <td className="px-3 py-2.5 text-right text-gray-500">{tx.iva23 ? fmt(inc(tx.iva23, 0.23)) : "—"}</td>
                       <td className="px-3 py-2.5 text-right text-[#32373c]">{tx.iva23 ? fmt(tx.iva23) : "—"}</td>
+                      <td className="px-3 py-2.5 text-right text-[#32373c]">{fmt(tx.taxFree)}</td>
                       <td className="px-3 py-2.5 text-right font-semibold text-[#32373c]">{fmt(tx.totalCost)}</td>
                       <td className="px-3 py-2.5">
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
@@ -378,10 +387,10 @@ export default async function AccountantPage({
                     </div>
                     <p className="font-bold text-gray-900 shrink-0">{fmt(tx.totalCost)}</p>
                   </div>
-                  <div className="flex gap-2 flex-wrap text-xs text-gray-400">
-                    {tx.iva6 > 0 && <span>6%: {fmt(tx.iva6)}</span>}
-                    {tx.iva13 > 0 && <span>13%: {fmt(tx.iva13)}</span>}
-                    {tx.iva23 > 0 && <span>23%: {fmt(tx.iva23)}</span>}
+                  <div className="flex gap-3 flex-wrap text-xs text-gray-400">
+                    {tx.iva6  > 0 && <span>6%: <span className="text-gray-500">{fmt(inc(tx.iva6,  0.06))}</span> inc · {fmt(tx.iva6)} IVA</span>}
+                    {tx.iva13 > 0 && <span>13%: <span className="text-gray-500">{fmt(inc(tx.iva13, 0.13))}</span> inc · {fmt(tx.iva13)} IVA</span>}
+                    {tx.iva23 > 0 && <span>23%: <span className="text-gray-500">{fmt(inc(tx.iva23, 0.23))}</span> inc · {fmt(tx.iva23)} IVA</span>}
                   </div>
                   {tx.bankReference && (
                     <p className="font-mono text-xs text-blue-500 truncate" title={tx.bankReference}>
