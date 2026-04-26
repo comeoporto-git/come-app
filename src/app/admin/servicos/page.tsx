@@ -31,7 +31,8 @@ const STATUS_COLORS: Record<string, string> = {
 
 export default async function AdminToursPage() {
   const session = await auth();
-  if (!session || session.user.role !== "Admin") redirect("/");
+  if (!session) redirect("/login");
+  if (session.user.role !== "Admin" && session.user.role !== "Super Guide") redirect("/");
 
   const [tours, pastTours, teamMembers] = await Promise.all([
     getAllUpcomingTours(),
