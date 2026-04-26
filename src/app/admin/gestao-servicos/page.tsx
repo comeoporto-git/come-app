@@ -35,7 +35,11 @@ function getMissingFields(tour: Tour): string[] {
 
 export default async function GestaoToursPage() {
   const session = await auth();
-  if (!session || session.user.role !== "Admin") redirect("/");
+  if (!session) redirect("/login");
+  const role = session.user.role;
+  if (role !== "Admin" && role !== "Super Guide") redirect("/");
+
+  const backHref = role === "Admin" ? "/admin" : "/super-guide";
 
   const [incompleteServices, pendingServices, missingStaffServices] = await Promise.all([
     getServicesWithMissingInfo(),
@@ -48,7 +52,7 @@ export default async function GestaoToursPage() {
       <header className="bg-[#7b8b87] sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Link href="/admin" className="text-white/40 hover:text-white transition-colors text-lg leading-none">←</Link>
+            <Link href={backHref} className="text-white/40 hover:text-white transition-colors text-lg leading-none">←</Link>
             <Link href="/">
               <Image
               src="https://comeoporto.com/wp-content/uploads/2023/08/cropped-COME-Porto-Food-Tours-Logo-Black-.png"
