@@ -71,28 +71,20 @@ export function AddExpenseModal({
   const fileRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
 
-  async function readFileAsDataUrl(file: File): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (ev) => resolve(ev.target?.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-  }
-
   async function normalizeImage(file: File): Promise<{ dataUrl: string; base64: string; mediaType: "image/jpeg" | "image/png" | "image/webp" }> {
+    const MAX_PX = 2048;
     const isHeic = file.type === "image/heic" || file.type === "image/heif" || file.name.toLowerCase().endsWith(".heic") || file.name.toLowerCase().endsWith(".heif");
-    if (isHeic) {
-      const bitmap = await createImageBitmap(file);
-      const canvas = document.createElement("canvas");
-      canvas.width = bitmap.width;
-      canvas.height = bitmap.height;
-      canvas.getContext("2d")!.drawImage(bitmap, 0, 0);
-      const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
-      return { dataUrl, base64: dataUrl.split(",")[1], mediaType: "image/jpeg" };
-    }
-    const dataUrl = await readFileAsDataUrl(file);
-    const mediaType = (file.type === "image/png" || file.type === "image/webp") ? file.type : "image/jpeg";
+
+    const bitmap = await createImageBitmap(file);
+    const canvas = document.createElement("canvas");
+    const scale = Math.min(1, MAX_PX / Math.max(bitmap.width, bitmap.height));
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    canvas.getContext("2d")!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+
+    const mediaType = (!isHeic && file.type === "image/png") ? "image/png" : "image/jpeg";
+    const quality = mediaType === "image/jpeg" ? 0.85 : undefined;
+    const dataUrl = canvas.toDataURL(mediaType, quality);
     return { dataUrl, base64: dataUrl.split(",")[1], mediaType };
   }
 
