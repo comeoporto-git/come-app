@@ -38,12 +38,7 @@ export default auth((req) => {
   if (pathname.startsWith("/super-guide") && role !== "Super Guide" && role !== "Admin") {
     return NextResponse.redirect(new URL("/unauthorized", req.url));
   }
-  const superGuideAdminPaths = ["/admin/analytics", "/admin/gestao-servicos", "/admin/servicos", "/admin/em-falta"];
-  if (
-    pathname.startsWith("/admin") &&
-    role !== "Admin" &&
-    !(role === "Super Guide" && superGuideAdminPaths.some((p) => pathname.startsWith(p)))
-  ) {
+  if (pathname.startsWith("/admin") && role !== "Admin") {
     return NextResponse.redirect(new URL("/unauthorized", req.url));
   }
 
