@@ -71,6 +71,31 @@ export function AddExpenseModal({
   const fileRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
 
+  async function readFileAsDataUrl(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (ev) => resolve(ev.target?.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function normalizeImage(file: File): Promise<{ dataUrl: string; base64: string; mediaType: "image/jpeg" | "image/png" | "image/webp" }> {
+    const isHeic = file.type === "image/heic" || file.type === "image/heif" || file.name.toLowerCase().endsWith(".heic") || file.name.toLowerCase().endsWith(".heif");
+    if (isHeic) {
+      const bitmap = await createImageBitmap(file);
+      const canvas = document.createElement("canvas");
+      canvas.width = bitmap.width;
+      canvas.height = bitmap.height;
+      canvas.getContext("2d")!.drawImage(bitmap, 0, 0);
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
+      return { dataUrl, base64: dataUrl.split(",")[1], mediaType: "image/jpeg" };
+    }
+    const dataUrl = await readFileAsDataUrl(file);
+    const mediaType = (file.type === "image/png" || file.type === "image/webp") ? file.type : "image/jpeg";
+    return { dataUrl, base64: dataUrl.split(",")[1], mediaType };
+  }
+
   async function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -84,28 +109,22 @@ export function AddExpenseModal({
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = async (ev) => {
-      const dataUrl = ev.target?.result as string;
+    setScanning(true);
+    setError("");
+    try {
+      const { dataUrl, base64, mediaType } = await normalizeImage(file);
       setImageDataUrl(dataUrl);
-      const base64 = dataUrl.split(",")[1];
       setImageBase64(base64);
-      const mt = file.type as "image/jpeg" | "image/png" | "image/webp";
-      setScanning(true);
-      setError("");
-      try {
-        const result = await analyzeInvoice(base64, mt, fornecedores.map((f) => f.name));
-        setAiResult(result);
-        setForm(result);
-        setMode("review");
-      } catch {
-        setError("Erro ao analisar a imagem. Podes editar manualmente.");
-        setMode("manual");
-      } finally {
-        setScanning(false);
-      }
-    };
-    reader.readAsDataURL(file);
+      const result = await analyzeInvoice(base64, mediaType, fornecedores.map((f) => f.name));
+      setAiResult(result);
+      setForm(result);
+      setMode("review");
+    } catch {
+      setError("Erro ao analisar a imagem. Podes editar manualmente.");
+      setMode("manual");
+    } finally {
+      setScanning(false);
+    }
   }
 
   function update(field: keyof InvoiceData, value: string | number) {
@@ -344,7 +363,7 @@ export function AddExpenseModal({
                   <input
                     ref={cameraRef}
                     type="file"
-                    accept="image/jpeg,image/png,image/webp"
+                    accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
                     className="hidden"
                     onChange={handleImageChange}
                     capture="environment"
@@ -352,7 +371,7 @@ export function AddExpenseModal({
                   <input
                     ref={fileRef}
                     type="file"
-                    accept="image/jpeg,image/png,image/webp,application/pdf"
+                    accept="image/jpeg,image/png,image/webp,image/heic,image/heif,application/pdf"
                     className="hidden"
                     onChange={handleImageChange}
                   />
