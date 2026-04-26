@@ -68,7 +68,7 @@ export const FEATURES: Feature[] = [
     label: "Gestão de Serviços",
     description: "Configurar tipos de tour e serviço",
     path: "/admin/gestao-servicos",
-    defaultRoles: ["Admin"],
+    defaultRoles: ["Admin", "Super Guide"],
   },
   {
     key: "user_management",
