@@ -168,15 +168,15 @@ export async function updateTeamMemberProfile(
 export async function getServicesWithMissingInfo(): Promise<Tour[]> {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const nextWeek = new Date(today);
-  nextWeek.setDate(nextWeek.getDate() + 7);
+  const in30Days = new Date(today);
+  in30Days.setDate(in30Days.getDate() + 30);
 
   const res = await notion.databases.query({
     database_id: TOURS_DB,
     filter: {
       and: [
         { property: "Date", date: { on_or_after: today.toISOString() } },
-        { property: "Date", date: { before: nextWeek.toISOString() } },
+        { property: "Date", date: { before: in30Days.toISOString() } },
       ],
     },
     sorts: [{ property: "Date", direction: "ascending" }],
@@ -198,15 +198,15 @@ export async function getPendingServices(): Promise<Tour[]> {
   try {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const in15Days = new Date(today);
-    in15Days.setDate(in15Days.getDate() + 15);
+    const in30Days = new Date(today);
+    in30Days.setDate(in30Days.getDate() + 30);
 
     const res = await notion.databases.query({
       database_id: TOURS_DB,
       filter: {
         and: [
           { property: "Date", date: { on_or_after: today.toISOString() } },
-          { property: "Date", date: { before: in15Days.toISOString() } },
+          { property: "Date", date: { before: in30Days.toISOString() } },
           { property: "Status", select: { equals: "Pending" } },
         ],
       },
@@ -246,15 +246,15 @@ export async function getServicesWithMissingStaff(): Promise<TourWithMissingStaf
   try {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const nextWeek = new Date(today);
-    nextWeek.setDate(nextWeek.getDate() + 7);
+    const in30Days = new Date(today);
+    in30Days.setDate(in30Days.getDate() + 30);
 
     const res = await notion.databases.query({
       database_id: TOURS_DB,
       filter: {
         and: [
           { property: "Date", date: { on_or_after: today.toISOString() } },
-          { property: "Date", date: { before: nextWeek.toISOString() } },
+          { property: "Date", date: { before: in30Days.toISOString() } },
         ],
       },
       sorts: [{ property: "Date", direction: "ascending" }],

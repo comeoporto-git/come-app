@@ -92,7 +92,7 @@ export default async function GestaoToursPage() {
           <div className="px-5 py-4 border-b border-gray-50 flex items-center justify-between">
             <div>
               <h2 className="text-sm font-semibold text-[#32373c]">Equipa em Falta</h2>
-              <p className="text-xs text-gray-400 mt-0.5">Próximos 7 dias · funções por atribuir</p>
+              <p className="text-xs text-gray-400 mt-0.5">Próximos 30 dias · funções por atribuir</p>
             </div>
             {missingStaffServices.length > 0 && (
               <span className="text-xs bg-orange-500 text-white font-bold px-2.5 py-1 rounded-full">
@@ -101,7 +101,7 @@ export default async function GestaoToursPage() {
             )}
           </div>
           {missingStaffServices.length === 0 ? (
-            <div className="px-5 py-6 text-center text-sm text-gray-400">✅ Toda a equipa atribuída para os próximos 7 dias</div>
+            <div className="px-5 py-6 text-center text-sm text-gray-400">✅ Toda a equipa atribuída para os próximos 30 dias</div>
           ) : (
             <ul className="divide-y divide-gray-50">
               {missingStaffServices.map((t: TourWithMissingStaff) => (
@@ -130,7 +130,7 @@ export default async function GestaoToursPage() {
           <div className="px-5 py-4 border-b border-gray-50 flex items-center justify-between">
             <div>
               <h2 className="text-sm font-semibold text-[#32373c]">Serviços Incompletos</h2>
-              <p className="text-xs text-gray-400 mt-0.5">Próximos 7 dias · campos em falta</p>
+              <p className="text-xs text-gray-400 mt-0.5">Próximos 30 dias · campos em falta</p>
             </div>
             {incompleteServices.length > 0 && (
               <span className="text-xs bg-red-500 text-white font-bold px-2.5 py-1 rounded-full">
@@ -139,7 +139,7 @@ export default async function GestaoToursPage() {
             )}
           </div>
           {incompleteServices.length === 0 ? (
-            <div className="px-5 py-6 text-center text-sm text-gray-400">✅ Tudo em ordem para os próximos 7 dias</div>
+            <div className="px-5 py-6 text-center text-sm text-gray-400">✅ Tudo em ordem para os próximos 30 dias</div>
           ) : (
             <ul className="divide-y divide-gray-50">
               {incompleteServices.map((t) => {
@@ -170,7 +170,7 @@ export default async function GestaoToursPage() {
           <div className="px-5 py-4 border-b border-gray-50 flex items-center justify-between">
             <div>
               <h2 className="text-sm font-semibold text-[#32373c]">Serviços Pendentes</h2>
-              <p className="text-xs text-gray-400 mt-0.5">Próximos 15 dias · estado Pending</p>
+              <p className="text-xs text-gray-400 mt-0.5">Próximos 30 dias · estado Pending</p>
             </div>
             {pendingServices.length > 0 && (
               <span className="text-xs bg-yellow-500 text-white font-bold px-2.5 py-1 rounded-full">
