@@ -20,7 +20,6 @@ export default async function SuperGuideDashboard() {
   const transferenciasCount = guideExpenses.length;
 
   const cards = [
-    { href: "/guide/services",     icon: "🗓️", label: "Serviços",                 sub: "Ver os teus serviços",         bg: "bg-[#667470]/10", badge: 0 },
     { href: "/super-guide/invoices", icon: "🧾", label: "Faturas em Falta",         sub: "Sem fatura associada",         bg: "bg-orange-50",    badge: pendingCount },
     { href: "/admin/em-falta",      icon: "💸", label: "Transferências em Falta",   sub: "Despesas pagas pelos guias",   bg: "bg-red-50",       badge: transferenciasCount },
     { href: "/profile",             icon: "👤", label: "Perfil",                   sub: "Ver e editar os teus dados",   bg: "bg-[#667470]/10", badge: 0 },
