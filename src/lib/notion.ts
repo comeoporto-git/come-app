@@ -1108,18 +1108,18 @@ export async function getGuideExpenses(): Promise<Transaction[]> {
 
     const transactions = (res.results as PageObjectResponse[]).map(mapTransaction);
 
-    // Resolve who paid by looking up the guide/chef assigned to the linked tour
     const uniqueTourIds = [...new Set(transactions.map((t) => t.tourId).filter(Boolean))] as string[];
-    if (uniqueTourIds.length === 0) return transactions;
 
     const [teamMembers, tourPages] = await Promise.all([
       getTeamMembers(),
       Promise.all(uniqueTourIds.map((id) => notion.pages.retrieve({ page_id: id }).catch(() => null))),
     ]);
 
-    const memberMap = Object.fromEntries(teamMembers.map((m) => [m.id, { name: m.name, iban: m.iban }]));
-    const tourMemberMap: Record<string, { guide?: string; chef?: string; driver?: string }> = {};
+    // id → { name, iban } and name (lowercase) → iban for Honorários lookup
+    const memberById = Object.fromEntries(teamMembers.map((m) => [m.id, { name: m.name, iban: m.iban }]));
+    const ibanByName = Object.fromEntries(teamMembers.map((m) => [m.name.toLowerCase(), m.iban]));
 
+    const tourMemberMap: Record<string, { guide?: string; chef?: string; driver?: string }> = {};
     for (let i = 0; i < uniqueTourIds.length; i++) {
       const page = tourPages[i] as PageObjectResponse | null;
       if (!page || !("properties" in page)) continue;
@@ -1131,14 +1131,16 @@ export async function getGuideExpenses(): Promise<Transaction[]> {
     }
 
     return transactions.map((t) => {
-      if (t.paymentMethod === "Honorários") return { ...t, paidByName: t.supplier };
+      if (t.paymentMethod === "Honorários") {
+        return { ...t, paidByName: t.supplier, payeeIban: ibanByName[t.supplier.toLowerCase()] ?? "" };
+      }
       if (!t.tourId) return t;
       const members = tourMemberMap[t.tourId];
       if (!members) return t;
       const memberId = t.paymentMethod === "Pelo Chef" ? members.chef
                      : t.paymentMethod === "Pelo Driver" ? members.driver
                      : members.guide;
-      const member = memberId ? memberMap[memberId] : undefined;
+      const member = memberId ? memberById[memberId] : undefined;
       return { ...t, paidByName: member?.name ?? "", payeeIban: member?.iban ?? "" };
     });
   } catch { return []; }
