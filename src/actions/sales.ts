@@ -1,6 +1,6 @@
 "use server";
 
-import { updateTransaction, updateSaleStatus } from "@/lib/notion";
+import { notion, updateSaleStatus } from "@/lib/notion";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 
@@ -21,12 +21,19 @@ export async function markSaleInvoicedAction(
       return { error: "Forbidden" };
     }
 
-    await updateTransaction(existingTransactionId, {
-      date: data.date,
-      taxFree: data.taxFree,
-      iva23: data.iva23,
-      totalCost: data.totalAmount,
-      ...(data.invoiceImageUrl ? { invoiceImageUrl: data.invoiceImageUrl } : {}),
+    // Update earnings transaction directly — Valor must be positive (income, not expense)
+    await notion.pages.update({
+      page_id: existingTransactionId,
+      properties: {
+        Data: { date: { start: data.date } },
+        "Valor Sem IVA": { number: data.taxFree },
+        "IVA 23%": { number: data.iva23 },
+        Valor: { number: data.totalAmount }, // positive for earnings
+        ...(data.invoiceImageUrl
+          ? { Fatura: { files: [{ type: "external", name: "fatura", external: { url: data.invoiceImageUrl } }] } }
+          : {}),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any,
     });
 
     await updateSaleStatus(saleNotionId, "Invoiced");
