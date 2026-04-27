@@ -155,12 +155,36 @@ function GuideExpenseRow({ expense }: { expense: Transaction }) {
 }
 
 export function GuideExpensesList({ expenses }: { expenses: Transaction[] }) {
+  const ready = expenses.filter((e) => !!(e.invoiceId || e.invoiceImageUrl));
+  const waitingForInvoice = expenses.filter((e) => !(e.invoiceId || e.invoiceImageUrl));
+
   return (
-    <ul className="divide-y divide-gray-50">
-      {expenses.map((expense) => (
-        <GuideExpenseRow key={expense.id} expense={expense} />
-      ))}
-    </ul>
+    <div>
+      {ready.length > 0 && (
+        <div>
+          <div className="px-5 py-2 bg-green-50 border-b border-green-100">
+            <p className="text-xs font-semibold text-green-700">✓ Prontas a transferir ({ready.length})</p>
+          </div>
+          <ul className="divide-y divide-gray-50">
+            {ready.map((expense) => (
+              <GuideExpenseRow key={expense.id} expense={expense} />
+            ))}
+          </ul>
+        </div>
+      )}
+      {waitingForInvoice.length > 0 && (
+        <div>
+          <div className="px-5 py-2 bg-orange-50 border-b border-orange-100 border-t border-t-gray-100">
+            <p className="text-xs font-semibold text-orange-600">⏳ Aguardam Fatura ({waitingForInvoice.length})</p>
+          </div>
+          <ul className="divide-y divide-gray-50 opacity-60">
+            {waitingForInvoice.map((expense) => (
+              <GuideExpenseRow key={expense.id} expense={expense} />
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
   );
 }
 
