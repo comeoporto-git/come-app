@@ -228,7 +228,10 @@ export function AddExpenseModal({
                  : effectivePaymentMethod === "Pelo Driver" ? "Driver"
                  : "Company",
           paymentMethod: effectivePaymentMethod,
-          status: notPaidYet ? "Pending Payment" : form.invoiceId ? "Paid" : "Pending Receipt",
+          status: isHonorarios ? "Pending Receipt"
+                 : notPaidYet ? "Pending Payment"
+                 : form.invoiceId ? "Paid"
+                 : "Pending Receipt",
           tourId,
           bankReference: "",
           invoiceImageUrl,
@@ -566,8 +569,8 @@ export function AddExpenseModal({
                 </label>
               )}
 
-              {/* Not paid yet checkbox */}
-              {!pendingTransaction && (
+              {/* Not paid yet checkbox — hidden for Honorários (always Pending Receipt at creation) */}
+              {!pendingTransaction && !honorariosMember && (
                 <label className="flex items-center gap-3 cursor-pointer select-none">
                   <div
                     onClick={() => setNotPaidYet((v) => !v)}

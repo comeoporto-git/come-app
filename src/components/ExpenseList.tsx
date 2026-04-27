@@ -75,18 +75,24 @@ export function ExpenseList({
                 )}
               </div>
               <div className="text-right shrink-0">
-                <p className="text-sm font-semibold text-gray-900">€{tx.totalCost.toFixed(2)}</p>
-                <span
-                  className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                    (tx.whoPaid === "Guide" || tx.whoPaid === "Chef" || tx.whoPaid === "Driver") && tx.status === "Paid"
-                      ? "bg-yellow-100 text-yellow-700"
-                      : STATUS_COLORS[tx.status] ?? "bg-gray-100 text-gray-500"
-                  }`}
-                >
-                  {(tx.whoPaid === "Guide" || tx.whoPaid === "Chef" || tx.whoPaid === "Driver") && tx.status === "Paid"
-                    ? "Aguarda Reembolso"
-                    : tx.status}
-                </span>
+                <p className="text-sm font-semibold text-gray-900">€{Math.abs(tx.totalCost).toFixed(2)}</p>
+                {(() => {
+                  const isGuideEtc = tx.whoPaid === "Guide" || tx.whoPaid === "Chef" || tx.whoPaid === "Driver";
+                  // "Pending Payment" with no receipt yet = receipt still needed first
+                  const noReceipt = !tx.invoiceId && !tx.invoiceImageUrl;
+                  const displayStatus = (tx.status === "Pending Payment" && noReceipt)
+                    ? "Pending Receipt"
+                    : tx.status;
+                  const label = (isGuideEtc && tx.status === "Paid") ? "Aguarda Reembolso" : displayStatus;
+                  const colorClass = (isGuideEtc && tx.status === "Paid")
+                    ? "bg-yellow-100 text-yellow-700"
+                    : STATUS_COLORS[displayStatus] ?? "bg-gray-100 text-gray-500";
+                  return (
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${colorClass}`}>
+                      {label}
+                    </span>
+                  );
+                })()}
               </div>
             </div>
 
