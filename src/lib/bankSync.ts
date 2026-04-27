@@ -23,7 +23,6 @@ import {
   getPeloGuiaTransactionsForMatching,
   getUnmatchedBankTransactions,
   getMatchedTransactionMap,
-  createTransaction,
   updateTransaction,
 } from "@/lib/notion";
 
@@ -135,6 +134,9 @@ export async function doMatch(): Promise<MatchResult> {
   const errors: string[] = [];
 
   // ── Load candidates ────────────────────────────────────────────────────────
+  // knownRefs: bank refs that already have an Unmatched entry in Notion (legacy).
+  // We no longer create new unmatched placeholders, but keep this check so that
+  // any previously-created "Unmatched Bank Entry" records aren't double-processed.
   let existingUnmatched: Awaited<ReturnType<typeof getUnmatchedBankTransactions>> = [];
   try { existingUnmatched = await getUnmatchedBankTransactions(); } catch (e) {
     errors.push(`getUnmatchedBankTransactions: ${e instanceof Error ? e.message : String(e)}`);
@@ -222,29 +224,10 @@ export async function doMatch(): Promise<MatchResult> {
     }
     if (matched2) continue;
 
-    // No match — create unmatched placeholder in Notion
-    try {
-      await createTransaction({
-        supplier:      merchantName,
-        fornecedorId:  null,
-        date:          txn.transaction_date,
-        invoiceId:     "",
-        taxFree:       bankAmount,
-        iva6:          0,
-        iva13:         0,
-        iva23:         0,
-        totalCost:     bankAmount,
-        whoPaid:       "Company",
-        paymentMethod: "Cartão COME",
-        status:        "Unmatched Bank Entry",
-        tourId:        null,
-        bankReference: bankRef,
-      });
-      knownRefs.add(bankRef);
-      unmatched++;
-    } catch (err) {
-      errors.push(`createTransaction ${bankRef}: ${err instanceof Error ? err.message : String(err)}`);
-    }
+    // No match — record in the counter only; do NOT create Notion transactions.
+    // Unmatched bank entries are visible in the bank ledger (Neon) but the team
+    // is responsible for adding transactions manually in the app.
+    unmatched++;
   }
 
   // ── Flag entries whose bank payments are missing ───────────────────────────
