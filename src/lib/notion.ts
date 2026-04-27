@@ -1094,15 +1094,16 @@ export async function getGuideExpenses(): Promise<Transaction[]> {
       database_id: TRANSACTIONS_DB,
       filter: {
         and: [
+          { property: "Transferência Feita", checkbox: { equals: false } },
           {
             or: [
               { property: "Método de Pagamento", select: { equals: "Pelo Guia" } },
               { property: "Método de Pagamento", select: { equals: "Pelo Chef" } },
               { property: "Método de Pagamento", select: { equals: "Pelo Driver" } },
               { property: "Método de Pagamento", select: { equals: "Honorários" } },
+              { property: "Status", select: { equals: "Pending Payment" } },
             ],
           },
-          { property: "Transferência Feita", checkbox: { equals: false } },
         ],
       },
       sorts: [{ property: "Data", direction: "descending" }],

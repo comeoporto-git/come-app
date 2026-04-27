@@ -54,14 +54,21 @@ function GuideExpenseRow({ expense }: { expense: Transaction }) {
     ? new Date(expense.date).toLocaleDateString("pt-PT", { day: "numeric", month: "short", year: "numeric" })
     : "—";
 
+  const isPendingPayment = expense.status === "Pending Payment";
+
   return (
     <li className="px-5 py-4 space-y-3">
       {/* Top row: supplier + amount */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-[#32373c] truncate">{expense.supplier}</p>
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-semibold text-[#32373c] truncate">{expense.supplier}</p>
+            {isPendingPayment && (
+              <span className="text-xs bg-orange-100 text-orange-700 font-semibold px-2 py-0.5 rounded-full shrink-0">A pagar</span>
+            )}
+          </div>
           <p className="text-xs text-gray-400 mt-0.5">{dateStr}</p>
-          {expense.paidByName && (
+          {expense.paidByName && !isPendingPayment && (
             <p className="text-xs font-medium text-[#667470] mt-0.5">Pago por: {expense.paidByName}</p>
           )}
           {expense.payeeIban && (

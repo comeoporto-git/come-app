@@ -39,7 +39,7 @@ export default async function TransferenciasPage() {
           <div className="px-5 py-4 border-b border-gray-50 flex items-center justify-between">
             <div>
               <h2 className="text-sm font-semibold text-[#32373c]">Transferências em Falta</h2>
-              <p className="text-xs text-gray-400 mt-0.5">Despesas pagas pelo guia · aguardam reembolso</p>
+              <p className="text-xs text-gray-400 mt-0.5">Reembolsos pendentes e pagamentos por fazer</p>
             </div>
             {guideExpenses.length > 0 && (
               <span className="text-xs bg-red-500 text-white font-bold px-2.5 py-1 rounded-full">

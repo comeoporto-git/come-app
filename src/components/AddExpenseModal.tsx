@@ -63,6 +63,7 @@ export function AddExpenseModal({
   const [paymentMethod, setPaymentMethod] = useState<string>(defaultPaymentMethod);
   const [honorariosMember, setHonorariosMember] = useState<string>("");
   const [needsInvoice, setNeedsInvoice] = useState(false);
+  const [notPaidYet, setNotPaidYet] = useState(false);
 
   // Local fornecedor list (grows if user creates a new one)
   const [fornecedores, setFornecedores] = useState<Fornecedor[]>(initialFornecedores);
@@ -214,7 +215,7 @@ export function AddExpenseModal({
                  : effectivePaymentMethod === "Pelo Driver" ? "Driver"
                  : "Company",
           paymentMethod: effectivePaymentMethod,
-          status: form.invoiceId ? "Paid" : "Pending Receipt",
+          status: notPaidYet ? "Pending Payment" : form.invoiceId ? "Paid" : "Pending Receipt",
           tourId,
           bankReference: "",
           invoiceImageUrl,
@@ -548,6 +549,30 @@ export function AddExpenseModal({
                     )}
                   </div>
                   <span className="text-sm text-gray-700">Precisa de Fatura</span>
+                </label>
+              )}
+
+              {/* Not paid yet checkbox */}
+              {!pendingTransaction && (
+                <label className="flex items-center gap-3 cursor-pointer select-none">
+                  <div
+                    onClick={() => setNotPaidYet((v) => !v)}
+                    className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+                      notPaidYet
+                        ? "bg-orange-500 border-orange-500"
+                        : "border-gray-300 bg-white"
+                    }`}
+                  >
+                    {notPaidYet && (
+                      <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="none">
+                        <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    )}
+                  </div>
+                  <div>
+                    <span className="text-sm text-gray-700">Ainda não pago</span>
+                    <p className="text-xs text-gray-400">Aparece em Transferências em Falta</p>
+                  </div>
                 </label>
               )}
 
