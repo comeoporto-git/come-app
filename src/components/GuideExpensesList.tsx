@@ -61,6 +61,9 @@ function GuideExpenseRow({ expense }: { expense: Transaction }) {
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-[#32373c] truncate">{expense.supplier}</p>
           <p className="text-xs text-gray-400 mt-0.5">{dateStr}</p>
+          {expense.paidByName && (
+            <p className="text-xs font-medium text-[#667470] mt-0.5">Pago por: {expense.paidByName}</p>
+          )}
           {expense.tourName && (
             <p className="text-xs text-gray-400">Serviço: {expense.tourName}</p>
           )}

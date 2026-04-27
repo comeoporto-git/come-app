@@ -680,6 +680,7 @@ export type Transaction = {
   precisaDeFatura?: "Sim" | "Não" | "Sim tratado" | "";
   transferenciaFeita?: boolean;
   comprovantivoUrl?: string;
+  paidByName?: string;
 };
 
 function mapTransaction(page: PageObjectResponse): Transaction {
@@ -1089,14 +1090,49 @@ export async function getGuideExpenses(): Promise<Transaction[]> {
       database_id: TRANSACTIONS_DB,
       filter: {
         and: [
-          { property: "Método de Pagamento", select: { equals: "Pelo Guia" } },
+          {
+            or: [
+              { property: "Método de Pagamento", select: { equals: "Pelo Guia" } },
+              { property: "Método de Pagamento", select: { equals: "Pelo Chef" } },
+            ],
+          },
           { property: "Transferência Feita", checkbox: { equals: false } },
         ],
       },
       sorts: [{ property: "Data", direction: "descending" }],
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
-    return (res.results as PageObjectResponse[]).map(mapTransaction);
+
+    const transactions = (res.results as PageObjectResponse[]).map(mapTransaction);
+
+    // Resolve who paid by looking up the guide/chef assigned to the linked tour
+    const uniqueTourIds = [...new Set(transactions.map((t) => t.tourId).filter(Boolean))] as string[];
+    if (uniqueTourIds.length === 0) return transactions;
+
+    const [teamMembers, tourPages] = await Promise.all([
+      getTeamMembers(),
+      Promise.all(uniqueTourIds.map((id) => notion.pages.retrieve({ page_id: id }).catch(() => null))),
+    ]);
+
+    const memberMap = Object.fromEntries(teamMembers.map((m) => [m.id, m.name]));
+    const tourMemberMap: Record<string, { guide?: string; chef?: string }> = {};
+
+    for (let i = 0; i < uniqueTourIds.length; i++) {
+      const page = tourPages[i] as PageObjectResponse | null;
+      if (!page || !("properties" in page)) continue;
+      tourMemberMap[uniqueTourIds[i]] = {
+        guide: relation(getProp(page, "🧭 Guide"))[0],
+        chef:  relation(getProp(page, "👨‍🍳 Chef"))[0],
+      };
+    }
+
+    return transactions.map((t) => {
+      if (!t.tourId) return t;
+      const members = tourMemberMap[t.tourId];
+      if (!members) return t;
+      const memberId = t.paymentMethod === "Pelo Chef" ? members.chef : members.guide;
+      return { ...t, paidByName: memberId ? (memberMap[memberId] ?? "") : "" };
+    });
   } catch { return []; }
 }
 

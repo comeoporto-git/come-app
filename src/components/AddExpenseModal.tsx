@@ -450,8 +450,8 @@ export function AddExpenseModal({
                 />
               )}
 
-              {/* Payment method — hidden for chefs (fixed by expense type) */}
-              {!isChef && (
+              {/* Payment method — Super Guide/Admin choose; plain guides/chefs fixed */}
+              {isSuperGuide && (
                 <div>
                   <label className="text-xs text-gray-500 mb-1 block">Método de Pagamento</label>
                   <select
@@ -459,7 +459,7 @@ export function AddExpenseModal({
                     onChange={(e) => setPaymentMethod(e.target.value)}
                     className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
                   >
-                    {isSuperGuide && <option value="Cartão COME">Cartão COME</option>}
+                    <option value="Cartão COME">Cartão COME</option>
                     <option value="Pelo Guia">Pelo Guia</option>
                   </select>
                 </div>
