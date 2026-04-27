@@ -461,6 +461,7 @@ export function AddExpenseModal({
                   >
                     <option value="Cartão COME">Cartão COME</option>
                     <option value="Pelo Guia">Pelo Guia</option>
+                    <option value="Pelo Chef">Pelo Chef</option>
                   </select>
                 </div>
               )}
