@@ -105,6 +105,18 @@ export async function linkBankTransactionAction(
 }
 
 /**
+ * Remove the link between a bank transaction and a Notion expense by clearing
+ * the bankReference field and resetting the status to "Pending Payment".
+ */
+export async function unlinkBankTransactionAction(
+  notionExpenseId: string,
+): Promise<void> {
+  await requireAdmin();
+  await updateTransaction(notionExpenseId, { bankReference: "", status: "Pending Payment" });
+  revalidatePath("/admin/reconciliation");
+}
+
+/**
  * Run matching on ALL unmatched bank transactions against ALL unmatched Notion
  * records. Debits matched against expenses; credits matched against earnings
  * ("IN - ..."). Uses same tolerance as the nightly sync.

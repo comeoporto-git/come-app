@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useMemo, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { linkBankTransactionAction, dismissUnmatchedAction, runManualMatchAction } from "@/actions/banking";
+import { linkBankTransactionAction, dismissUnmatchedAction, runManualMatchAction, unlinkBankTransactionAction } from "@/actions/banking";
 import type { StoredTransaction } from "@/lib/enablebanking";
 import type { Transaction } from "@/lib/notion";
 
@@ -110,6 +110,31 @@ function ExpensePicker({
 
 // ── Row ───────────────────────────────────────────────────────────────────────
 
+function UnlinkButton({ notionId, onUnlinked }: { notionId: string; onUnlinked: () => void }) {
+  const [confirming, setConfirming] = useState(false);
+  const [pending, startTransition] = useTransition();
+
+  if (!confirming) {
+    return (
+      <button onClick={() => setConfirming(true)}
+        className="text-[10px] text-gray-300 hover:text-red-400 transition-colors ml-1" title="Remover ligação">
+        ✕
+      </button>
+    );
+  }
+  return (
+    <span className="flex items-center gap-1 ml-1">
+      <button
+        disabled={pending}
+        onClick={() => startTransition(async () => { await unlinkBankTransactionAction(notionId); onUnlinked(); })}
+        className="text-[10px] font-semibold text-red-500 hover:text-red-700 disabled:opacity-50">
+        {pending ? "…" : "Confirmar"}
+      </button>
+      <button onClick={() => setConfirming(false)} className="text-[10px] text-gray-400">Cancelar</button>
+    </span>
+  );
+}
+
 function LedgerRow({
   bankTxn, matched, placeholderId, linkableExpenses, linkableEarnings,
 }: {
@@ -119,6 +144,7 @@ function LedgerRow({
   linkableExpenses: Transaction[];
   linkableEarnings: Transaction[];
 }) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   const [dismissPending, startDismiss] = useTransition();
@@ -192,7 +218,10 @@ function LedgerRow({
         <div className="min-w-0 col-span-1 space-y-2">
           {matched.map((m, idx) => (
             <div key={m.id} className={`${idx > 0 ? "border-t border-gray-100 pt-2" : ""}`}>
-              <p className="text-xs font-semibold text-gray-800 truncate">{m.supplier || "—"}</p>
+              <div className="flex items-center gap-1">
+                <p className="text-xs font-semibold text-gray-800 truncate flex-1">{m.supplier || "—"}</p>
+                <UnlinkButton notionId={m.id} onUnlinked={() => router.refresh()} />
+              </div>
               <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-gray-500">
                 <span className="font-semibold text-gray-700">{fmtEur(Math.abs(m.totalCost))}</span>
                 {m.date && <span>{fmtDate(m.date)}</span>}
