@@ -134,6 +134,7 @@ export async function finishPendingExpenseAction(
   totalCost: number,
   tourId: string | null,
   invoiceImageUrl?: string,
+  originalStatus?: string,
 ): Promise<{ error?: string }> {
   try {
     const session = await requireAuth();
@@ -152,7 +153,8 @@ export async function finishPendingExpenseAction(
       iva13,
       iva23,
       totalCost,
-      status: "Paid",
+      // Keep "Pending Payment" — invoice added but transfer not yet done
+      status: originalStatus === "Pending Payment" ? "Pending Payment" : "Paid",
       ...(invoiceImageUrl ? { invoiceImageUrl } : {}),
     });
     revalidatePath(`/guide/tours/${tourId}`);

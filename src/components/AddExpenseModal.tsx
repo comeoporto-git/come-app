@@ -99,27 +99,38 @@ export function AddExpenseModal({
     const file = e.target.files?.[0];
     if (!file) return;
     setImageFile(file);
-
-    if (file.type === "application/pdf") {
-      setImageDataUrl("");
-      setImageBase64("");
-      setError("");
-      setMode("manual");
-      return;
-    }
-
     setScanning(true);
     setError("");
+
     try {
-      const { dataUrl, base64, mediaType } = await normalizeImage(file);
-      setImageDataUrl(dataUrl);
-      setImageBase64(base64);
-      const result = await analyzeInvoice(base64, mediaType, fornecedores.map((f) => f.name));
-      setAiResult(result);
-      setForm(result);
-      setMode("review");
+      if (file.type === "application/pdf") {
+        // Read PDF as base64 and send to AI
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+            const dataUrl = ev.target?.result as string;
+            resolve(dataUrl.split(",")[1]);
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+        setImageDataUrl("pdf");
+        setImageBase64(base64);
+        const result = await analyzeInvoice(base64, "application/pdf", fornecedores.map((f) => f.name));
+        setAiResult(result);
+        setForm(result);
+        setMode("review");
+      } else {
+        const { dataUrl, base64, mediaType } = await normalizeImage(file);
+        setImageDataUrl(dataUrl);
+        setImageBase64(base64);
+        const result = await analyzeInvoice(base64, mediaType, fornecedores.map((f) => f.name));
+        setAiResult(result);
+        setForm(result);
+        setMode("review");
+      }
     } catch {
-      setError("Erro ao analisar a imagem. Podes editar manualmente.");
+      setError("Erro ao analisar o ficheiro. Podes editar manualmente.");
       setMode("manual");
     } finally {
       setScanning(false);
@@ -183,6 +194,7 @@ export function AddExpenseModal({
           form.totalCost,
           tourId,
           invoiceImageUrl,
+          pendingTransaction.status,
         );
         if (result?.error) throw new Error(result.error);
       } else {
@@ -190,6 +202,7 @@ export function AddExpenseModal({
         const isHonorarios = !!honorariosMember;
         const effectivePaymentMethod = isChef
           ? (chefExpenseType === "service-invoice" ? "Chef Fee" : "Pelo Chef")
+          : isHonorarios ? "Honorários"
           : paymentMethod;
 
         const selectedFornecedor = fornecedores.find(
@@ -513,8 +526,8 @@ export function AddExpenseModal({
                 />
               )}
 
-              {/* Payment method — Super Guide/Admin choose */}
-              {isSuperGuide && (
+              {/* Payment method — Super Guide/Admin choose; not shown for honorários (always "Honorários") */}
+              {isSuperGuide && !honorariosMember && (
                 <div>
                   <label className="text-xs text-gray-500 mb-1 block">Método de Pagamento</label>
                   <select
@@ -522,20 +535,11 @@ export function AddExpenseModal({
                     onChange={(e) => setPaymentMethod(e.target.value)}
                     className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
                   >
-                    {honorariosMember ? (
-                      <>
-                        <option value="Transferência Bancária COME">Transferência Bancária COME</option>
-                        <option value="Cartão COME">Cartão COME</option>
-                      </>
-                    ) : (
-                      <>
-                        <option value="Cartão COME">Cartão COME</option>
-                        <option value="Transferência Bancária COME">Transferência Bancária COME</option>
-                        <option value="Pelo Guia">Pelo Guia</option>
-                        <option value="Pelo Chef">Pelo Chef</option>
-                        <option value="Pelo Driver">Pelo Driver</option>
-                      </>
-                    )}
+                    <option value="Cartão COME">Cartão COME</option>
+                    <option value="Transferência Bancária COME">Transferência Bancária COME</option>
+                    <option value="Pelo Guia">Pelo Guia</option>
+                    <option value="Pelo Chef">Pelo Chef</option>
+                    <option value="Pelo Driver">Pelo Driver</option>
                   </select>
                 </div>
               )}

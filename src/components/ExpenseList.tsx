@@ -100,7 +100,7 @@ export function ExpenseList({
             )}
 
             {/* Finish pending */}
-            {tx.status === "Pending Receipt" && !isClosed && (
+            {(tx.status === "Pending Receipt" || tx.status === "Pending Payment") && !isClosed && (
               <button
                 onClick={(e) => { e.stopPropagation(); setPendingToFinish(tx); }}
                 className="mt-1 text-xs text-[#667470] font-semibold hover:underline"

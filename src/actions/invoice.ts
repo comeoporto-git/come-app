@@ -55,8 +55,8 @@ Rules:
 6. For supplier: always prefer an exact match from the KNOWN SUPPLIERS list over raw receipt text`;
 
 export async function analyzeInvoice(
-  imageBase64: string,
-  mediaType: "image/jpeg" | "image/png" | "image/webp" | "image/gif",
+  fileBase64: string,
+  mediaType: "image/jpeg" | "image/png" | "image/webp" | "image/gif" | "application/pdf",
   fornecedorNames: string[] = []
 ): Promise<InvoiceData> {
   const [fewShot, supplierContext] = await Promise.all([
@@ -66,6 +66,10 @@ export async function analyzeInvoice(
 
   const systemPrompt = BASE_SYSTEM_PROMPT + supplierContext + fewShot;
 
+  const contentBlock = mediaType === "application/pdf"
+    ? { type: "document" as const, source: { type: "base64" as const, media_type: "application/pdf" as const, data: fileBase64 } }
+    : { type: "image" as const, source: { type: "base64" as const, media_type: mediaType, data: fileBase64 } };
+
   const response = await anthropic.messages.create({
     model: "claude-sonnet-4-6",
     max_tokens: 512,
@@ -74,10 +78,8 @@ export async function analyzeInvoice(
       {
         role: "user",
         content: [
-          {
-            type: "image",
-            source: { type: "base64", media_type: mediaType, data: imageBase64 },
-          },
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          contentBlock as any,
           {
             type: "text",
             text: "Extract the invoice data from this Portuguese receipt and return only JSON.",
