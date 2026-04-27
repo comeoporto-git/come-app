@@ -291,6 +291,11 @@ async function TourPageContent({
                 fornecedores={fornecedores}
                 userRole={role}
                 chefName={chefMember?.name}
+                tourTeam={[
+                  tour.guideName ? { name: tour.guideName, role: "Guia" } : null,
+                  tour.chefName  ? { name: tour.chefName,  role: "Chef" } : null,
+                  tour.driverName ? { name: tour.driverName, role: "Motorista" } : null,
+                ].filter(Boolean) as { name: string; role: string }[]}
               />
             )}
           </div>

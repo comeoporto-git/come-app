@@ -6,7 +6,7 @@ import { logExpenseAction, finishPendingExpenseAction, createFornecedorAction } 
 import type { Transaction, Fornecedor } from "@/lib/notion";
 import { useRouter } from "next/navigation";
 
-type Mode = "chef-choose" | "choose" | "scan" | "manual" | "review";
+type Mode = "chef-choose" | "admin-choose" | "honorarios" | "choose" | "scan" | "manual" | "review";
 
 const EMPTY_FORM: InvoiceData = {
   supplier: "",
@@ -28,6 +28,7 @@ export function AddExpenseModal({
   fornecedores: initialFornecedores = [],
   userRole = "Guide",
   chefName,
+  tourTeam = [],
   onClose,
 }: {
   tourId: string;
@@ -35,14 +36,15 @@ export function AddExpenseModal({
   fornecedores?: Fornecedor[];
   userRole?: string;
   chefName?: string;
+  tourTeam?: { name: string; role: string }[];
   onClose: () => void;
 }) {
   const router = useRouter();
   const isSuperGuide = userRole === "Super Guide" || userRole === "Admin";
   const isChef = userRole === "Chef";
 
-  // Chef: start with a type choice; others go straight to choose/scan
-  const initialMode: Mode = pendingTransaction ? "scan" : isChef ? "chef-choose" : "choose";
+  // Chef/Admin: start with a type choice; others go straight to choose/scan
+  const initialMode: Mode = pendingTransaction ? "scan" : isChef ? "chef-choose" : isSuperGuide ? "admin-choose" : "choose";
 
   // "tour-expense" → ingredients / materials (Fornecedores, paymentMethod "Pelo Chef")
   // "service-invoice" → chef's own service fee (chef name as supplier, paymentMethod "Chef Fee")
@@ -56,6 +58,7 @@ export function AddExpenseModal({
   // For chefs: payment method is fixed by expense type; for others it's selectable
   const defaultPaymentMethod = isSuperGuide ? "Cartão COME" : "Pelo Guia";
   const [paymentMethod, setPaymentMethod] = useState<string>(defaultPaymentMethod);
+  const [honorariosMember, setHonorariosMember] = useState<string>("");
   const [needsInvoice, setNeedsInvoice] = useState(false);
 
   // Local fornecedor list (grows if user creates a new one)
@@ -179,17 +182,19 @@ export function AddExpenseModal({
         );
         if (result?.error) throw new Error(result.error);
       } else {
-        // Determine the effective payment method for chefs
+        // Determine the effective payment method
+        const isHonorarios = !!honorariosMember;
         const effectivePaymentMethod = isChef
           ? (chefExpenseType === "service-invoice" ? "Chef Fee" : "Pelo Chef")
+          : isHonorarios ? "Honorários"
           : paymentMethod;
 
         const selectedFornecedor = fornecedores.find(
           (f) => f.name.toLowerCase() === form.supplier.toLowerCase()
         );
-        // For service invoices the supplier is the chef's own name (no Fornecedor record)
+        // Honorários and service invoices have no Fornecedor record
         const effectiveFornecedorId =
-          chefExpenseType === "service-invoice" ? null : (selectedFornecedor?.id ?? null);
+          (chefExpenseType === "service-invoice" || isHonorarios) ? null : (selectedFornecedor?.id ?? null);
 
         const logResult = await logExpenseAction({
           supplier: form.supplier,
@@ -202,9 +207,8 @@ export function AddExpenseModal({
           iva23: form.iva23,
           totalCost: form.totalCost,
           whoPaid: effectivePaymentMethod === "Pelo Guia" ? "Guide"
-                 : effectivePaymentMethod === "Cartão COME" ? "Company"
                  : effectivePaymentMethod === "Pelo Chef" ? "Chef"
-                 : "Chef",
+                 : "Company",
           paymentMethod: effectivePaymentMethod,
           status: form.invoiceId ? "Paid" : "Pending Receipt",
           tourId,
@@ -285,6 +289,59 @@ export function AddExpenseModal({
               ? "Fatura de Serviço"
               : "Nova Despesa"}
           </h2>
+
+          {/* ADMIN: choose expense type */}
+          {mode === "admin-choose" && (
+            <div className="space-y-3">
+              <button
+                onClick={() => setMode("choose")}
+                className="w-full flex items-center gap-4 p-4 rounded-2xl border-2 border-[#667470]/30 bg-[#667470]/5 hover:bg-[#667470]/10 transition-colors text-left"
+              >
+                <span className="text-3xl flex-shrink-0">🛒</span>
+                <div>
+                  <p className="text-sm font-bold text-[#32373c]">Despesa do Serviço</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Ingredientes, materiais ou outros custos</p>
+                </div>
+              </button>
+              <button
+                onClick={() => setMode("honorarios")}
+                className="w-full flex items-center gap-4 p-4 rounded-2xl border-2 border-gray-200 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
+              >
+                <span className="text-3xl flex-shrink-0">💼</span>
+                <div>
+                  <p className="text-sm font-bold text-[#32373c]">Honorários</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Remuneração de um membro da equipa</p>
+                </div>
+              </button>
+            </div>
+          )}
+
+          {/* HONORÁRIOS: pick team member */}
+          {mode === "honorarios" && (
+            <div className="space-y-3">
+              <p className="text-sm text-gray-500 mb-1">Seleciona o membro da equipa:</p>
+              {tourTeam.filter((m) => m.name).map((member) => (
+                <button
+                  key={member.name}
+                  onClick={() => {
+                    setHonorariosMember(member.name);
+                    setForm((f) => ({ ...f, supplier: member.name }));
+                    setMode("manual");
+                  }}
+                  className="w-full flex items-center gap-4 p-4 rounded-2xl border-2 border-gray-200 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
+                >
+                  <span className="text-3xl flex-shrink-0">👤</span>
+                  <div>
+                    <p className="text-sm font-bold text-[#32373c]">{member.name}</p>
+                    <p className="text-xs text-gray-500">{member.role}</p>
+                  </div>
+                </button>
+              ))}
+              {tourTeam.filter((m) => m.name).length === 0 && (
+                <p className="text-sm text-gray-400 text-center py-4">Nenhum membro atribuído a este serviço.</p>
+              )}
+            </div>
+          )}
 
           {/* CHEF: choose expense type */}
           {mode === "chef-choose" && (
@@ -450,8 +507,8 @@ export function AddExpenseModal({
                 />
               )}
 
-              {/* Payment method — Super Guide/Admin choose; plain guides/chefs fixed */}
-              {isSuperGuide && (
+              {/* Payment method — Super Guide/Admin choose; hidden for honorários (fixed) */}
+              {isSuperGuide && !honorariosMember && (
                 <div>
                   <label className="text-xs text-gray-500 mb-1 block">Método de Pagamento</label>
                   <select

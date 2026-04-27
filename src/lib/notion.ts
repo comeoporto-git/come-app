@@ -1094,6 +1094,7 @@ export async function getGuideExpenses(): Promise<Transaction[]> {
             or: [
               { property: "Método de Pagamento", select: { equals: "Pelo Guia" } },
               { property: "Método de Pagamento", select: { equals: "Pelo Chef" } },
+              { property: "Método de Pagamento", select: { equals: "Honorários" } },
             ],
           },
           { property: "Transferência Feita", checkbox: { equals: false } },
@@ -1127,6 +1128,7 @@ export async function getGuideExpenses(): Promise<Transaction[]> {
     }
 
     return transactions.map((t) => {
+      if (t.paymentMethod === "Honorários") return { ...t, paidByName: t.supplier };
       if (!t.tourId) return t;
       const members = tourMemberMap[t.tourId];
       if (!members) return t;
