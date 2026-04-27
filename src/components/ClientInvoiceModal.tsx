@@ -3,13 +3,15 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { markSaleInvoicedAction } from "@/actions/sales";
-import type { FinalisedSale } from "@/lib/notion";
+import type { FinalisedSale, Transaction } from "@/lib/notion";
 
 export function ClientInvoiceModal({
   sale,
+  existingTransaction,
   onClose,
 }: {
   sale: FinalisedSale;
+  existingTransaction: Transaction | null;
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -28,6 +30,7 @@ export function ClientInvoiceModal({
   const totalNum = Math.round((baseNum + iva23Num) * 100) / 100;
 
   async function handleSubmit() {
+    if (!existingTransaction) { setError("Não existe transação IN- para este serviço."); return; }
     if (!baseNum) { setError("Introduz o valor base da fatura."); return; }
     setSaving(true);
     setError("");
@@ -44,9 +47,7 @@ export function ClientInvoiceModal({
         invoiceImageUrl = (await res.json()).url;
       }
 
-      const result = await markSaleInvoicedAction(sale.id, {
-        saleId: sale.saleId,
-        clientName: sale.clientName || sale.saleId,
+      const result = await markSaleInvoicedAction(sale.id, existingTransaction.id, {
         date,
         taxFree: baseNum,
         iva23: iva23Num,
@@ -78,6 +79,12 @@ export function ClientInvoiceModal({
 
         <div className="px-5 pb-8 pt-2 space-y-5">
           <h2 className="text-lg font-bold text-gray-900">Emitir Fatura</h2>
+
+          {!existingTransaction && (
+            <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 text-sm text-orange-700">
+              Sem transação IN- associada a este serviço. Cria-a primeiro no Notion.
+            </div>
+          )}
 
           {/* Sale summary */}
           <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4 space-y-2 text-sm">

@@ -78,6 +78,7 @@ export function FaturasClientesList({
       {selected && (
         <ClientInvoiceModal
           sale={selected}
+          existingTransaction={earningsBySale[selected.id] ?? null}
           onClose={() => setSelected(null)}
         />
       )}
