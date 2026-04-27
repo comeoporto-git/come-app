@@ -106,18 +106,20 @@ function mapTeamMember(page: PageObjectResponse): TeamMember {
   };
 }
 
+async function fetchTeamMembersRaw(): Promise<TeamMember[]> {
+  try {
+    const res = await notion.databases.query({
+      database_id: TEAM_DB,
+      sorts: [{ property: "Name", direction: "ascending" }],
+      page_size: 100,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
+    return (res.results as PageObjectResponse[]).map(mapTeamMember).filter((m) => m.name);
+  } catch { return []; }
+}
+
 export const getTeamMembers = unstable_cache(
-  async (): Promise<TeamMember[]> => {
-    try {
-      const res = await notion.databases.query({
-        database_id: TEAM_DB,
-        sorts: [{ property: "Name", direction: "ascending" }],
-        page_size: 100,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any);
-      return (res.results as PageObjectResponse[]).map(mapTeamMember).filter((m) => m.name);
-    } catch { return []; }
-  },
+  fetchTeamMembersRaw,
   ["team-members"],
   { revalidate: 300, tags: ["team-members"] }, // 5 min — safe to cache, changes rarely
 );
@@ -1112,7 +1114,7 @@ export async function getGuideExpenses(): Promise<Transaction[]> {
     const uniqueTourIds = [...new Set(transactions.map((t) => t.tourId).filter(Boolean))] as string[];
 
     const [teamMembers, tourPages] = await Promise.all([
-      getTeamMembers(),
+      fetchTeamMembersRaw(), // bypass cache so IBAN is always fresh
       Promise.all(uniqueTourIds.map((id) => notion.pages.retrieve({ page_id: id }).catch(() => null))),
     ]);
 
@@ -1150,7 +1152,10 @@ export async function getGuideExpenses(): Promise<Transaction[]> {
 export async function markTransferenciaFeita(pageId: string): Promise<void> {
   await notion.pages.update({
     page_id: pageId,
-    properties: { "Transferência Feita": { checkbox: true } },
+    properties: {
+      "Transferência Feita": { checkbox: true },
+      Status: { select: { name: "Paid" } },
+    },
   });
 }
 

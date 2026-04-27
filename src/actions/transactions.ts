@@ -253,6 +253,8 @@ export async function markTransferenciaFeitaAction(
   }
   await markTransferenciaFeita(transactionId);
   revalidatePath("/admin/em-falta");
+  revalidatePath("/admin/transferencias");
+  revalidatePath("/super-guide/transferencias");
 }
 
 export async function deleteExpenseAction(
