@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getDb } from "@/lib/enablebanking";
+import { getDb } from "@/lib/db";
 
 /**
  * One-time cleanup: delete duplicate bank_transactions rows where two rows
