@@ -642,6 +642,71 @@ export async function closeTour(tourId: string): Promise<void> {
   });
 }
 
+export type FinalisedSale = Tour & {
+  price1: number;
+  price23: number;
+  price46: number;
+  price7: number;
+  pricePerPax: number;
+};
+
+export async function getFinalisedSales(): Promise<FinalisedSale[]> {
+  const res = await notion.databases.query({
+    database_id: TOURS_DB,
+    filter: { property: "Status", select: { equals: "Finalised" } },
+    sorts: [{ property: "Date", direction: "descending" }],
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any);
+
+  const tours = (res.results as PageObjectResponse[]).map(mapTour);
+  const resolved = await resolveRelationNames(tours);
+
+  const serviceIds = [...new Set(resolved.map((t) => t.service).filter(Boolean))];
+  const priceMap: Record<string, { p1: number; p23: number; p46: number; p7: number }> = {};
+
+  await Promise.all(serviceIds.map(async (id) => {
+    try {
+      const page = await getCachedPage(id);
+      priceMap[id] = {
+        p1:  num(getProp(page, "1")),
+        p23: num(getProp(page, "2-3")),
+        p46: num(getProp(page, "4-6")),
+        p7:  num(getProp(page, "7+")),
+      };
+    } catch { /* ignore */ }
+  }));
+
+  return resolved.map((t) => {
+    const prices = priceMap[t.service] ?? { p1: 0, p23: 0, p46: 0, p7: 0 };
+    const pricePerPax = t.numGuests >= 7 ? prices.p7
+                      : t.numGuests >= 4 ? prices.p46
+                      : t.numGuests >= 2 ? prices.p23
+                      : prices.p1;
+    return { ...t, price1: prices.p1, price23: prices.p23, price46: prices.p46, price7: prices.p7, pricePerPax };
+  });
+}
+
+export async function getFinalisedSalesCount(): Promise<number> {
+  try {
+    const res = await notion.databases.query({
+      database_id: TOURS_DB,
+      filter: { property: "Status", select: { equals: "Finalised" } },
+      page_size: 100,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
+    return res.results.length;
+  } catch { return 0; }
+}
+
+export async function updateSaleStatus(saleId: string, status: string): Promise<void> {
+  await notion.pages.update({
+    page_id: saleId,
+    properties: {
+      Status: { select: { name: status } },
+    } as Parameters<typeof notion.pages.update>[0]["properties"],
+  });
+}
+
 // ── Transactions ──────────────────────────────────────────────────────────────
 //
 // Property name mapping (our code → your Notion DB):
