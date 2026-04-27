@@ -1,7 +1,7 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { signOut } from "@/lib/auth";
-import { getFinalisedSales } from "@/lib/notion";
+import { getFinalisedSales, getEarningsForSales } from "@/lib/notion";
 import Image from "next/image";
 import Link from "next/link";
 import { FaturasClientesList } from "@/components/FaturasClientesList";
@@ -11,6 +11,7 @@ export default async function FaturasClientesPage() {
   if (!session || session.user.role !== "Admin") redirect("/");
 
   const sales = await getFinalisedSales();
+  const earningsBySale = await getEarningsForSales(sales.map((s) => s.id));
 
   return (
     <div className="min-h-screen bg-[#667470] text-[#32373c]">
@@ -41,7 +42,7 @@ export default async function FaturasClientesPage() {
             <p className="text-sm mt-1">Nenhum serviço com estado "Finalised"</p>
           </div>
         ) : (
-          <FaturasClientesList sales={sales} />
+          <FaturasClientesList sales={sales} earningsBySale={earningsBySale} />
         )}
       </main>
     </div>

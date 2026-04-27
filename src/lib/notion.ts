@@ -823,6 +823,30 @@ export async function getEarningsForTour(tourId: string): Promise<Transaction[]>
   return (await getRawTransactionsForTour(tourId)).filter((t) => t.supplier.startsWith("IN -"));
 }
 
+/** Batch-fetch IN- earnings for multiple sale IDs in a single Notion query. */
+export async function getEarningsForSales(saleIds: string[]): Promise<Record<string, Transaction>> {
+  if (!saleIds.length) return {};
+  try {
+    const res = await notion.databases.query({
+      database_id: TRANSACTIONS_DB,
+      filter: {
+        and: [
+          { property: "ID", title: { starts_with: "IN -" } },
+          { or: saleIds.map((id) => ({ property: "🎫 Sales", relation: { contains: id } })) },
+        ],
+      },
+      page_size: 100,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
+    const result: Record<string, Transaction> = {};
+    for (const raw of res.results as PageObjectResponse[]) {
+      const t = mapTransaction(raw);
+      if (t.tourId) result[t.tourId] = t;
+    }
+    return result;
+  } catch { return {}; }
+}
+
 /**
  * Fetch expenses and earnings for a tour in a single Notion query.
  * Use this instead of calling getTransactionsForTour + getEarningsForTour

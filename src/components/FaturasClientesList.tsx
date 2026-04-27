@@ -1,10 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import type { FinalisedSale } from "@/lib/notion";
+import type { FinalisedSale, Transaction } from "@/lib/notion";
 import { ClientInvoiceModal } from "./ClientInvoiceModal";
 
-export function FaturasClientesList({ sales }: { sales: FinalisedSale[] }) {
+export function FaturasClientesList({
+  sales,
+  earningsBySale,
+}: {
+  sales: FinalisedSale[];
+  earningsBySale: Record<string, Transaction>;
+}) {
   const [selected, setSelected] = useState<FinalisedSale | null>(null);
 
   return (
@@ -15,7 +21,11 @@ export function FaturasClientesList({ sales }: { sales: FinalisedSale[] }) {
                            : sale.numGuests >= 4 ? "4-6"
                            : sale.numGuests >= 2 ? "2-3"
                            : "1";
-          const estimatedTotal = sale.pricePerPax * Math.max(sale.numGuests, 1);
+          const base = sale.pricePerPax * Math.max(sale.numGuests, 1);
+          const estimatedTotal = Math.round(base * 1.23 * 100) / 100;
+          const existing = earningsBySale[sale.id];
+          const existingTotal = existing ? Math.abs(existing.totalCost) : null;
+          const isMatch = existingTotal !== null && Math.abs(existingTotal - estimatedTotal) < 0.02;
 
           return (
             <li
@@ -38,7 +48,7 @@ export function FaturasClientesList({ sales }: { sales: FinalisedSale[] }) {
                   )}
                   {estimatedTotal > 0 && (
                     <p className="text-sm font-semibold text-[#32373c] mt-0.5">
-                      ~€{estimatedTotal.toFixed(0)}
+                      €{estimatedTotal.toFixed(2)} c/ IVA
                     </p>
                   )}
                 </div>
@@ -46,8 +56,16 @@ export function FaturasClientesList({ sales }: { sales: FinalisedSale[] }) {
 
               {/* Price breakdown */}
               {sale.pricePerPax > 0 && sale.numGuests > 0 && (
-                <div className="mt-2 pt-2 border-t border-gray-100 flex items-center gap-2 text-xs text-gray-400">
-                  <span>{sale.numGuests} × €{sale.pricePerPax.toFixed(2)}/pax ({priceLabel} pax)</span>
+                <div className="mt-2 pt-2 border-t border-gray-100 text-xs text-gray-400">
+                  <span>{sale.numGuests} × €{sale.pricePerPax.toFixed(2)}/pax ({priceLabel} pax) + IVA 23%</span>
+                </div>
+              )}
+
+              {/* IN- transaction reconciliation */}
+              {existingTotal !== null && (
+                <div className={`mt-2 pt-2 border-t border-gray-100 flex items-center justify-between text-xs ${isMatch ? "text-green-600" : "text-orange-500"}`}>
+                  <span>{isMatch ? "✓ Valor IN- coincide" : "⚠ Valor IN- difere"}</span>
+                  <span className="font-semibold">€{existingTotal.toFixed(2)} na transação</span>
                 </div>
               )}
 
