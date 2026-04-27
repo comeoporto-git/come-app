@@ -195,6 +195,7 @@ export function AddExpenseModal({
           tourId,
           invoiceImageUrl,
           pendingTransaction.status,
+          pendingTransaction.paymentMethod,
         );
         if (result?.error) throw new Error(result.error);
       } else {
@@ -227,7 +228,7 @@ export function AddExpenseModal({
                  : effectivePaymentMethod === "Pelo Driver" ? "Driver"
                  : "Company",
           paymentMethod: effectivePaymentMethod,
-          status: (isHonorarios || notPaidYet) ? "Pending Payment" : form.invoiceId ? "Paid" : "Pending Receipt",
+          status: notPaidYet ? "Pending Payment" : form.invoiceId ? "Paid" : "Pending Receipt",
           tourId,
           bankReference: "",
           invoiceImageUrl,
