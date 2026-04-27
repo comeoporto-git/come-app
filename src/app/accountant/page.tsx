@@ -27,7 +27,7 @@ export default async function AccountantPage({
   if (session.user.role !== "Accountant" && session.user.role !== "Admin") redirect("/");
 
   const { tab = "movimentos", days: daysParam } = await searchParams;
-  const days = Math.min(parseInt(daysParam ?? "30", 10) || 30, 90);
+  const days = daysParam === "0" ? 0 : (parseInt(daysParam ?? "30", 10) || 30);
 
   const [transactions, bankTxns, matchedExpenses, unmatchedEntries] = await Promise.all([
     getAccountantTransactions(),
@@ -114,7 +114,7 @@ export default async function AccountantPage({
             </div>
 
             {/* Day range */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xs text-gray-400">Período:</span>
               {[7, 30, 60, 90].map((d) => (
                 <Link key={d} href={`?tab=movimentos&days=${d}`}
@@ -124,6 +124,12 @@ export default async function AccountantPage({
                   {d} dias
                 </Link>
               ))}
+              <Link href="?tab=movimentos&days=0"
+                className={`text-xs px-3 py-1 rounded-full font-medium transition-colors ${
+                  days === 0 ? "bg-[#667470] text-white" : "bg-white border border-gray-200 text-gray-500 hover:border-[#667470]"
+                }`}>
+                Tudo
+              </Link>
             </div>
 
             {bankTxns.length === 0 ? (
