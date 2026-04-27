@@ -1135,8 +1135,11 @@ export async function getGuideExpenses(): Promise<Transaction[]> {
     }
 
     return transactions.map((t) => {
-      if (t.paymentMethod === "Honorários") {
-        return { ...t, paidByName: t.supplier, payeeIban: ibanByName[t.supplier.toLowerCase()] ?? "" };
+      // Old honorários (legacy paymentMethod) or new company-paid pending payments:
+      // supplier is a team member name — look up IBAN by name
+      if (t.paymentMethod === "Honorários" || (t.status === "Pending Payment" && t.whoPaid === "Company")) {
+        const iban = ibanByName[t.supplier.toLowerCase()];
+        return { ...t, paidByName: t.supplier, payeeIban: iban ?? "" };
       }
       if (!t.tourId) return t;
       const members = tourMemberMap[t.tourId];

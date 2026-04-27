@@ -190,7 +190,6 @@ export function AddExpenseModal({
         const isHonorarios = !!honorariosMember;
         const effectivePaymentMethod = isChef
           ? (chefExpenseType === "service-invoice" ? "Chef Fee" : "Pelo Chef")
-          : isHonorarios ? "Honorários"
           : paymentMethod;
 
         const selectedFornecedor = fornecedores.find(
@@ -215,7 +214,7 @@ export function AddExpenseModal({
                  : effectivePaymentMethod === "Pelo Driver" ? "Driver"
                  : "Company",
           paymentMethod: effectivePaymentMethod,
-          status: notPaidYet ? "Pending Payment" : form.invoiceId ? "Paid" : "Pending Receipt",
+          status: (isHonorarios || notPaidYet) ? "Pending Payment" : form.invoiceId ? "Paid" : "Pending Receipt",
           tourId,
           bankReference: "",
           invoiceImageUrl,
@@ -332,6 +331,7 @@ export function AddExpenseModal({
                   onClick={() => {
                     setHonorariosMember(member.name);
                     setForm((f) => ({ ...f, supplier: member.name }));
+                    setPaymentMethod("Transferência Bancária COME");
                     setMode("manual");
                   }}
                   className="w-full flex items-center gap-4 p-4 rounded-2xl border-2 border-gray-200 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
@@ -513,8 +513,8 @@ export function AddExpenseModal({
                 />
               )}
 
-              {/* Payment method — Super Guide/Admin choose; hidden for honorários (fixed) */}
-              {isSuperGuide && !honorariosMember && (
+              {/* Payment method — Super Guide/Admin choose */}
+              {isSuperGuide && (
                 <div>
                   <label className="text-xs text-gray-500 mb-1 block">Método de Pagamento</label>
                   <select
@@ -522,11 +522,20 @@ export function AddExpenseModal({
                     onChange={(e) => setPaymentMethod(e.target.value)}
                     className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
                   >
-                    <option value="Cartão COME">Cartão COME</option>
-                    <option value="Transferência Bancária COME">Transferência Bancária COME</option>
-                    <option value="Pelo Guia">Pelo Guia</option>
-                    <option value="Pelo Chef">Pelo Chef</option>
-                    <option value="Pelo Driver">Pelo Driver</option>
+                    {honorariosMember ? (
+                      <>
+                        <option value="Transferência Bancária COME">Transferência Bancária COME</option>
+                        <option value="Cartão COME">Cartão COME</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="Cartão COME">Cartão COME</option>
+                        <option value="Transferência Bancária COME">Transferência Bancária COME</option>
+                        <option value="Pelo Guia">Pelo Guia</option>
+                        <option value="Pelo Chef">Pelo Chef</option>
+                        <option value="Pelo Driver">Pelo Driver</option>
+                      </>
+                    )}
                   </select>
                 </div>
               )}
