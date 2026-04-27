@@ -102,7 +102,7 @@ export function ClientInvoiceModal({
             </div>
             <div className="flex justify-between">
               <span className="text-gray-500">Data</span>
-              <span className="font-semibold text-gray-900">{sale.date ?? "—"}</span>
+              <span className="font-semibold text-gray-900">{sale.date?.slice(0, 10) ?? "—"}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-500">Nº Pax</span>

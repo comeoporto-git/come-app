@@ -39,7 +39,7 @@ export function FaturasClientesList({
                     {sale.clientName || sale.saleId}
                   </p>
                   <p className="text-xs text-gray-500 truncate mt-0.5">{sale.serviceName}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">{sale.date ?? "—"}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{sale.date?.slice(0, 10) ?? "—"}</p>
                 </div>
                 <div className="text-right shrink-0">
                   <p className="text-xs text-gray-400 font-mono">{sale.saleId}</p>
