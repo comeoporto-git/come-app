@@ -25,7 +25,7 @@ export async function GET() {
       )
     `;
 
-    return NextResponse.json({ ok: true, deleted: result.count });
+    return NextResponse.json({ ok: true, deleted: result.length });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     return NextResponse.json({ ok: false, error: msg }, { status: 500 });
