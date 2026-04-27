@@ -3,7 +3,7 @@ import { getDb } from "@/lib/db";
 
 /**
  * One-time cleanup: delete duplicate bank_transactions rows where two rows
- * share (account_uid, transaction_date::date, amount, credit_debit).
+ * share (transaction_date::date, amount, credit_debit) regardless of account_uid.
  * Keeps the row with the lower id (earliest inserted).
  */
 export async function GET() {
@@ -16,13 +16,14 @@ export async function GET() {
         SELECT id FROM (
           SELECT id,
                  ROW_NUMBER() OVER (
-                   PARTITION BY account_uid, transaction_date::date, amount, credit_debit
+                   PARTITION BY transaction_date::date, amount, credit_debit
                    ORDER BY id ASC
                  ) AS rn
           FROM bank_transactions
         ) ranked
         WHERE rn > 1
       )
+      RETURNING id
     `;
 
     return NextResponse.json({ ok: true, deleted: result.length });

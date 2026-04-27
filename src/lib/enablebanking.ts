@@ -315,10 +315,9 @@ export async function upsertBankTransactions(
         ${JSON.stringify(t)}
       WHERE NOT EXISTS (
         SELECT 1 FROM bank_transactions
-        WHERE account_uid   = ${accountUid}
-          AND transaction_date::date = ${txDate}::date
-          AND amount        = ${amount}
-          AND credit_debit  = ${t.credit_debit_indicator}
+        WHERE transaction_date::date = ${txDate}::date
+          AND amount       = ${amount}
+          AND credit_debit = ${t.credit_debit_indicator}
       )
       ON CONFLICT (transaction_id) DO NOTHING
     `;
