@@ -295,16 +295,17 @@ export async function upsertBankTransactions(
         ? (t.creditor?.name ?? (remit || null))
         : (t.debtor?.name ?? (remit || null));
 
+    const amount = parseFloat(t.transaction_amount.amount);
     await sql`
       INSERT INTO bank_transactions
         (transaction_id, account_uid, institution_name, amount, currency,
          credit_debit, transaction_date, booking_date, merchant_name,
          remittance_info, raw)
-      VALUES (
+      SELECT
         ${txId},
         ${accountUid},
         ${institutionName},
-        ${parseFloat(t.transaction_amount.amount)},
+        ${amount},
         ${t.transaction_amount.currency},
         ${t.credit_debit_indicator},
         ${txDate},
@@ -312,6 +313,12 @@ export async function upsertBankTransactions(
         ${merchantName},
         ${remit || null},
         ${JSON.stringify(t)}
+      WHERE NOT EXISTS (
+        SELECT 1 FROM bank_transactions
+        WHERE account_uid   = ${accountUid}
+          AND transaction_date::date = ${txDate}::date
+          AND amount        = ${amount}
+          AND credit_debit  = ${t.credit_debit_indicator}
       )
       ON CONFLICT (transaction_id) DO NOTHING
     `;
