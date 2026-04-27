@@ -1121,8 +1121,8 @@ export async function getGuideExpenses(): Promise<Transaction[]> {
       const page = tourPages[i] as PageObjectResponse | null;
       if (!page || !("properties" in page)) continue;
       tourMemberMap[uniqueTourIds[i]] = {
-        guide: relation(getProp(page, "🧭 Guide"))[0],
-        chef:  relation(getProp(page, "👨‍🍳 Chef"))[0],
+        guide: relation(getProp(page, "Guia"))[0],
+        chef:  relation(getProp(page, "Chef"))[0],
       };
     }
 
