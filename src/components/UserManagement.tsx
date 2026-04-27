@@ -70,6 +70,9 @@ function UserRow({ member }: { member: TeamMember }) {
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-[#32373c] truncate">{member.name}</p>
         <p className="text-xs text-gray-400 truncate">{member.email}</p>
+        {member.iban && (
+          <p className="text-xs text-gray-400 font-mono truncate">{member.iban}</p>
+        )}
         {error && <p className="text-xs text-red-500 mt-0.5">{error}</p>}
       </div>
 
