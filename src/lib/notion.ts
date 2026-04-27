@@ -36,6 +36,7 @@ function text(prop: unknown): string {
   if (p.type === "email")       return (p.email as string) ?? "";
   if (p.type === "phone_number") return (p.phone_number as string) ?? "";
   if (p.type === "select")      return (p.select as { name: string } | null)?.name ?? "";
+  if (p.type === "url")         return (p.url as string) ?? "";
   return "";
 }
 
@@ -159,7 +160,7 @@ export async function updateTeamMemberProfile(
       page_id: memberId,
       properties: {
         NIF:  { rich_text: [{ text: { content: data.nif  } }] },
-        IBAN: { rich_text: [{ text: { content: data.iban } }] },
+        IBAN: { url: data.iban || null },
       } as Parameters<typeof notion.pages.update>[0]["properties"],
     });
   } catch { /* columns may not exist in this workspace yet */ }
