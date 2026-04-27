@@ -19,11 +19,15 @@ export function ExpenseList({
   tourId,
   isClosed,
   fornecedores = [],
+  guideName,
+  chefName,
 }: {
   transactions: Transaction[];
   tourId: string;
   isClosed: boolean;
   fornecedores?: Fornecedor[];
+  guideName?: string;
+  chefName?: string;
 }) {
   const [pendingToFinish, setPendingToFinish] = useState<Transaction | null>(null);
   const [editing, setEditing] = useState<Transaction | null>(null);
@@ -56,6 +60,12 @@ export function ExpenseList({
                   )}
                 </div>
                 <p className="text-xs text-gray-400">{tx.date ?? "—"}</p>
+                {(tx.whoPaid === "Guide" && guideName) && (
+                  <p className="text-xs font-medium text-[#667470]">Pago por: {guideName}</p>
+                )}
+                {(tx.whoPaid === "Chef" && chefName) && (
+                  <p className="text-xs font-medium text-[#667470]">Pago por: {chefName}</p>
+                )}
               </div>
               <div className="text-right shrink-0">
                 <p className="text-sm font-semibold text-gray-900">€{tx.totalCost.toFixed(2)}</p>
