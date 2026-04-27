@@ -1,20 +1,18 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { signOut } from "@/lib/auth";
-import { getUnmatchedBankTransactions, getFlaggedTransactions, getGuideExpenses, getFornecedores } from "@/lib/notion";
+import { getUnmatchedBankTransactions, getFlaggedTransactions, getGuideExpenses } from "@/lib/notion";
 import Image from "next/image";
 import Link from "next/link";
-import { AddStandaloneExpenseButton } from "@/components/AddStandaloneExpenseButton";
 
 export default async function ContabilidadePage() {
   const session = await auth();
   if (!session || session.user.role !== "Admin") redirect("/");
 
-  const [unmatched, flagged, guideExpenses, fornecedores] = await Promise.all([
+  const [unmatched, flagged, guideExpenses] = await Promise.all([
     getUnmatchedBankTransactions(),
     getFlaggedTransactions(),
     getGuideExpenses(),
-    getFornecedores(),
   ]);
 
   const reconciliationCount = unmatched.length + flagged.length;
@@ -100,16 +98,6 @@ export default async function ContabilidadePage() {
           </Link>
         </div>
 
-        {/* Despesas Avulso */}
-        <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-sm font-semibold text-[#32373c]">Despesas sem Serviço</h2>
-              <p className="text-xs text-gray-400 mt-0.5">Custos não associados a um serviço específico</p>
-            </div>
-            <AddStandaloneExpenseButton fornecedores={fornecedores} />
-          </div>
-        </section>
 
       </main>
     </div>

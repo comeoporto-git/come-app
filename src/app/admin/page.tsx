@@ -1,7 +1,8 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { signOut } from "@/lib/auth";
-import { getUnmatchedBankTransactions, getFlaggedTransactions, getGuideExpenses, getServicesWithMissingInfo, getPendingServices } from "@/lib/notion";
+import { getUnmatchedBankTransactions, getFlaggedTransactions, getGuideExpenses, getServicesWithMissingInfo, getPendingServices, getFornecedores } from "@/lib/notion";
+import { AddStandaloneExpenseButton } from "@/components/AddStandaloneExpenseButton";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -15,12 +16,13 @@ export default async function AdminPage({
 
   const params = await searchParams;
 
-  const [unmatched, flagged, guideExpenses, incompleteServices, pendingServices] = await Promise.all([
+  const [unmatched, flagged, guideExpenses, incompleteServices, pendingServices, fornecedores] = await Promise.all([
     getUnmatchedBankTransactions(),
     getFlaggedTransactions(),
     getGuideExpenses(),
     getServicesWithMissingInfo(),
     getPendingServices(),
+    getFornecedores(),
   ]);
 
   const reconciliationCount = unmatched.length + flagged.length;
@@ -114,6 +116,17 @@ export default async function AdminPage({
             </div>
           </Link>
         </div>
+
+        {/* Despesas sem Serviço */}
+        <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-semibold text-[#32373c]">Despesas sem Serviço</h2>
+              <p className="text-xs text-gray-400 mt-0.5">Custos não associados a um serviço específico</p>
+            </div>
+            <AddStandaloneExpenseButton fornecedores={fornecedores} />
+          </div>
+        </section>
       </main>
     </div>
   );

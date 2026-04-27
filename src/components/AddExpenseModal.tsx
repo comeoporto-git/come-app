@@ -31,7 +31,7 @@ export function AddExpenseModal({
   tourTeam = [],
   onClose,
 }: {
-  tourId: string;
+  tourId: string | null;
   pendingTransaction?: Transaction;
   fornecedores?: Fornecedor[];
   userRole?: string;
@@ -44,7 +44,8 @@ export function AddExpenseModal({
   const isChef = userRole === "Chef";
 
   // Chef/Admin: start with a type choice; others go straight to choose/scan
-  const initialMode: Mode = pendingTransaction ? "scan" : isChef ? "chef-choose" : isSuperGuide ? "admin-choose" : "choose";
+  // tourId=null means standalone (not tied to a tour) — skip honorários flow
+  const initialMode: Mode = pendingTransaction ? "scan" : isChef ? "chef-choose" : (isSuperGuide && tourId !== null) ? "admin-choose" : "choose";
 
   // "tour-expense" → ingredients / materials (Fornecedores, paymentMethod "Pelo Chef")
   // "service-invoice" → chef's own service fee (chef name as supplier, paymentMethod "Chef Fee")

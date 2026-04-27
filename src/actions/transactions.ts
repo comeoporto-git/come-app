@@ -111,7 +111,11 @@ export async function logExpenseAction(
       return { error: "Forbidden" };
     }
     const id = await createTransaction(data);
-    revalidatePath(`/guide/tours/${data.tourId}`);
+    if (data.tourId) {
+      revalidatePath(`/guide/tours/${data.tourId}`);
+    } else {
+      revalidatePath("/admin");
+    }
     return { id };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
