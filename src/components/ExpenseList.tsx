@@ -21,6 +21,7 @@ export function ExpenseList({
   fornecedores = [],
   guideName,
   chefName,
+  userRole = "Guide",
 }: {
   transactions: Transaction[];
   tourId: string;
@@ -28,6 +29,7 @@ export function ExpenseList({
   fornecedores?: Fornecedor[];
   guideName?: string;
   chefName?: string;
+  userRole?: string;
 }) {
   const [pendingToFinish, setPendingToFinish] = useState<Transaction | null>(null);
   const [editing, setEditing] = useState<Transaction | null>(null);
@@ -123,6 +125,7 @@ export function ExpenseList({
           transaction={editing}
           tourId={tourId}
           fornecedores={fornecedores}
+          userRole={userRole}
           onClose={() => setEditing(null)}
         />
       )}

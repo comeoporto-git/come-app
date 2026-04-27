@@ -24,11 +24,13 @@ export function EditExpenseModal({
   transaction,
   tourId,
   fornecedores = [],
+  userRole = "Guide",
   onClose,
 }: {
   transaction: Transaction;
   tourId: string;
   fornecedores?: Fornecedor[];
+  userRole?: string;
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -140,7 +142,7 @@ export function EditExpenseModal({
         iva13: form.iva13,
         iva23: form.iva23,
         totalCost: form.totalCost,
-        whoPaid: form.paymentMethod === "Pelo Guia" ? "Guide" : "Company",
+        whoPaid: form.paymentMethod === "Pelo Guia" ? "Guide" : form.paymentMethod === "Pelo Chef" ? "Chef" : "Company",
         paymentMethod: form.paymentMethod,
         ...(invoiceImageUrl ? { invoiceImageUrl } : {}),
       });
@@ -292,14 +294,17 @@ export function EditExpenseModal({
               <input type="number" step="0.01" min="0" value={form.totalCost || ""} onChange={(e) => update("totalCost", parseFloat(e.target.value) || 0)} className="input font-semibold" />
             </div>
 
-            {/* Payment method */}
-            <div>
-              <label className="text-xs text-gray-500 mb-1 block">Método de Pagamento</label>
-              <select value={form.paymentMethod} onChange={(e) => update("paymentMethod", e.target.value)} className="input">
-                <option value="Cartão Comum">Cartão Comum</option>
-                <option value="Pelo Guia">Pelo Guia</option>
-              </select>
-            </div>
+            {/* Payment method — Admin/Super Guide only */}
+            {(userRole === "Admin" || userRole === "Super Guide") && (
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">Método de Pagamento</label>
+                <select value={form.paymentMethod} onChange={(e) => update("paymentMethod", e.target.value)} className="input">
+                  <option value="Cartão COME">Cartão COME</option>
+                  <option value="Pelo Guia">Pelo Guia</option>
+                  <option value="Pelo Chef">Pelo Chef</option>
+                </select>
+              </div>
+            )}
 
             {/* Replace receipt photo */}
             <div>
