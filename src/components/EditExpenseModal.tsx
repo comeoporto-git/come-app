@@ -142,7 +142,10 @@ export function EditExpenseModal({
         iva13: form.iva13,
         iva23: form.iva23,
         totalCost: form.totalCost,
-        whoPaid: form.paymentMethod === "Pelo Guia" ? "Guide" : form.paymentMethod === "Pelo Chef" ? "Chef" : "Company",
+        whoPaid: form.paymentMethod === "Pelo Guia" ? "Guide"
+               : form.paymentMethod === "Pelo Chef" ? "Chef"
+               : form.paymentMethod === "Pelo Driver" ? "Driver"
+               : "Company",
         paymentMethod: form.paymentMethod,
         ...(invoiceImageUrl ? { invoiceImageUrl } : {}),
       });
@@ -300,8 +303,10 @@ export function EditExpenseModal({
                 <label className="text-xs text-gray-500 mb-1 block">Método de Pagamento</label>
                 <select value={form.paymentMethod} onChange={(e) => update("paymentMethod", e.target.value)} className="input">
                   <option value="Cartão COME">Cartão COME</option>
+                  <option value="Transferência Bancária COME">Transferência Bancária COME</option>
                   <option value="Pelo Guia">Pelo Guia</option>
                   <option value="Pelo Chef">Pelo Chef</option>
+                  <option value="Pelo Driver">Pelo Driver</option>
                 </select>
               </div>
             )}

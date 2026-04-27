@@ -299,7 +299,7 @@ async function TourPageContent({
               />
             )}
           </div>
-          <ExpenseList transactions={transactions} tourId={id} isClosed={isClosed} fornecedores={fornecedores} guideName={tour.guideName} chefName={tour.chefName} userRole={role} />
+          <ExpenseList transactions={transactions} tourId={id} isClosed={isClosed} fornecedores={fornecedores} guideName={tour.guideName} chefName={tour.chefName} driverName={tour.driverName} userRole={role} />
         </section>
 
         {/* Close Tour — only guides, super guides, admins */}

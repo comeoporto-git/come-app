@@ -21,6 +21,7 @@ export function ExpenseList({
   fornecedores = [],
   guideName,
   chefName,
+  driverName,
   userRole = "Guide",
 }: {
   transactions: Transaction[];
@@ -29,6 +30,7 @@ export function ExpenseList({
   fornecedores?: Fornecedor[];
   guideName?: string;
   chefName?: string;
+  driverName?: string;
   userRole?: string;
 }) {
   const [pendingToFinish, setPendingToFinish] = useState<Transaction | null>(null);
@@ -68,17 +70,20 @@ export function ExpenseList({
                 {(tx.whoPaid === "Chef" && chefName) && (
                   <p className="text-xs font-medium text-[#667470]">Pago por: {chefName}</p>
                 )}
+                {(tx.whoPaid === "Driver" && driverName) && (
+                  <p className="text-xs font-medium text-[#667470]">Pago por: {driverName}</p>
+                )}
               </div>
               <div className="text-right shrink-0">
                 <p className="text-sm font-semibold text-gray-900">€{tx.totalCost.toFixed(2)}</p>
                 <span
                   className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                    (tx.whoPaid === "Guide" || tx.whoPaid === "Chef") && tx.status === "Paid"
+                    (tx.whoPaid === "Guide" || tx.whoPaid === "Chef" || tx.whoPaid === "Driver") && tx.status === "Paid"
                       ? "bg-yellow-100 text-yellow-700"
                       : STATUS_COLORS[tx.status] ?? "bg-gray-100 text-gray-500"
                   }`}
                 >
-                  {(tx.whoPaid === "Guide" || tx.whoPaid === "Chef") && tx.status === "Paid"
+                  {(tx.whoPaid === "Guide" || tx.whoPaid === "Chef" || tx.whoPaid === "Driver") && tx.status === "Paid"
                     ? "Aguarda Reembolso"
                     : tx.status}
                 </span>

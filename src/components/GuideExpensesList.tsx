@@ -64,6 +64,9 @@ function GuideExpenseRow({ expense }: { expense: Transaction }) {
           {expense.paidByName && (
             <p className="text-xs font-medium text-[#667470] mt-0.5">Pago por: {expense.paidByName}</p>
           )}
+          {expense.payeeIban && (
+            <IbanCopy iban={expense.payeeIban} />
+          )}
           {expense.tourName && (
             <p className="text-xs text-gray-400">Serviço: {expense.tourName}</p>
           )}
@@ -151,5 +154,32 @@ export function GuideExpensesList({ expenses }: { expenses: Transaction[] }) {
         <GuideExpenseRow key={expense.id} expense={expense} />
       ))}
     </ul>
+  );
+}
+
+function IbanCopy({ iban }: { iban: string }) {
+  const [copied, setCopied] = useState(false);
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(iban);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // fallback: select text
+    }
+  }
+
+  return (
+    <button
+      onClick={handleCopy}
+      className="flex items-center gap-1.5 mt-0.5 text-xs text-gray-500 font-mono hover:text-[#667470] active:scale-95 transition-all"
+      title="Toque para copiar IBAN"
+    >
+      <span>{iban}</span>
+      <span className="text-[10px] font-sans font-medium text-gray-400">
+        {copied ? "✓ copiado" : "copiar"}
+      </span>
+    </button>
   );
 }

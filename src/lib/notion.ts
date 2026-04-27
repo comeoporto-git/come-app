@@ -681,6 +681,7 @@ export type Transaction = {
   transferenciaFeita?: boolean;
   comprovantivoUrl?: string;
   paidByName?: string;
+  payeeIban?: string;
 };
 
 function mapTransaction(page: PageObjectResponse): Transaction {
@@ -1094,6 +1095,7 @@ export async function getGuideExpenses(): Promise<Transaction[]> {
             or: [
               { property: "Método de Pagamento", select: { equals: "Pelo Guia" } },
               { property: "Método de Pagamento", select: { equals: "Pelo Chef" } },
+              { property: "Método de Pagamento", select: { equals: "Pelo Driver" } },
               { property: "Método de Pagamento", select: { equals: "Honorários" } },
             ],
           },
@@ -1115,15 +1117,16 @@ export async function getGuideExpenses(): Promise<Transaction[]> {
       Promise.all(uniqueTourIds.map((id) => notion.pages.retrieve({ page_id: id }).catch(() => null))),
     ]);
 
-    const memberMap = Object.fromEntries(teamMembers.map((m) => [m.id, m.name]));
-    const tourMemberMap: Record<string, { guide?: string; chef?: string }> = {};
+    const memberMap = Object.fromEntries(teamMembers.map((m) => [m.id, { name: m.name, iban: m.iban }]));
+    const tourMemberMap: Record<string, { guide?: string; chef?: string; driver?: string }> = {};
 
     for (let i = 0; i < uniqueTourIds.length; i++) {
       const page = tourPages[i] as PageObjectResponse | null;
       if (!page || !("properties" in page)) continue;
       tourMemberMap[uniqueTourIds[i]] = {
-        guide: relation(getProp(page, "Guia"))[0],
-        chef:  relation(getProp(page, "Chef"))[0],
+        guide:  relation(getProp(page, "Guia"))[0],
+        chef:   relation(getProp(page, "Chef"))[0],
+        driver: relation(getProp(page, "Driver 1"))[0],
       };
     }
 
@@ -1132,8 +1135,11 @@ export async function getGuideExpenses(): Promise<Transaction[]> {
       if (!t.tourId) return t;
       const members = tourMemberMap[t.tourId];
       if (!members) return t;
-      const memberId = t.paymentMethod === "Pelo Chef" ? members.chef : members.guide;
-      return { ...t, paidByName: memberId ? (memberMap[memberId] ?? "") : "" };
+      const memberId = t.paymentMethod === "Pelo Chef" ? members.chef
+                     : t.paymentMethod === "Pelo Driver" ? members.driver
+                     : members.guide;
+      const member = memberId ? memberMap[memberId] : undefined;
+      return { ...t, paidByName: member?.name ?? "", payeeIban: member?.iban ?? "" };
     });
   } catch { return []; }
 }

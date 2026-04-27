@@ -56,8 +56,10 @@ export function AddExpenseModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  // For chefs: payment method is fixed by expense type; for others it's selectable
-  const defaultPaymentMethod = isSuperGuide ? "Cartão COME" : "Pelo Guia";
+  // Default payment method based on who's logged in
+  const defaultPaymentMethod = isSuperGuide ? "Cartão COME"
+    : userRole === "Driver" ? "Pelo Driver"
+    : "Pelo Guia";
   const [paymentMethod, setPaymentMethod] = useState<string>(defaultPaymentMethod);
   const [honorariosMember, setHonorariosMember] = useState<string>("");
   const [needsInvoice, setNeedsInvoice] = useState(false);
@@ -209,6 +211,7 @@ export function AddExpenseModal({
           totalCost: form.totalCost,
           whoPaid: effectivePaymentMethod === "Pelo Guia" ? "Guide"
                  : effectivePaymentMethod === "Pelo Chef" ? "Chef"
+                 : effectivePaymentMethod === "Pelo Driver" ? "Driver"
                  : "Company",
           paymentMethod: effectivePaymentMethod,
           status: form.invoiceId ? "Paid" : "Pending Receipt",
@@ -252,8 +255,9 @@ export function AddExpenseModal({
         iva23: 0,
         totalCost: form.totalCost,
         whoPaid: effectivePaymentMethod === "Pelo Guia" ? "Guide"
-               : effectivePaymentMethod === "Cartão COME" ? "Company"
-               : "Chef",
+               : effectivePaymentMethod === "Pelo Chef" ? "Chef"
+               : effectivePaymentMethod === "Pelo Driver" ? "Driver"
+               : "Company",
         paymentMethod: effectivePaymentMethod,
         status: "Pending Receipt",
         tourId,
@@ -518,8 +522,10 @@ export function AddExpenseModal({
                     className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
                   >
                     <option value="Cartão COME">Cartão COME</option>
+                    <option value="Transferência Bancária COME">Transferência Bancária COME</option>
                     <option value="Pelo Guia">Pelo Guia</option>
                     <option value="Pelo Chef">Pelo Chef</option>
+                    <option value="Pelo Driver">Pelo Driver</option>
                   </select>
                 </div>
               )}
