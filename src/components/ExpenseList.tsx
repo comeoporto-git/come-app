@@ -83,8 +83,10 @@ export function ExpenseList({
                   const displayStatus = (tx.status === "Pending Payment" && noReceipt)
                     ? "Pending Receipt"
                     : tx.status;
-                  const label = (isGuideEtc && tx.status === "Paid") ? "Aguarda Reembolso" : displayStatus;
-                  const colorClass = (isGuideEtc && tx.status === "Paid")
+                  // Only show "Aguarda Reembolso" if transfer hasn't been done yet
+                  const awaitingReimbursement = isGuideEtc && tx.status === "Paid" && !tx.transferenciaFeita;
+                  const label = awaitingReimbursement ? "Aguarda Reembolso" : displayStatus;
+                  const colorClass = awaitingReimbursement
                     ? "bg-yellow-100 text-yellow-700"
                     : STATUS_COLORS[displayStatus] ?? "bg-gray-100 text-gray-500";
                   return (
