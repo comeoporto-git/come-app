@@ -73,10 +73,14 @@ export function ExpenseList({
                 <p className="text-sm font-semibold text-gray-900">€{tx.totalCost.toFixed(2)}</p>
                 <span
                   className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                    STATUS_COLORS[tx.status] ?? "bg-gray-100 text-gray-500"
+                    (tx.whoPaid === "Guide" || tx.whoPaid === "Chef") && tx.status === "Paid"
+                      ? "bg-yellow-100 text-yellow-700"
+                      : STATUS_COLORS[tx.status] ?? "bg-gray-100 text-gray-500"
                   }`}
                 >
-                  {tx.status}
+                  {(tx.whoPaid === "Guide" || tx.whoPaid === "Chef") && tx.status === "Paid"
+                    ? "Aguarda Reembolso"
+                    : tx.status}
                 </span>
               </div>
             </div>
