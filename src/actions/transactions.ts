@@ -132,7 +132,7 @@ export async function finishPendingExpenseAction(
   iva13: number,
   iva23: number,
   totalCost: number,
-  tourId: string,
+  tourId: string | null,
   invoiceImageUrl?: string,
 ): Promise<{ error?: string }> {
   try {
