@@ -17,7 +17,7 @@ export function FaturasClientesList({
     <>
       <ul className="space-y-3">
         {sales.map((sale) => {
-          const priceLabel = sale.numGuests >= 7 ? "7+"
+          const priceLabel = sale.numGuests >= 7 ? "7-"
                            : sale.numGuests >= 4 ? "4-6"
                            : sale.numGuests >= 2 ? "2-3"
                            : "1";

@@ -671,7 +671,7 @@ export async function getFinalisedSales(): Promise<FinalisedSale[]> {
         p1:  num(getProp(page, "1")),
         p23: num(getProp(page, "2-3")),
         p46: num(getProp(page, "4-6")),
-        p7:  num(getProp(page, "7+")),
+        p7:  num(getProp(page, "7-")),
       };
     } catch { /* ignore */ }
   }));

@@ -65,7 +65,7 @@ export function ClientInvoiceModal({
     }
   }
 
-  const priceLabel = sale.numGuests >= 7 ? "7+" : sale.numGuests >= 4 ? "4-6" : sale.numGuests >= 2 ? "2-3" : "1";
+  const priceLabel = sale.numGuests >= 7 ? "7-" : sale.numGuests >= 4 ? "4-6" : sale.numGuests >= 2 ? "2-3" : "1";
 
   return (
     <div className="fixed inset-0 z-50 flex items-end bg-black/50" onClick={onClose}>
