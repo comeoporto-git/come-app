@@ -10,6 +10,8 @@ export async function markSaleInvoicedAction(
     saleId: string;
     clientName: string;
     date: string;
+    taxFree: number;
+    iva23: number;
     totalAmount: number;
     invoiceImageUrl?: string;
   }
@@ -25,10 +27,10 @@ export async function markSaleInvoicedAction(
       fornecedorId: null,
       date: data.date,
       invoiceId: data.saleId,
-      taxFree: data.totalAmount,
+      taxFree: data.taxFree,
       iva6: 0,
       iva13: 0,
-      iva23: 0,
+      iva23: data.iva23,
       totalCost: data.totalAmount,
       whoPaid: "Company",
       paymentMethod: "Transferência Bancária COME",

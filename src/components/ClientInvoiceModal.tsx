@@ -17,17 +17,18 @@ export function ClientInvoiceModal({
 
   const today = new Date().toISOString().slice(0, 10);
   const [date, setDate] = useState(today);
-  const [total, setTotal] = useState(
-    sale.pricePerPax > 0 ? (sale.pricePerPax * Math.max(sale.numGuests, 1)).toFixed(2) : ""
-  );
+  const defaultBase = sale.pricePerPax > 0 ? sale.pricePerPax * Math.max(sale.numGuests, 1) : 0;
+  const [base, setBase] = useState(defaultBase > 0 ? defaultBase.toFixed(2) : "");
   const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  const totalNum = parseFloat(total) || 0;
+  const baseNum = parseFloat(base) || 0;
+  const iva23Num = Math.round(baseNum * 0.23 * 100) / 100;
+  const totalNum = Math.round((baseNum + iva23Num) * 100) / 100;
 
   async function handleSubmit() {
-    if (!totalNum) { setError("Introduz o valor total da fatura."); return; }
+    if (!baseNum) { setError("Introduz o valor base da fatura."); return; }
     setSaving(true);
     setError("");
     try {
@@ -47,6 +48,8 @@ export function ClientInvoiceModal({
         saleId: sale.saleId,
         clientName: sale.clientName || sale.saleId,
         date,
+        taxFree: baseNum,
+        iva23: iva23Num,
         totalAmount: totalNum,
         invoiceImageUrl,
       });
@@ -106,19 +109,36 @@ export function ClientInvoiceModal({
             )}
           </div>
 
-          {/* Total */}
+          {/* Base + IVA breakdown */}
           <div>
-            <label className="text-xs text-gray-500 mb-1 block">Total da Fatura (€)</label>
+            <label className="text-xs text-gray-500 mb-1 block">Valor Base s/ IVA (€)</label>
             <input
               type="number"
               step="0.01"
               min="0"
-              value={total}
-              onChange={(e) => setTotal(e.target.value)}
+              value={base}
+              onChange={(e) => setBase(e.target.value)}
               placeholder="0.00"
-              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#667470]/40 font-semibold"
+              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#667470]/40"
             />
           </div>
+
+          {baseNum > 0 && (
+            <div className="rounded-xl border border-gray-100 bg-gray-50 divide-y divide-gray-100 text-sm">
+              <div className="flex justify-between px-4 py-2.5">
+                <span className="text-gray-500">Base s/ IVA</span>
+                <span className="font-medium text-gray-800">€{baseNum.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between px-4 py-2.5">
+                <span className="text-gray-500">IVA 23%</span>
+                <span className="font-medium text-gray-800">€{iva23Num.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between px-4 py-2.5 bg-white rounded-b-xl">
+                <span className="font-bold text-gray-900">Total da Fatura</span>
+                <span className="font-bold text-gray-900">€{totalNum.toFixed(2)}</span>
+              </div>
+            </div>
+          )}
 
           {/* Date */}
           <div>
@@ -170,7 +190,7 @@ export function ClientInvoiceModal({
 
           <button
             onClick={handleSubmit}
-            disabled={saving || !totalNum}
+            disabled={saving || !baseNum}
             className="w-full bg-[#32373c] hover:bg-[#1a2018] text-white font-semibold py-3.5 rounded-2xl text-sm disabled:opacity-50 transition-colors active:scale-[0.98]"
           >
             {saving ? "A guardar…" : "Confirmar Faturação"}
