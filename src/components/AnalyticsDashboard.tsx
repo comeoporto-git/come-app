@@ -274,6 +274,21 @@ export function AnalyticsDashboard({
     const topStatuses = Object.entries(byStatus).sort((a, b) => b[1] - a[1]);
     const maxStatus   = Math.max(...topStatuses.map(([, v]) => v), 1);
 
+    // Revenue by status — sum IN- earnings per tour, grouped by that tour's status
+    const tourStatusMap: Record<string, string> = {};
+    for (const t of tours) {
+      if (t.id) tourStatusMap[t.id] = t.status === "Canceled" ? "Cancelled" : (t.status || "Sem estado");
+    }
+    const revenueByStatus: Record<string, number> = {};
+    for (const tx of txns) {
+      if (!tx.supplier.startsWith("IN -") || !tx.tourId) continue;
+      const s = tourStatusMap[tx.tourId];
+      if (!s) continue;
+      revenueByStatus[s] = (revenueByStatus[s] ?? 0) + tx.totalCost;
+    }
+    const topRevenueByStatus = Object.entries(revenueByStatus).sort((a, b) => b[1] - a[1]);
+    const maxRevenueByStatus = Math.max(...topRevenueByStatus.map(([, v]) => v), 1);
+
     // By service name
     const byService: Record<string, number> = {};
     for (const t of completed) {
@@ -376,6 +391,7 @@ export function AnalyticsDashboard({
       totalGuests, avgGroup, cancelRate,
       monthlyEntries, maxMonthly, monthlyColors, hasFutureMonths,
       topStatuses, maxStatus,
+      topRevenueByStatus, maxRevenueByStatus,
       topServices, maxService,
       topCategories, maxCategory,
       DAYS_PT, byDay, maxDay,
@@ -458,6 +474,24 @@ export function AnalyticsDashboard({
                     max={a.maxStatus}
                     color={STATUS_COLORS[status] ?? "bg-gray-400"}
                     labelWidth="w-24"
+                  />
+                ))}
+              </div>
+            )}
+          </SectionCard>
+
+          <SectionCard title="Receita por Estado" sub="Receita faturada (IN-) agrupada pelo estado do serviço">
+            {a.topRevenueByStatus.length === 0 ? <EmptyState /> : (
+              <div className="space-y-3">
+                {a.topRevenueByStatus.map(([status, rev]) => (
+                  <HBar
+                    key={status}
+                    label={status}
+                    value={rev}
+                    max={a.maxRevenueByStatus}
+                    color={STATUS_COLORS[status] ?? "bg-gray-400"}
+                    labelWidth="w-24"
+                    formatValue={(v) => fmtEur(v)}
                   />
                 ))}
               </div>
