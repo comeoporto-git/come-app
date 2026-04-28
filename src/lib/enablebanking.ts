@@ -285,10 +285,29 @@ export async function upsertBankTransactions(
   institutionName: string,
 ): Promise<void> {
   const sql = getDb();
+  // Track synth IDs used within this batch to handle multiple same-day
+  // identical-description entries (e.g. bank fees per transfer).
+  const batchIds = new Set<string>();
+
   for (const t of txns) {
     const txDate = t.transaction_date ?? t.booking_date;
     if (!txDate) continue; // skip if we have no date at all
-    const txId = t.transaction_id ?? syntheticId(t, accountUid);
+
+    // If EB provides a real transaction_id use it directly; otherwise generate
+    // a synth ID and append a counter suffix until it's unique in this batch.
+    let txId: string;
+    if (t.transaction_id) {
+      txId = t.transaction_id;
+    } else {
+      const base = syntheticId(t, accountUid);
+      txId = base;
+      let counter = 2;
+      while (batchIds.has(txId)) {
+        txId = `${base}-${counter++}`;
+      }
+    }
+    batchIds.add(txId);
+
     const remit = remittanceText(t);
     const merchantName =
       t.credit_debit_indicator === "DBIT"
