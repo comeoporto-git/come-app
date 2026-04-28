@@ -995,7 +995,7 @@ export async function getMatchedTransactionMap(): Promise<Record<string, Transac
         }
       }
       cursor = res.next_cursor ?? undefined;
-    } while (cursor && ++pages < 20);
+    } while (cursor && ++pages < 10);
     return map;
   } catch (err) {
     console.error("[getMatchedTransactionMap] failed:", err);
@@ -1004,12 +1004,15 @@ export async function getMatchedTransactionMap(): Promise<Record<string, Transac
 }
 
 /**
- * Notion earnings ("IN - ...") with no bank reference — for matching against
- * bank credit (CRDT) transactions.
+ * Fetch all Notion transactions with no bank reference in a SINGLE paginated
+ * query, then split into expenses and earnings client-side.
+ * This halves the Notion API calls compared to two separate queries.
  */
-export async function getLinkableEarnings(): Promise<Transaction[]> {
+async function fetchAllLinkable(): Promise<{ expenses: Transaction[]; earnings: Transaction[] }> {
+  const expenses: Transaction[] = [];
+  const earnings: Transaction[] = [];
+  const EXCLUDED = new Set(["Unmatched Bank Entry", "Cancelled"]);
   try {
-    const results: Transaction[] = [];
     let cursor: string | undefined;
     let pages = 0;
     do {
@@ -1021,18 +1024,30 @@ export async function getLinkableEarnings(): Promise<Transaction[]> {
         page_size: 100,
         ...(cursor ? { start_cursor: cursor } : {}),
       } as any);
-      results.push(
-        ...(res.results as PageObjectResponse[])
-          .map(mapTransaction)
-          .filter((t) => t.supplier.startsWith("IN -") && t.status !== "Unmatched Bank Entry")
-      );
+      for (const page of res.results as PageObjectResponse[]) {
+        const t = mapTransaction(page);
+        if (t.status === "Unmatched Bank Entry" || EXCLUDED.has(t.status)) continue;
+        if (t.supplier.startsWith("IN -")) {
+          earnings.push(t);
+        } else {
+          expenses.push(t);
+        }
+      }
       cursor = res.next_cursor ?? undefined;
     } while (cursor && ++pages < 10);
-    return results;
   } catch (err) {
-    console.error("[getLinkableEarnings] failed:", err);
-    return [];
+    console.error("[fetchAllLinkable] failed:", err);
   }
+  return { expenses, earnings };
+}
+
+/**
+ * Notion earnings ("IN - ...") with no bank reference — for matching against
+ * bank credit (CRDT) transactions.
+ */
+export async function getLinkableEarnings(): Promise<Transaction[]> {
+  const { earnings } = await fetchAllLinkable();
+  return earnings;
 }
 
 /**
@@ -1041,32 +1056,17 @@ export async function getLinkableEarnings(): Promise<Transaction[]> {
  * placeholders, cancelled records, and earnings client-side.
  */
 export async function getLinkableExpenses(): Promise<Transaction[]> {
-  try {
-    const results: Transaction[] = [];
-    let cursor: string | undefined;
-    let pages = 0;
-    do {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const res: any = await notion.databases.query({
-        database_id: TRANSACTIONS_DB,
-        filter: { property: "ID do Banco", rich_text: { is_empty: true } },
-        sorts: [{ property: "Data", direction: "descending" }],
-        page_size: 100,
-        ...(cursor ? { start_cursor: cursor } : {}),
-      } as any);
-      const EXCLUDED = new Set(["Unmatched Bank Entry", "Cancelled"]);
-      results.push(
-        ...(res.results as PageObjectResponse[])
-          .map(mapTransaction)
-          .filter((t) => !EXCLUDED.has(t.status) && !t.supplier.startsWith("IN -"))
-      );
-      cursor = res.next_cursor ?? undefined;
-    } while (cursor && ++pages < 10);
-    return results;
-  } catch (err) {
-    console.error("[getLinkableExpenses] failed:", err);
-    return [];
-  }
+  const { expenses } = await fetchAllLinkable();
+  return expenses;
+}
+
+/**
+ * Returns both linkable expenses AND earnings in a single Notion query —
+ * use this when you need both at once (e.g. reconciliation page) to avoid
+ * making the same query twice.
+ */
+export async function getLinkableTransactions(): Promise<{ expenses: Transaction[]; earnings: Transaction[] }> {
+  return fetchAllLinkable();
 }
 
 export async function getTransactionsTreated(): Promise<Transaction[]> {

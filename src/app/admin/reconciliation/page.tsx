@@ -4,8 +4,7 @@ import { signOut } from "@/lib/auth";
 import {
   getUnmatchedBankTransactions,
   getMatchedTransactionMap,
-  getLinkableExpenses,
-  getLinkableEarnings,
+  getLinkableTransactions,
 } from "@/lib/notion";
 import { getStoredTransactions } from "@/lib/enablebanking";
 import { BankLedger } from "@/components/BankLedger";
@@ -17,13 +16,16 @@ export default async function ReconciliationPage() {
   if (!session || session.user.role !== "Admin") redirect("/");
 
   // Fetch all data in parallel — individual failures return empty defaults
-  const [bankTxns, matchedMap, unmatchedPlaceholders, linkableExpenses, linkableEarnings] = await Promise.all([
+  // getLinkableTransactions() makes a SINGLE Notion query instead of two,
+  // halving the API calls and preventing timeout on large datasets.
+  const [bankTxns, matchedMap, unmatchedPlaceholders, linkable] = await Promise.all([
     getStoredTransactions(0).catch((e) => { console.error("[reconciliation] bankTxns:", e); return []; }),
-    getMatchedTransactionMap(),
+    getMatchedTransactionMap().catch((e) => { console.error("[reconciliation] matchedMap:", e); return {} as Record<string, import("@/lib/notion").Transaction[]>; }),
     getUnmatchedBankTransactions().catch((e) => { console.error("[reconciliation] unmatched:", e); return []; }),
-    getLinkableExpenses(),
-    getLinkableEarnings(),
+    getLinkableTransactions().catch((e) => { console.error("[reconciliation] linkable:", e); return { expenses: [], earnings: [] }; }),
   ]);
+  const linkableExpenses = linkable.expenses;
+  const linkableEarnings = linkable.earnings;
 
   // Build a map: bankRef → Notion placeholder ID (for archiving on manual link)
   const unmatchedPlaceholderMap: Record<string, string> = {};
