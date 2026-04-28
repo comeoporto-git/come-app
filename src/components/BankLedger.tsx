@@ -19,7 +19,11 @@ type Filter     = "all" | "matched" | "unmatched" | "partial" | "duplicates";
 type TypeFilter = "all" | "debit" | "credit";
 
 function txnDupKey(t: StoredTransaction) {
-  return `${t.transaction_date?.slice(0, 10)}|${t.amount}|${t.credit_debit}`;
+  // transaction_date may arrive as a Date object from Neon (DATE column) or as a string
+  const d = t.transaction_date
+    ? new Date(t.transaction_date as unknown as string | Date).toISOString().slice(0, 10)
+    : "";
+  return `${d}|${t.amount}|${t.credit_debit}`;
 }
 
 // ── Inline expense picker ─────────────────────────────────────────────────────
