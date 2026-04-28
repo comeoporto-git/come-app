@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useMemo, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { linkBankTransactionAction, dismissUnmatchedAction, runManualMatchAction, unlinkBankTransactionAction } from "@/actions/banking";
+import { linkBankTransactionAction, dismissUnmatchedAction, runManualMatchAction, unlinkBankTransactionAction, deleteBankTransactionAction } from "@/actions/banking";
 import type { StoredTransaction } from "@/lib/enablebanking";
 import type { Transaction } from "@/lib/notion";
 
@@ -15,8 +15,12 @@ function fmtEur(n: number) {
   return n.toLocaleString("pt-PT", { style: "currency", currency: "EUR" });
 }
 
-type Filter     = "all" | "matched" | "unmatched" | "partial";
+type Filter     = "all" | "matched" | "unmatched" | "partial" | "duplicates";
 type TypeFilter = "all" | "debit" | "credit";
+
+function txnDupKey(t: StoredTransaction) {
+  return `${t.transaction_date?.slice(0, 10)}|${t.amount}|${t.credit_debit}`;
+}
 
 // ── Inline expense picker ─────────────────────────────────────────────────────
 
@@ -138,6 +142,35 @@ function UnlinkButton({ notionId, onUnlinked }: { notionId: string; onUnlinked: 
   );
 }
 
+function DeleteButton({ transactionId, onDeleted }: { transactionId: string; onDeleted: () => void }) {
+  const [confirming, setConfirming] = useState(false);
+  const [pending, startTransition] = useTransition();
+
+  if (!confirming) {
+    return (
+      <button
+        onClick={() => setConfirming(true)}
+        className="text-[10px] text-gray-300 hover:text-red-500 transition-colors"
+        title="Apagar movimento"
+      >
+        🗑
+      </button>
+    );
+  }
+  return (
+    <span className="flex items-center gap-1">
+      <button
+        disabled={pending}
+        onClick={() => startTransition(async () => { await deleteBankTransactionAction(transactionId); onDeleted(); })}
+        className="text-[10px] font-semibold text-red-500 hover:text-red-700 disabled:opacity-50"
+      >
+        {pending ? "…" : "Apagar"}
+      </button>
+      <button onClick={() => setConfirming(false)} className="text-[10px] text-gray-400">Cancelar</button>
+    </span>
+  );
+}
+
 function LedgerRow({
   bankTxn, matched, placeholderId, linkableExpenses, linkableEarnings, linkedIds,
 }: {
@@ -154,6 +187,8 @@ function LedgerRow({
   const [dismissPending, startDismiss] = useTransition();
 
   if (dismissed) return null;
+
+  function handleDeleted() { setDismissed(true); }
 
   const isCredit   = bankTxn.credit_debit === "CRDT";
   const bankAmount = Math.abs(bankTxn.amount);
@@ -309,6 +344,7 @@ function LedgerRow({
               Dispensar
             </button>
           )}
+          <DeleteButton transactionId={bankTxn.transaction_id} onDeleted={handleDeleted} />
         </div>
       </div>
     </div>
@@ -363,6 +399,16 @@ export function BankLedger({
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [search,     setSearch]     = useState("");
 
+  // Keys (date|amount|credit_debit) that appear more than once → duplicates
+  const dupKeys = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const t of bankTxns) {
+      const k = txnDupKey(t);
+      counts.set(k, (counts.get(k) ?? 0) + 1);
+    }
+    return new Set([...counts.entries()].filter(([, n]) => n > 1).map(([k]) => k));
+  }, [bankTxns]);
+
   function matchStatus(t: StoredTransaction): "full" | "partial" | "none" {
     const list = matchedMap[t.transaction_id] ?? [];
     if (list.length === 0) return "none";
@@ -376,9 +422,10 @@ export function BankLedger({
     const qDot = q.replace(",", ".");
     return bankTxns.filter((t) => {
       const status = matchStatus(t);
-      if (filter === "matched"   && status === "none") return false;
-      if (filter === "unmatched" && status !== "none") return false;
-      if (filter === "partial"   && status !== "partial") return false;
+      if (filter === "matched"    && status === "none") return false;
+      if (filter === "unmatched"  && status !== "none") return false;
+      if (filter === "partial"    && status !== "partial") return false;
+      if (filter === "duplicates" && !dupKeys.has(txnDupKey(t))) return false;
       if (typeFilter === "debit"  && t.credit_debit !== "DBIT") return false;
       if (typeFilter === "credit" && t.credit_debit !== "CRDT") return false;
       if (!q) return true;
@@ -410,6 +457,7 @@ export function BankLedger({
   const fullCount    = bankTxns.filter((t) => matchStatus(t) === "full").length;
   const partialCount = bankTxns.filter((t) => matchStatus(t) === "partial").length;
   const noneCount    = bankTxns.filter((t) => matchStatus(t) === "none").length;
+  const dupCount     = bankTxns.filter((t) => dupKeys.has(txnDupKey(t))).length;
   const debitCount   = bankTxns.filter((t) => t.credit_debit === "DBIT").length;
   const creditCount  = bankTxns.filter((t) => t.credit_debit === "CRDT").length;
 
@@ -429,13 +477,22 @@ export function BankLedger({
       <div className="flex flex-wrap gap-2">
         <div className="flex bg-gray-100 rounded-xl p-1 gap-1 text-xs font-semibold">
           {([
-            ["all",       `Todos (${bankTxns.length})`],
-            ["matched",   `✓ Completo (${fullCount})`],
-            ["partial",   `◑ Parcial (${partialCount})`],
-            ["unmatched", `○ Sem match (${noneCount})`],
+            ["all",        `Todos (${bankTxns.length})`],
+            ["matched",    `✓ Completo (${fullCount})`],
+            ["partial",    `◑ Parcial (${partialCount})`],
+            ["unmatched",  `○ Sem match (${noneCount})`],
+            ["duplicates", `⚠ Duplicados (${dupCount})`],
           ] as [Filter, string][]).map(([f, label]) => (
             <button key={f} onClick={() => setFilter(f)}
-              className={`px-3 py-1.5 rounded-lg transition-all ${filter === f ? "bg-white text-gray-800 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
+              className={`px-3 py-1.5 rounded-lg transition-all ${
+                filter === f
+                  ? f === "duplicates"
+                    ? "bg-orange-500 text-white shadow-sm"
+                    : "bg-white text-gray-800 shadow-sm"
+                  : f === "duplicates" && dupCount > 0
+                    ? "text-orange-500 hover:text-orange-700"
+                    : "text-gray-500 hover:text-gray-700"
+              }`}>
               {label}
             </button>
           ))}

@@ -13,6 +13,7 @@ import {
   archiveTransaction,
 } from "@/lib/notion";
 import { getStoredTransactions } from "@/lib/enablebanking";
+import { getDb } from "@/lib/db";
 import { doSync } from "@/lib/bankSync";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
@@ -180,6 +181,15 @@ export async function runManualMatchAction(): Promise<{
 
   revalidatePath("/admin/reconciliation");
   return { matched, skipped, errors };
+}
+
+// ── Delete bank transaction ───────────────────────────────────────────────────
+
+export async function deleteBankTransactionAction(transactionId: string): Promise<void> {
+  await requireAdmin();
+  const sql = getDb();
+  await sql`DELETE FROM bank_transactions WHERE transaction_id = ${transactionId}`;
+  revalidatePath("/admin/reconciliation");
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
