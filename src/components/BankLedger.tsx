@@ -21,11 +21,12 @@ type TypeFilter = "all" | "debit" | "credit";
 // ── Inline expense picker ─────────────────────────────────────────────────────
 
 function ExpensePicker({
-  bankTxn, placeholderId, linkable, onDone,
+  bankTxn, placeholderId, linkable, linkedIds, onDone,
 }: {
   bankTxn: StoredTransaction;
   placeholderId?: string;
   linkable: Transaction[];
+  linkedIds: Set<string>; // Notion IDs already linked to other bank txns
   onDone: () => void;
 }) {
   const [search, setSearch] = useState("");
@@ -36,9 +37,11 @@ function ExpensePicker({
 
   const filtered = useMemo(() => {
     const q    = search.toLowerCase().trim();
-    if (!q) return linkable;
     const qDot = q.replace(",", ".");
-    return linkable.filter((e) =>
+    // Exclude expenses already linked to a different bank transaction
+    const available = linkable.filter((e) => !linkedIds.has(e.id));
+    if (!q) return available;
+    return available.filter((e) =>
       e.supplier.toLowerCase().includes(q) ||
       e.invoiceId.toLowerCase().includes(q) ||
       (e.tourName ?? "").toLowerCase().includes(q) ||
@@ -46,7 +49,7 @@ function ExpensePicker({
       String(Math.abs(e.totalCost)).includes(qDot) ||
       fmtEur(Math.abs(e.totalCost)).includes(q)
     );
-  }, [linkable, search]);
+  }, [linkable, linkedIds, search]);
 
   function pick(expense: Transaction) {
     startTransition(async () => {
@@ -136,13 +139,14 @@ function UnlinkButton({ notionId, onUnlinked }: { notionId: string; onUnlinked: 
 }
 
 function LedgerRow({
-  bankTxn, matched, placeholderId, linkableExpenses, linkableEarnings,
+  bankTxn, matched, placeholderId, linkableExpenses, linkableEarnings, linkedIds,
 }: {
   bankTxn: StoredTransaction;
   matched: Transaction[];          // may be empty; may have multiple
   placeholderId?: string;
   linkableExpenses: Transaction[];
   linkableEarnings: Transaction[];
+  linkedIds: Set<string>;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -265,6 +269,7 @@ function LedgerRow({
               bankTxn={bankTxn}
               placeholderId={placeholderId}
               linkable={linkable}
+              linkedIds={linkedIds}
               onDone={() => setOpen(false)}
             />
           )}
@@ -393,6 +398,15 @@ export function BankLedger({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bankTxns, filter, typeFilter, search, matchedMap]);
 
+  // All Notion IDs already linked to any bank transaction
+  const linkedIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const txns of Object.values(matchedMap)) {
+      for (const t of txns) ids.add(t.id);
+    }
+    return ids;
+  }, [matchedMap]);
+
   const fullCount    = bankTxns.filter((t) => matchStatus(t) === "full").length;
   const partialCount = bankTxns.filter((t) => matchStatus(t) === "partial").length;
   const noneCount    = bankTxns.filter((t) => matchStatus(t) === "none").length;
@@ -460,6 +474,7 @@ export function BankLedger({
               placeholderId={unmatchedPlaceholderMap[t.transaction_id]}
               linkableExpenses={linkableExpenses}
               linkableEarnings={linkableEarnings}
+              linkedIds={linkedIds}
             />
           ))
         )}

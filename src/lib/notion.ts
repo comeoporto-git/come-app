@@ -1049,6 +1049,7 @@ export async function getLinkableExpenses(): Promise<Transaction[]> {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const res: any = await notion.databases.query({
         database_id: TRANSACTIONS_DB,
+        filter: { property: "ID do Banco", rich_text: { is_empty: true } },
         sorts: [{ property: "Data", direction: "descending" }],
         page_size: 100,
         ...(cursor ? { start_cursor: cursor } : {}),
