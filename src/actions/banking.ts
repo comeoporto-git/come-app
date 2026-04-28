@@ -183,13 +183,26 @@ export async function runManualMatchAction(): Promise<{
   return { matched, skipped, errors };
 }
 
-// ── Delete bank transaction ───────────────────────────────────────────────────
+// ── Delete bank transaction(s) ────────────────────────────────────────────────
 
 export async function deleteBankTransactionAction(transactionId: string): Promise<void> {
   await requireAdmin();
   const sql = getDb();
   await sql`DELETE FROM bank_transactions WHERE transaction_id = ${transactionId}`;
   revalidatePath("/admin/reconciliation");
+}
+
+export async function deleteBankTransactionsAction(transactionIds: string[]): Promise<{ deleted: number }> {
+  await requireAdmin();
+  if (transactionIds.length === 0) return { deleted: 0 };
+  const sql = getDb();
+  let deleted = 0;
+  for (const id of transactionIds) {
+    await sql`DELETE FROM bank_transactions WHERE transaction_id = ${id}`;
+    deleted++;
+  }
+  revalidatePath("/admin/reconciliation");
+  return { deleted };
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useMemo, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { linkBankTransactionAction, dismissUnmatchedAction, runManualMatchAction, unlinkBankTransactionAction, deleteBankTransactionAction } from "@/actions/banking";
+import { linkBankTransactionAction, dismissUnmatchedAction, runManualMatchAction, unlinkBankTransactionAction, deleteBankTransactionAction, deleteBankTransactionsAction } from "@/actions/banking";
 import type { StoredTransaction } from "@/lib/enablebanking";
 import type { Transaction } from "@/lib/notion";
 
@@ -177,13 +177,16 @@ function DeleteButton({ transactionId, onDeleted }: { transactionId: string; onD
 
 function LedgerRow({
   bankTxn, matched, placeholderId, linkableExpenses, linkableEarnings, linkedIds,
+  isSelected, onToggle,
 }: {
   bankTxn: StoredTransaction;
-  matched: Transaction[];          // may be empty; may have multiple
+  matched: Transaction[];
   placeholderId?: string;
   linkableExpenses: Transaction[];
   linkableEarnings: Transaction[];
   linkedIds: Set<string>;
+  isSelected: boolean;
+  onToggle: (id: string) => void;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -211,11 +214,21 @@ function LedgerRow({
   }
 
   return (
-    <div className={`border-b border-gray-100 last:border-0 ${
+    <div className={`border-b border-gray-100 last:border-0 ${isSelected ? "bg-blue-50/60" : (
       !isMatched  ? (isCredit ? "bg-blue-50/30" : "bg-orange-50/30") :
       isPartial   ? "bg-yellow-50/40" : ""
-    }`}>
-      <div className="grid grid-cols-[1fr_auto] md:grid-cols-[160px_1fr_100px_1fr_auto] gap-x-4 items-start px-4 py-3">
+    )}`}>
+      <div className="grid grid-cols-[20px_1fr_auto] md:grid-cols-[20px_160px_1fr_100px_1fr_auto] gap-x-3 items-start px-3 py-3">
+
+        {/* Checkbox */}
+        <div className="pt-0.5">
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={() => onToggle(bankTxn.transaction_id)}
+            className="w-4 h-4 rounded border-gray-300 text-blue-600 cursor-pointer accent-[#32373c]"
+          />
+        </div>
 
         {/* Date */}
         <div className="hidden md:block">
@@ -402,6 +415,10 @@ export function BankLedger({
   const [filter,     setFilter]     = useState<Filter>("all");
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [search,     setSearch]     = useState("");
+  const [selectedIds,    setSelectedIds]    = useState<Set<string>>(new Set());
+  const [bulkConfirm,    setBulkConfirm]    = useState(false);
+  const [bulkPending,    startBulkTransition] = useTransition();
+  const router = useRouter();
 
   // Keys (date|amount|credit_debit) that appear more than once → duplicates
   const dupKeys = useMemo(() => {
@@ -457,6 +474,42 @@ export function BankLedger({
     }
     return ids;
   }, [matchedMap]);
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  const allVisibleSelected = rows.length > 0 && rows.every((r) => selectedIds.has(r.transaction_id));
+  const someVisibleSelected = rows.some((r) => selectedIds.has(r.transaction_id));
+
+  function toggleSelectAll() {
+    if (allVisibleSelected) {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        rows.forEach((r) => next.delete(r.transaction_id));
+        return next;
+      });
+    } else {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        rows.forEach((r) => next.add(r.transaction_id));
+        return next;
+      });
+    }
+  }
+
+  function handleBulkDelete() {
+    startBulkTransition(async () => {
+      await deleteBankTransactionsAction([...selectedIds]);
+      setSelectedIds(new Set());
+      setBulkConfirm(false);
+      router.refresh();
+    });
+  }
 
   const fullCount    = bankTxns.filter((t) => matchStatus(t) === "full").length;
   const partialCount = bankTxns.filter((t) => matchStatus(t) === "partial").length;
@@ -515,9 +568,59 @@ export function BankLedger({
         </div>
       </div>
 
+      {/* Bulk action bar */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 bg-[#32373c] text-white rounded-xl px-4 py-2.5 shadow-lg">
+          <span className="text-sm font-semibold flex-1">
+            {selectedIds.size} movimento{selectedIds.size !== 1 ? "s" : ""} selecionado{selectedIds.size !== 1 ? "s" : ""}
+          </span>
+          {!bulkConfirm ? (
+            <>
+              <button
+                onClick={() => setBulkConfirm(true)}
+                className="text-xs font-semibold bg-red-500 hover:bg-red-600 px-3 py-1.5 rounded-lg transition-colors"
+              >
+                🗑 Apagar selecionados
+              </button>
+              <button
+                onClick={() => setSelectedIds(new Set())}
+                className="text-xs text-white/60 hover:text-white transition-colors"
+              >
+                Cancelar
+              </button>
+            </>
+          ) : (
+            <>
+              <span className="text-xs text-red-300 font-semibold">Apagar {selectedIds.size} movimentos?</span>
+              <button
+                disabled={bulkPending}
+                onClick={handleBulkDelete}
+                className="text-xs font-bold bg-red-600 hover:bg-red-700 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+              >
+                {bulkPending ? "A apagar…" : "Confirmar"}
+              </button>
+              <button
+                onClick={() => setBulkConfirm(false)}
+                className="text-xs text-white/60 hover:text-white transition-colors"
+              >
+                Voltar
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
       {/* Table */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="hidden md:grid grid-cols-[160px_1fr_100px_1fr_auto] gap-x-4 px-4 py-2.5 bg-gray-50 border-b border-gray-100 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
+        <div className="hidden md:grid grid-cols-[20px_160px_1fr_100px_1fr_auto] gap-x-3 px-3 py-2.5 bg-gray-50 border-b border-gray-100 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
+          <input
+            type="checkbox"
+            checked={allVisibleSelected}
+            ref={(el) => { if (el) el.indeterminate = someVisibleSelected && !allVisibleSelected; }}
+            onChange={toggleSelectAll}
+            className="w-4 h-4 rounded border-gray-300 cursor-pointer accent-[#32373c] mt-0.5"
+            title="Selecionar todos visíveis"
+          />
           <span>Data</span>
           <span>Transação Banco</span>
           <span className="text-right">Valor</span>
@@ -536,6 +639,8 @@ export function BankLedger({
               linkableExpenses={linkableExpenses}
               linkableEarnings={linkableEarnings}
               linkedIds={linkedIds}
+              isSelected={selectedIds.has(t.transaction_id)}
+              onToggle={toggleSelect}
             />
           ))
         )}
