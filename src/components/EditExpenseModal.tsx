@@ -83,18 +83,52 @@ export function EditExpenseModal({
     });
   }
 
-  function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    setImageFile(file);
-    // PDFs have no visual preview — just track the file
+
     if (file.type === "application/pdf") {
+      setImageFile(file);
       setImageDataUrl("pdf");
       return;
     }
-    const reader = new FileReader();
-    reader.onload = (ev) => setImageDataUrl(ev.target?.result as string);
-    reader.readAsDataURL(file);
+
+    try {
+      // Normalize: resize to max 2048px and convert to JPEG via FileReader+Image
+      // (avoids createImageBitmap which is unreliable on iOS Safari)
+      const MAX_PX = 2048;
+      const rawDataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (ev) => resolve(ev.target!.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const el = new Image();
+        el.onload = () => resolve(el);
+        el.onerror = reject;
+        el.src = rawDataUrl;
+      });
+      const scale = Math.min(1, MAX_PX / Math.max(img.naturalWidth || 1, img.naturalHeight || 1));
+      const canvas = document.createElement("canvas");
+      canvas.width  = Math.round((img.naturalWidth  || 1) * scale);
+      canvas.height = Math.round((img.naturalHeight || 1) * scale);
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("no ctx");
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      const outUrl = canvas.toDataURL("image/jpeg", 0.85);
+      const blob = await new Promise<Blob>((resolve, reject) =>
+        canvas.toBlob((b) => b ? resolve(b) : reject(new Error("toBlob failed")), "image/jpeg", 0.85)
+      );
+      setImageFile(new File([blob], "invoice.jpg", { type: "image/jpeg" }));
+      setImageDataUrl(outUrl);
+    } catch {
+      // Fallback: use original file as-is
+      setImageFile(file);
+      const reader = new FileReader();
+      reader.onload = (ev) => setImageDataUrl(ev.target?.result as string);
+      reader.readAsDataURL(file);
+    }
   }
 
   async function handleDelete() {
