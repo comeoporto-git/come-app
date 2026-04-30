@@ -14,6 +14,7 @@ import { ExpenseList } from "@/components/ExpenseList";
 import { AddExpenseButton } from "@/components/AddExpenseButton";
 import { TeamPicker } from "@/components/TeamPicker";
 import { ServiceInfoEditor } from "@/components/ServiceInfoEditor";
+import { MapsLink } from "@/components/MapsLink";
 
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
@@ -185,21 +186,10 @@ async function TourPageContent({
                   </div>
                 </div>
                 <InfoField label="Notas" value={tour.notes || "—"} />
-                {tour.meetingPoint ? (
-                  <div>
-                    <p className="text-xs text-gray-500 mb-1">Ponto de Encontro</p>
-                    <a
-                      href={`https://maps.apple.com/?q=${encodeURIComponent(tour.meetingPoint)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm text-[#667470] font-medium hover:underline flex items-center gap-1"
-                    >
-                      📍 {tour.meetingPoint}
-                    </a>
-                  </div>
-                ) : (
-                  <InfoField label="Ponto de Encontro" value="—" />
-                )}
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">Ponto de Encontro</p>
+                  {tour.meetingPoint ? <MapsLink location={tour.meetingPoint} /> : <p className="text-sm text-gray-800 font-medium">—</p>}
+                </div>
               </>
             )}
           </div>
