@@ -110,7 +110,21 @@ export function ServiceInfoEditor({
           </div>
 
           <ReadField label="Notas" value={notes || "—"} />
-          <ReadField label="Ponto de Encontro" value={meetingPoint || "—"} />
+          <div>
+            <p className="text-xs text-gray-500 mb-1">Ponto de Encontro</p>
+            {meetingPoint ? (
+              <a
+                href={`https://maps.apple.com/?q=${encodeURIComponent(meetingPoint)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-[#667470] font-medium hover:underline flex items-center gap-1"
+              >
+                📍 {meetingPoint}
+              </a>
+            ) : (
+              <p className="text-sm text-gray-800 font-medium">—</p>
+            )}
+          </div>
 
           <button
             onClick={() => setEditing(true)}
