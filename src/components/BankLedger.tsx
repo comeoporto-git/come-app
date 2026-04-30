@@ -213,12 +213,145 @@ function LedgerRow({
     startDismiss(async () => { await dismissUnmatchedAction(placeholderId); setDismissed(true); });
   }
 
+  const badge = (
+    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${isCredit ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"}`}>
+      {isCredit ? "CRÉDITO" : "DÉBITO"}
+    </span>
+  );
+
+  const notionRecords = (
+    <>
+      {matched.map((m, idx) => (
+        <div key={m.id} className={idx > 0 ? "border-t border-gray-100 pt-2" : ""}>
+          <div className="flex items-center gap-1">
+            <p className="text-xs font-semibold text-gray-800 truncate flex-1">{m.supplier || "—"}</p>
+            <span className="text-xs font-bold text-gray-700 shrink-0">{fmtEur(Math.abs(m.totalCost))}</span>
+            <UnlinkButton notionId={m.id} onUnlinked={() => router.refresh()} />
+          </div>
+          <p className="text-[10px] text-gray-400 truncate">
+            {m.date ? fmtDate(m.date) : ""}
+            {m.invoiceId ? ` · Fatura ${m.invoiceId}` : ""}
+            {m.tourName ? ` · ${m.tourName}` : ""}
+          </p>
+          {(m.iva6 > 0 || m.iva13 > 0 || m.iva23 > 0) && (
+            <div className="flex gap-x-2 text-[10px] text-gray-400">
+              {m.iva6  > 0 && <span>IVA 6% {fmtEur(m.iva6)}</span>}
+              {m.iva13 > 0 && <span>IVA 13% {fmtEur(m.iva13)}</span>}
+              {m.iva23 > 0 && <span>IVA 23% {fmtEur(m.iva23)}</span>}
+              {m.taxFree > 0 && <span>S/IVA {fmtEur(m.taxFree)}</span>}
+            </div>
+          )}
+          {m.invoiceImageUrl && (
+            <a href={m.invoiceImageUrl} target="_blank" rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-[10px] text-blue-500 hover:text-blue-700"
+              onClick={(e) => e.stopPropagation()}>
+              📄 Ver fatura
+            </a>
+          )}
+        </div>
+      ))}
+      {matched.length > 1 && (
+        <div className={`flex items-center justify-between text-[10px] font-semibold pt-1 border-t border-gray-100 ${isFullMatch ? "text-green-600" : "text-yellow-600"}`}>
+          <span>Total ({matched.length} registos)</span>
+          <span>{fmtEur(matchedTotal)} / {fmtEur(bankAmount)}</span>
+        </div>
+      )}
+    </>
+  );
+
+  const actionButtons = (
+    <>
+      {isFullMatch ? (
+        <button onClick={() => setOpen((o) => !o)} className="text-[10px] text-gray-400 hover:text-blue-500 transition-colors">
+          {open ? "Fechar" : "+ Ligar mais"}
+        </button>
+      ) : (
+        <button
+          onClick={() => setOpen((o) => !o)}
+          className={`text-[10px] font-semibold px-2 py-1 rounded-full transition-colors ${
+            isPartial ? "text-yellow-700 bg-yellow-100 hover:bg-yellow-200" : "text-blue-600 bg-blue-50 hover:bg-blue-100"
+          }`}
+        >
+          {open ? "Fechar" : isPartial ? "🔗 Mais" : "🔗 Ligar"}
+        </button>
+      )}
+      {!isMatched && placeholderId && (
+        <button disabled={dismissPending} onClick={dismiss} className="text-[10px] text-gray-400 hover:text-red-500 transition-colors">
+          Dispensar
+        </button>
+      )}
+      <DeleteButton transactionId={bankTxn.transaction_id} onDeleted={handleDeleted} />
+    </>
+  );
+
   return (
     <div className={`border-b border-gray-100 last:border-0 ${isSelected ? "bg-blue-50/60" : (
       !isMatched  ? (isCredit ? "bg-blue-50/30" : "bg-orange-50/30") :
       isPartial   ? "bg-yellow-50/40" : ""
     )}`}>
-      <div className="grid grid-cols-[20px_1fr_auto] md:grid-cols-[20px_160px_1fr_100px_1fr_auto] gap-x-3 items-start px-3 py-3">
+
+      {/* ── Mobile layout ─────────────────────────────────────────────────── */}
+      <div className="md:hidden px-3 py-3 space-y-2">
+
+        {/* Row 1: checkbox · badge · amount */}
+        <div className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={() => onToggle(bankTxn.transaction_id)}
+            className="w-4 h-4 rounded border-gray-300 cursor-pointer accent-[#32373c] shrink-0"
+          />
+          {badge}
+          <span className="flex-1" />
+          <span className={`text-sm font-bold ${isCredit ? "text-green-600" : "text-gray-800"}`}>
+            {isCredit ? "+" : ""}{fmtEur(bankAmount)}
+          </span>
+        </div>
+
+        {/* Row 2: description + date/ref */}
+        <div className="pl-6">
+          <p className="text-xs font-semibold text-gray-800 line-clamp-2">
+            {bankTxn.merchant_name || bankTxn.remittance_info || "—"}
+          </p>
+          <p className="text-[10px] text-gray-400 truncate mt-0.5">
+            {bankTxn.transaction_date ? fmtDate(bankTxn.transaction_date) : ""}
+            {" · Ref: "}{bankTxn.transaction_id}
+          </p>
+        </div>
+
+        {/* Matched records */}
+        {matched.length > 0 && (
+          <div className="pl-6 pt-2 border-t border-gray-100 space-y-2">
+            {notionRecords}
+          </div>
+        )}
+
+        {/* Status + actions */}
+        <div className="pl-6 flex items-center justify-between gap-2">
+          <div className="min-w-0 flex-1 text-[10px] font-semibold">
+            {!isMatched && <span className="text-orange-500">Sem correspondência · {isCredit ? "receita" : "despesa"}</span>}
+            {isPartial  && <span className="text-yellow-600">{fmtEur(remaining)} por ligar</span>}
+            {isFullMatch && <span className="text-green-600">✓ Completo</span>}
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {actionButtons}
+          </div>
+        </div>
+
+        {/* Expense picker */}
+        {open && (
+          <ExpensePicker
+            bankTxn={bankTxn}
+            placeholderId={placeholderId}
+            linkable={linkable}
+            linkedIds={linkedIds}
+            onDone={() => setOpen(false)}
+          />
+        )}
+      </div>
+
+      {/* ── Desktop layout ─────────────────────────────────────────────────── */}
+      <div className="hidden md:grid grid-cols-[20px_160px_1fr_100px_1fr_auto] gap-x-3 items-start px-3 py-3">
 
         {/* Checkbox */}
         <div className="pt-0.5">
@@ -231,7 +364,7 @@ function LedgerRow({
         </div>
 
         {/* Date */}
-        <div className="hidden md:block">
+        <div>
           <p className="text-xs font-medium text-gray-700">
             {bankTxn.transaction_date ? fmtDate(bankTxn.transaction_date) : "—"}
           </p>
@@ -244,16 +377,11 @@ function LedgerRow({
 
         {/* Bank description */}
         <div className="min-w-0">
-          <div className="flex items-center gap-1.5 mb-0.5">
-            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${isCredit ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"}`}>
-              {isCredit ? "CRÉDITO" : "DÉBITO"}
-            </span>
-          </div>
+          <div className="flex items-center gap-1.5 mb-0.5">{badge}</div>
           <p className="text-xs font-semibold text-gray-800 truncate">
             {bankTxn.merchant_name || bankTxn.remittance_info || "—"}
           </p>
           <p className="text-[10px] text-gray-400 truncate mt-0.5">
-            <span className="md:hidden">{bankTxn.transaction_date ? fmtDate(bankTxn.transaction_date) : ""} · </span>
             Ref: {bankTxn.transaction_id}
           </p>
         </div>
@@ -270,52 +398,14 @@ function LedgerRow({
           )}
         </div>
 
-        {/* Notion side — list of all linked records */}
-        <div className="min-w-0 col-span-1 space-y-2">
-          {matched.map((m, idx) => (
-            <div key={m.id} className={`${idx > 0 ? "border-t border-gray-100 pt-2" : ""}`}>
-              <div className="flex items-center gap-1">
-                <p className="text-xs font-semibold text-gray-800 truncate flex-1">{m.supplier || "—"}</p>
-                <UnlinkButton notionId={m.id} onUnlinked={() => router.refresh()} />
-              </div>
-              <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-gray-500">
-                <span className="font-semibold text-gray-700">{fmtEur(Math.abs(m.totalCost))}</span>
-                {m.date && <span>{fmtDate(m.date)}</span>}
-                {m.invoiceId && <span>Fatura {m.invoiceId}</span>}
-                {m.tourName && <span>· {m.tourName}</span>}
-              </div>
-              {(m.iva6 > 0 || m.iva13 > 0 || m.iva23 > 0) && (
-                <div className="flex gap-x-2 text-[10px] text-gray-400">
-                  {m.iva6  > 0 && <span>IVA 6% {fmtEur(m.iva6)}</span>}
-                  {m.iva13 > 0 && <span>IVA 13% {fmtEur(m.iva13)}</span>}
-                  {m.iva23 > 0 && <span>IVA 23% {fmtEur(m.iva23)}</span>}
-                  {m.taxFree > 0 && <span>S/IVA {fmtEur(m.taxFree)}</span>}
-                </div>
-              )}
-              {m.invoiceImageUrl && (
-                <a href={m.invoiceImageUrl} target="_blank" rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-[10px] text-blue-500 hover:text-blue-700"
-                  onClick={(e) => e.stopPropagation()}>
-                  📄 Ver fatura
-                </a>
-              )}
-            </div>
-          ))}
-
-          {/* Total bar when multiple records linked */}
-          {matched.length > 1 && (
-            <div className={`flex items-center justify-between text-[10px] font-semibold pt-1 border-t border-gray-100 ${isFullMatch ? "text-green-600" : "text-yellow-600"}`}>
-              <span>Total ligado ({matched.length} registos)</span>
-              <span>{fmtEur(matchedTotal)} / {fmtEur(bankAmount)}</span>
-            </div>
-          )}
-
+        {/* Notion side */}
+        <div className="min-w-0 space-y-2">
+          {notionRecords}
           {!isMatched && (
             <p className="text-[10px] text-orange-500 font-semibold">
               Sem correspondência · {isCredit ? "receita" : "despesa"}
             </p>
           )}
-
           {open && (
             <ExpensePicker
               bankTxn={bankTxn}
@@ -329,39 +419,8 @@ function LedgerRow({
 
         {/* Actions */}
         <div className="flex flex-col items-end gap-1.5 shrink-0">
-          {isFullMatch ? (
-            <span className="text-[10px] font-semibold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">✓</span>
-          ) : (
-            <button
-              onClick={() => setOpen((o) => !o)}
-              className={`text-[10px] font-semibold px-2 py-1 rounded-full transition-colors ${
-                isPartial
-                  ? "text-yellow-700 bg-yellow-100 hover:bg-yellow-200"
-                  : "text-blue-600 bg-blue-50 hover:bg-blue-100"
-              }`}
-            >
-              {open ? "Fechar" : isPartial ? "🔗 Ligar mais" : "🔗 Ligar"}
-            </button>
-          )}
-          {/* Always allow adding more links even on fully matched rows */}
-          {isFullMatch && (
-            <button
-              onClick={() => setOpen((o) => !o)}
-              className="text-[10px] text-gray-400 hover:text-blue-500 transition-colors"
-            >
-              {open ? "Fechar" : "+ Ligar mais"}
-            </button>
-          )}
-          {!isMatched && placeholderId && (
-            <button
-              disabled={dismissPending}
-              onClick={dismiss}
-              className="text-[10px] text-gray-400 hover:text-red-500 transition-colors"
-            >
-              Dispensar
-            </button>
-          )}
-          <DeleteButton transactionId={bankTxn.transaction_id} onDeleted={handleDeleted} />
+          {isFullMatch && <span className="text-[10px] font-semibold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">✓</span>}
+          {actionButtons}
         </div>
       </div>
     </div>
@@ -530,18 +589,18 @@ export function BankLedger({
         </div>
       </div>
 
-      {/* Filter pills */}
-      <div className="flex flex-wrap gap-2">
-        <div className="flex bg-gray-100 rounded-xl p-1 gap-1 text-xs font-semibold">
+      {/* Filter pills — scrollable on mobile, wrapping on desktop */}
+      <div className="flex gap-2 overflow-x-auto pb-0.5 -mx-4 px-4 md:mx-0 md:px-0 md:flex-wrap md:overflow-visible scrollbar-none">
+        <div className="flex bg-gray-100 rounded-xl p-1 gap-1 text-xs font-semibold shrink-0">
           {([
             ["all",        `Todos (${bankTxns.length})`],
             ["matched",    `✓ Completo (${fullCount})`],
             ["partial",    `◑ Parcial (${partialCount})`],
             ["unmatched",  `○ Sem match (${noneCount})`],
-            ["duplicates", `⚠ Duplicados (${dupCount})`],
+            ["duplicates", `⚠ Dup. (${dupCount})`],
           ] as [Filter, string][]).map(([f, label]) => (
             <button key={f} onClick={() => setFilter(f)}
-              className={`px-3 py-1.5 rounded-lg transition-all ${
+              className={`px-3 py-1.5 rounded-lg transition-all whitespace-nowrap ${
                 filter === f
                   ? f === "duplicates"
                     ? "bg-orange-500 text-white shadow-sm"
@@ -554,14 +613,14 @@ export function BankLedger({
             </button>
           ))}
         </div>
-        <div className="flex bg-gray-100 rounded-xl p-1 gap-1 text-xs font-semibold">
+        <div className="flex bg-gray-100 rounded-xl p-1 gap-1 text-xs font-semibold shrink-0">
           {([
             ["all",    "Ambos"],
-            ["debit",  `Débitos (${debitCount})`],
-            ["credit", `Créditos (${creditCount})`],
+            ["debit",  `Déb. (${debitCount})`],
+            ["credit", `Cré. (${creditCount})`],
           ] as [TypeFilter, string][]).map(([f, label]) => (
             <button key={f} onClick={() => setTypeFilter(f)}
-              className={`px-3 py-1.5 rounded-lg transition-all ${typeFilter === f ? "bg-white text-gray-800 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
+              className={`px-3 py-1.5 rounded-lg transition-all whitespace-nowrap ${typeFilter === f ? "bg-white text-gray-800 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
               {label}
             </button>
           ))}
