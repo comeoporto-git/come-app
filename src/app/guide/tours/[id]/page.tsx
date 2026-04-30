@@ -145,6 +145,7 @@ async function TourPageContent({
                 names={tour.names}
                 phoneNumber={tour.phoneNumber}
                 notes={tour.notes}
+                meetingPoint={tour.meetingPoint}
               />
             ) : (
               <>
@@ -184,6 +185,7 @@ async function TourPageContent({
                   </div>
                 </div>
                 <InfoField label="Notas" value={tour.notes || "—"} />
+                <InfoField label="Ponto de Encontro" value={tour.meetingPoint || "—"} />
               </>
             )}
           </div>

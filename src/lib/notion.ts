@@ -298,6 +298,7 @@ export async function updateTeamMemberRole(
 //   numGuests      → "Number of Guests" (Number)
 //   names          → "Names"            (Text)
 //   notes          → "Notes"            (Text)
+//   meetingPoint   → "Meeting Point"    (Text)
 //   guideId        → "Guia"             (Relation → Team DB)
 //   chefId         → "Chef"             (Relation → Team DB)
 //   driverId       → "Driver 1"         (Relation → Team DB)
@@ -317,6 +318,7 @@ export type Tour = {
   names: string;
   phoneNumber: string;
   notes: string;
+  meetingPoint: string;
   status: string;
   // Team
   guideId: string | null;
@@ -352,6 +354,7 @@ function mapTour(page: PageObjectResponse): Tour {
     names:           text(getProp(page, "Names")),
     phoneNumber:     text(getProp(page, "Phone Number")),
     notes:           text(getProp(page, "Notes")),
+    meetingPoint:    text(getProp(page, "Meeting Point")),
     status:          text(getProp(page, "Status")),
     guideId:         guideIds[0]  ?? null,
     guideName:       "",
@@ -432,6 +435,7 @@ export async function updateTourServiceInfo(
     names: string;
     phoneNumber: string;
     notes: string;
+    meetingPoint: string;
   },
 ): Promise<void> {
   try {
@@ -442,6 +446,7 @@ export async function updateTourServiceInfo(
         Names: { rich_text: data.names ? [{ text: { content: data.names } }] : [] },
         "Phone Number": { rich_text: data.phoneNumber ? [{ text: { content: data.phoneNumber } }] : [] },
         Notes: { rich_text: data.notes ? [{ text: { content: data.notes } }] : [] },
+        "Meeting Point": { rich_text: data.meetingPoint ? [{ text: { content: data.meetingPoint } }] : [] },
       } as Parameters<typeof notion.pages.update>[0]["properties"],
     });
   } catch (err) {

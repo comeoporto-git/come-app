@@ -49,6 +49,7 @@ export async function updateTourServiceInfoAction(
     names: string;
     phoneNumber: string;
     notes: string;
+    meetingPoint: string;
   },
 ): Promise<{ error?: string }> {
   const session = await requireAuth();

@@ -13,6 +13,7 @@ interface Props {
   names: string;
   phoneNumber: string;
   notes: string;
+  meetingPoint: string;
 }
 
 export function ServiceInfoEditor({
@@ -25,15 +26,17 @@ export function ServiceInfoEditor({
   names,
   phoneNumber,
   notes,
+  meetingPoint,
 }: Props) {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [draftGuests, setDraftGuests]     = useState(numGuests > 0 ? String(numGuests) : "");
-  const [draftNames, setDraftNames]       = useState(names);
-  const [draftPhone, setDraftPhone]       = useState(phoneNumber);
-  const [draftNotes, setDraftNotes]       = useState(notes);
+  const [draftGuests,  setDraftGuests]  = useState(numGuests > 0 ? String(numGuests) : "");
+  const [draftNames,   setDraftNames]   = useState(names);
+  const [draftPhone,   setDraftPhone]   = useState(phoneNumber);
+  const [draftNotes,   setDraftNotes]   = useState(notes);
+  const [draftMeeting, setDraftMeeting] = useState(meetingPoint);
 
   async function handleSave() {
     setSaving(true);
@@ -44,6 +47,7 @@ export function ServiceInfoEditor({
         names: draftNames,
         phoneNumber: draftPhone,
         notes: draftNotes,
+        meetingPoint: draftMeeting,
       });
       if (result.error) {
         setError(result.error);
@@ -62,6 +66,7 @@ export function ServiceInfoEditor({
     setDraftNames(names);
     setDraftPhone(phoneNumber);
     setDraftNotes(notes);
+    setDraftMeeting(meetingPoint);
     setEditing(false);
   }
 
@@ -105,6 +110,7 @@ export function ServiceInfoEditor({
           </div>
 
           <ReadField label="Notas" value={notes || "—"} />
+          <ReadField label="Ponto de Encontro" value={meetingPoint || "—"} />
 
           <button
             onClick={() => setEditing(true)}
@@ -157,6 +163,17 @@ export function ServiceInfoEditor({
               rows={3}
               placeholder="Notas adicionais..."
               className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#667470]/30 bg-white resize-none"
+            />
+          </div>
+
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">Ponto de Encontro</label>
+            <input
+              type="text"
+              value={draftMeeting}
+              onChange={(e) => setDraftMeeting(e.target.value)}
+              placeholder="Ex: Mercado do Bolhão, entrada principal"
+              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#667470]/30 bg-white"
             />
           </div>
 
