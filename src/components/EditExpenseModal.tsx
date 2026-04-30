@@ -116,11 +116,18 @@ export function EditExpenseModal({
       const ctx = canvas.getContext("2d");
       if (!ctx) throw new Error("no ctx");
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      const outUrl = canvas.toDataURL("image/jpeg", 0.85);
-      const blob = await new Promise<Blob>((resolve, reject) =>
-        canvas.toBlob((b) => b ? resolve(b) : reject(new Error("toBlob failed")), "image/jpeg", 0.85)
+      const blob = await new Promise<Blob | null>((resolve) =>
+        canvas.toBlob((b) => resolve(b), "image/jpeg", 0.85)
       );
-      setImageFile(new File([blob], "invoice.jpg", { type: "image/jpeg" }));
+      // toDataURL can return "data:," on low-memory iOS — fall back to rawDataUrl
+      const outUrl = (() => {
+        const d = canvas.toDataURL("image/jpeg", 0.85);
+        return d.length > 50 ? d : rawDataUrl;
+      })();
+      setImageFile(blob
+        ? new File([blob], "invoice.jpg", { type: "image/jpeg" })
+        : file // fallback: upload original
+      );
       setImageDataUrl(outUrl);
     } catch {
       // Fallback: use original file as-is

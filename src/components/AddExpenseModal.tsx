@@ -117,14 +117,24 @@ export function AddExpenseModal({
 
     const mediaType = (!isHeic && file.type === "image/png") ? "image/png" : "image/jpeg";
     const quality   = mediaType === "image/jpeg" ? 0.85 : undefined;
-    const dataUrl   = canvas.toDataURL(mediaType, quality);
 
-    // Step 4: Build a normalized File for upload (JPEG/PNG, never raw HEIC)
-    const blob = await new Promise<Blob>((resolve, reject) =>
-      canvas.toBlob((b) => b ? resolve(b) : reject(new Error("toBlob failed")), mediaType, quality)
+    // Step 4: toBlob for the upload File (more memory-efficient than toDataURL on iOS)
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob((b) => resolve(b), mediaType, quality)
     );
+
+    // Step 5: toDataURL for preview + AI — fall back to rawDataUrl if canvas
+    // returns empty (iOS low-memory symptom: returns "data:," without throwing)
+    const dataUrl = (() => {
+      const d = canvas.toDataURL(mediaType, quality);
+      return d.length > 50 ? d : rawDataUrl; // rawDataUrl is always valid
+    })();
+
+    // Build the normalized File — prefer the canvas blob, fall back to original
     const ext = mediaType === "image/png" ? "png" : "jpg";
-    const normalizedFile = new File([blob], `invoice.${ext}`, { type: mediaType });
+    const normalizedFile = blob
+      ? new File([blob], `invoice.${ext}`, { type: mediaType })
+      : file; // last-resort fallback: upload original
 
     return { dataUrl, base64: dataUrl.split(",")[1], mediaType, normalizedFile };
   }
