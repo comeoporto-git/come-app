@@ -110,10 +110,13 @@ export function ServiceInfoEditor({
             )}
           </div>
 
-          <ReadField label="Notas" value={notes || "—"} />
           <div>
             <p className="text-xs text-gray-500 mb-1">Ponto de Encontro</p>
             {meetingPoint ? <MapsLink location={meetingPoint} /> : <p className="text-sm text-gray-800 font-medium">—</p>}
+          </div>
+          <div>
+            <p className="text-xs text-gray-500 mb-1">Notas</p>
+            <p className="text-sm font-bold text-red-600 whitespace-pre-line">{notes || "—"}</p>
           </div>
 
           <button
@@ -160,17 +163,6 @@ export function ServiceInfoEditor({
           </div>
 
           <div>
-            <label className="text-xs text-gray-500 mb-1 block">Notas</label>
-            <textarea
-              value={draftNotes}
-              onChange={(e) => setDraftNotes(e.target.value)}
-              rows={3}
-              placeholder="Notas adicionais..."
-              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#667470]/30 bg-white resize-none"
-            />
-          </div>
-
-          <div>
             <label className="text-xs text-gray-500 mb-1 block">Ponto de Encontro</label>
             <input
               type="text"
@@ -178,6 +170,17 @@ export function ServiceInfoEditor({
               onChange={(e) => setDraftMeeting(e.target.value)}
               placeholder="Ex: Mercado do Bolhão, entrada principal"
               className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#667470]/30 bg-white"
+            />
+          </div>
+
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">Notas</label>
+            <textarea
+              value={draftNotes}
+              onChange={(e) => setDraftNotes(e.target.value)}
+              rows={3}
+              placeholder="Notas adicionais..."
+              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#667470]/30 bg-white resize-none"
             />
           </div>
 

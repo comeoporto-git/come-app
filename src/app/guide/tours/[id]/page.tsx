@@ -185,10 +185,13 @@ async function TourPageContent({
                     )}
                   </div>
                 </div>
-                <InfoField label="Notas" value={tour.notes || "—"} />
                 <div>
                   <p className="text-xs text-gray-500 mb-1">Ponto de Encontro</p>
                   {tour.meetingPoint ? <MapsLink location={tour.meetingPoint} /> : <p className="text-sm text-gray-800 font-medium">—</p>}
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">Notas</p>
+                  <p className="text-sm font-bold text-red-600 whitespace-pre-line">{tour.notes || "—"}</p>
                 </div>
               </>
             )}
