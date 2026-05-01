@@ -37,6 +37,19 @@ export default async function ReconciliationPage() {
   const matchedCount = bankTxns.filter((t) => (matchedMap[t.transaction_id] ?? []).length > 0).length;
   const pendingCount = totalAll - matchedCount;
 
+  // Financial totals
+  const totalEntradas = bankTxns
+    .filter((t) => t.credit_debit === "CRDT")
+    .reduce((s, t) => s + Math.abs(t.amount), 0);
+  const totalSaidas = bankTxns
+    .filter((t) => t.credit_debit === "DBIT")
+    .reduce((s, t) => s + Math.abs(t.amount), 0);
+  const saldo = totalEntradas - totalSaidas;
+
+  function fmtEur(n: number) {
+    return n.toLocaleString("pt-PT", { style: "currency", currency: "EUR" });
+  }
+
   // Oldest transaction date for the footer
   const oldestDate = bankTxns.length > 0
     ? bankTxns.reduce((min, t) => t.transaction_date < min ? t.transaction_date : min, bankTxns[0].transaction_date)
@@ -63,7 +76,23 @@ export default async function ReconciliationPage() {
 
       <main className="max-w-4xl mx-auto px-4 py-6 space-y-6">
 
-        {/* Summary KPIs */}
+        {/* Financial totals */}
+        <div className="grid grid-cols-3 gap-3">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 text-center">
+            <p className="text-lg font-bold text-green-600 tabular-nums">{fmtEur(totalEntradas)}</p>
+            <p className="text-xs text-gray-400 mt-1">Total de Entradas</p>
+          </div>
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 text-center">
+            <p className="text-lg font-bold text-red-500 tabular-nums">{fmtEur(totalSaidas)}</p>
+            <p className="text-xs text-gray-400 mt-1">Total de Saídas</p>
+          </div>
+          <div className={`rounded-2xl border shadow-sm p-4 text-center ${saldo >= 0 ? "bg-white border-gray-100" : "bg-red-50 border-red-100"}`}>
+            <p className={`text-lg font-bold tabular-nums ${saldo >= 0 ? "text-[#32373c]" : "text-red-500"}`}>{fmtEur(saldo)}</p>
+            <p className="text-xs text-gray-400 mt-1">Saldo</p>
+          </div>
+        </div>
+
+        {/* Match status KPIs */}
         <div className="grid grid-cols-3 gap-3">
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 text-center">
             <p className="text-2xl font-bold text-[#32373c]">{totalAll}</p>
