@@ -157,8 +157,9 @@ export function AddExpenseModal({
         setImageDataUrl("pdf");
         setImageBase64(base64);
         const result = await analyzeInvoice(base64, "application/pdf", fornecedores.map((f) => f.name));
-        setAiResult(result);
-        setForm(result);
+        const finalResult = honorariosMember ? { ...result, supplier: honorariosMember } : result;
+        setAiResult(finalResult);
+        setForm(finalResult);
         setMode("review");
       } else {
         const { dataUrl, base64, mediaType, normalizedFile } = await normalizeImage(file);
@@ -166,8 +167,9 @@ export function AddExpenseModal({
         setImageDataUrl(dataUrl);
         setImageBase64(base64);
         const result = await analyzeInvoice(base64, mediaType, fornecedores.map((f) => f.name));
-        setAiResult(result);
-        setForm(result);
+        const finalResult = honorariosMember ? { ...result, supplier: honorariosMember } : result;
+        setAiResult(finalResult);
+        setForm(finalResult);
         setMode("review");
       }
     } catch (err) {
@@ -392,7 +394,7 @@ export function AddExpenseModal({
                     setHonorariosMember(member.name);
                     setForm((f) => ({ ...f, supplier: member.name }));
                     setPaymentMethod("Transferência Bancária COME");
-                    setMode("manual");
+                    setMode("choose");
                   }}
                   className="w-full flex items-center gap-4 p-4 rounded-2xl border-2 border-gray-200 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
                 >
@@ -447,20 +449,44 @@ export function AddExpenseModal({
 
           {/* CHOOSE MODE */}
           {mode === "choose" && (
-            <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-3">
+              {honorariosMember && (
+                <p className="text-sm text-gray-500">
+                  Honorários para <span className="font-semibold text-[#32373c]">{honorariosMember}</span>
+                </p>
+              )}
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => setMode("scan")}
+                  className="flex flex-col items-center justify-center gap-2 p-5 rounded-2xl border-2 border-[#667470]/30 bg-[#667470]/5 hover:bg-[#667470]/10 transition-colors"
+                >
+                  <span className="text-3xl">📷</span>
+                  <span className="text-sm font-semibold text-[#667470] font-bold">Escanear Recibo</span>
+                </button>
+                <button
+                  onClick={() => setMode("manual")}
+                  className="flex flex-col items-center justify-center gap-2 p-5 rounded-2xl border-2 border-gray-200 bg-gray-50 hover:bg-gray-100 transition-colors"
+                >
+                  <span className="text-3xl">✏️</span>
+                  <span className="text-sm font-semibold text-gray-700">Entrada Manual</span>
+                </button>
+              </div>
               <button
-                onClick={() => setMode("scan")}
-                className="flex flex-col items-center justify-center gap-2 p-5 rounded-2xl border-2 border-[#667470]/30 bg-[#667470]/5 hover:bg-[#667470]/10 transition-colors"
+                onClick={() => {
+                  if (honorariosMember) {
+                    setHonorariosMember("");
+                    setForm((f) => ({ ...f, supplier: "" }));
+                    setMode("honorarios");
+                  } else if (isChef) {
+                    setChefExpenseType(null);
+                    setMode("chef-choose");
+                  } else if (isSuperGuide && tourId !== null) {
+                    setMode("admin-choose");
+                  }
+                }}
+                className="text-sm text-gray-400 hover:text-gray-600 w-full text-center"
               >
-                <span className="text-3xl">📷</span>
-                <span className="text-sm font-semibold text-[#667470] font-bold">Escanear Recibo</span>
-              </button>
-              <button
-                onClick={() => setMode("manual")}
-                className="flex flex-col items-center justify-center gap-2 p-5 rounded-2xl border-2 border-gray-200 bg-gray-50 hover:bg-gray-100 transition-colors"
-              >
-                <span className="text-3xl">✏️</span>
-                <span className="text-sm font-semibold text-gray-700">Entrada Manual</span>
+                ← Voltar
               </button>
             </div>
           )}
@@ -564,6 +590,8 @@ export function AddExpenseModal({
 
               {chefExpenseType === "service-invoice" ? (
                 <ServiceInvoiceForm form={form} update={update} />
+              ) : honorariosMember ? (
+                <ServiceInvoiceForm form={form} update={update} supplierLabel="Membro da Equipa" />
               ) : (
                 <InvoiceForm
                   form={form}
@@ -812,13 +840,15 @@ function InvoiceForm({
 function ServiceInvoiceForm({
   form,
   update,
+  supplierLabel = "Fornecedor (o teu nome)",
 }: {
   form: InvoiceData;
   update: (field: keyof InvoiceData, value: string | number) => void;
+  supplierLabel?: string;
 }) {
   return (
     <div className="space-y-3">
-      <Field label="Fornecedor (o teu nome)" required>
+      <Field label={supplierLabel} required>
         <input
           type="text"
           value={form.supplier}
