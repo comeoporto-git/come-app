@@ -9,12 +9,14 @@ export function AddExpenseButton({
   fornecedores,
   userRole,
   chefName,
+  guideName,
   tourTeam = [],
 }: {
   tourId: string;
   fornecedores: Fornecedor[];
   userRole: string;
   chefName?: string;
+  guideName?: string;
   tourTeam?: { name: string; role: string }[];
 }) {
   const [open, setOpen] = useState(false);
@@ -32,6 +34,7 @@ export function AddExpenseButton({
           fornecedores={fornecedores}
           userRole={userRole}
           chefName={chefName}
+          guideName={guideName}
           tourTeam={tourTeam}
           onClose={() => setOpen(false)}
         />

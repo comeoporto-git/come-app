@@ -99,8 +99,9 @@ async function TourPageContent({
 
   const transactions = canSeeFinancials ? txResult.expenses : txResult.expenses;
   const earnings     = canSeeFinancials ? txResult.earnings : [];
-  // Derive chefMember from the already-fetched team list — no extra Notion call needed
+  // Derive chefMember/guideMember from the already-fetched team list — no extra Notion call needed
   const chefMember   = isChef ? (teamMembers.find((m) => m.email === email) ?? null) : null;
+  const guideMember  = role === "Guide" ? (teamMembers.find((m) => m.email === email) ?? null) : null;
 
   if (!tour) notFound();
 
@@ -300,6 +301,7 @@ async function TourPageContent({
                 fornecedores={fornecedores}
                 userRole={role}
                 chefName={chefMember?.name}
+                guideName={guideMember?.name}
                 tourTeam={[
                   tour.guideName ? { name: tour.guideName, role: "Guia" } : null,
                   tour.chefName  ? { name: tour.chefName,  role: "Chef" } : null,

@@ -28,6 +28,7 @@ export function AddExpenseModal({
   fornecedores: initialFornecedores = [],
   userRole = "Guide",
   chefName,
+  guideName,
   tourTeam = [],
   onClose,
 }: {
@@ -36,16 +37,18 @@ export function AddExpenseModal({
   fornecedores?: Fornecedor[];
   userRole?: string;
   chefName?: string;
+  guideName?: string;
   tourTeam?: { name: string; role: string }[];
   onClose: () => void;
 }) {
   const router = useRouter();
   const isSuperGuide = userRole === "Super Guide" || userRole === "Admin";
   const isChef = userRole === "Chef";
+  const isGuide = userRole === "Guide";
 
-  // Chef/Admin: start with a type choice; others go straight to choose/scan
+  // Chef/Guide/Admin: start with a type choice; others go straight to choose/scan
   // tourId=null means standalone (not tied to a tour) — skip honorários flow
-  const initialMode: Mode = pendingTransaction ? "scan" : isChef ? "chef-choose" : (isSuperGuide && tourId !== null) ? "admin-choose" : "choose";
+  const initialMode: Mode = pendingTransaction ? "scan" : (isChef || isGuide) ? "chef-choose" : (isSuperGuide && tourId !== null) ? "admin-choose" : "choose";
 
   // "tour-expense" → ingredients / materials (Fornecedores, paymentMethod "Pelo Chef")
   // "service-invoice" → chef's own service fee (chef name as supplier, paymentMethod "Chef Fee")
@@ -246,6 +249,8 @@ export function AddExpenseModal({
         const isHonorarios = !!honorariosMember;
         const effectivePaymentMethod = isChef
           ? (chefExpenseType === "service-invoice" ? "Chef Fee" : "Pelo Chef")
+          : isGuide
+          ? (chefExpenseType === "service-invoice" ? "Guide Fee" : "Pelo Guia")
           : isHonorarios ? "Honorários"
           : paymentMethod;
 
@@ -299,6 +304,8 @@ export function AddExpenseModal({
     try {
       const effectivePaymentMethod = isChef
         ? (chefExpenseType === "service-invoice" ? "Chef Fee" : "Pelo Chef")
+        : isGuide
+        ? (chefExpenseType === "service-invoice" ? "Guide Fee" : "Pelo Guia")
         : paymentMethod;
 
       const selectedFornecedor = fornecedores.find(
@@ -428,9 +435,10 @@ export function AddExpenseModal({
               <button
                 onClick={() => {
                   setChefExpenseType("service-invoice");
-                  // Pre-fill supplier with chef's own name
-                  if (chefName) {
-                    setForm((f) => ({ ...f, supplier: chefName }));
+                  // Pre-fill supplier with the member's own name
+                  const memberName = isGuide ? guideName : chefName;
+                  if (memberName) {
+                    setForm((f) => ({ ...f, supplier: memberName }));
                   }
                   setMode("choose");
                 }}
@@ -510,7 +518,7 @@ export function AddExpenseModal({
               )}
               {!scanning && (
                 <button
-                  onClick={() => setMode(isChef ? "chef-choose" : "choose")}
+                  onClick={() => setMode((isChef || isGuide) ? "chef-choose" : "choose")}
                   className="text-sm text-gray-400 hover:text-gray-600 w-full text-center"
                 >
                   ← Voltar
