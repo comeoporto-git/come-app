@@ -311,8 +311,8 @@ async function TourPageContent({
           <ExpenseList transactions={transactions} tourId={id} isClosed={isClosed} fornecedores={fornecedores} guideName={tour.guideName} chefName={tour.chefName} driverName={tour.driverName} userRole={role} />
         </section>
 
-        {/* Close Tour — only guides, super guides, admins */}
-        {!isClosed && !isChef && (
+        {/* Close Tour — only admins */}
+        {!isClosed && role === "Admin" && (
           <form
             action={async () => {
               "use server";
