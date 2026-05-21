@@ -56,7 +56,6 @@ export function InvoiceCollectionModal({
     ...EMPTY_FORM,
     supplier: transaction.supplier,
     date: transaction.date ?? EMPTY_FORM.date,
-    totalCost: transaction.totalCost,
   });
 
   const cameraRef = useRef<HTMLInputElement>(null);
