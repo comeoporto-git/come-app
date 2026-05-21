@@ -61,47 +61,88 @@ export function InvoiceCollectionModal({
   const cameraRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  async function normalizeImage(file: File): Promise<{
+    dataUrl: string; base64: string;
+    mediaType: "image/jpeg" | "image/png" | "image/webp";
+    normalizedFile: File;
+  }> {
+    const MAX_PX = 2048;
+    const isHeic = file.type === "image/heic" || file.type === "image/heif" ||
+      file.name.toLowerCase().endsWith(".heic") || file.name.toLowerCase().endsWith(".heif");
+
+    const rawDataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target!.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = reject;
+      el.src = rawDataUrl;
+    });
+
+    const scale = Math.min(1, MAX_PX / Math.max(img.naturalWidth || 1, img.naturalHeight || 1));
+    const canvas = document.createElement("canvas");
+    canvas.width  = Math.round((img.naturalWidth  || 1) * scale);
+    canvas.height = Math.round((img.naturalHeight || 1) * scale);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Canvas 2D context unavailable");
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+    const mediaType = (!isHeic && file.type === "image/png") ? "image/png" : "image/jpeg";
+    const quality   = mediaType === "image/jpeg" ? 0.85 : undefined;
+
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob((b) => resolve(b), mediaType, quality)
+    );
+
+    const dataUrl = (() => {
+      const d = canvas.toDataURL(mediaType, quality);
+      return d.length > 50 ? d : rawDataUrl;
+    })();
+
+    const ext = mediaType === "image/png" ? "png" : "jpg";
+    const normalizedFile = blob
+      ? new File([blob], `invoice.${ext}`, { type: mediaType })
+      : file;
+
+    return { dataUrl, base64: dataUrl.split(",")[1], mediaType, normalizedFile };
+  }
+
   async function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    setImageFile(file);
     setError("");
 
     if (file.type === "application/pdf") {
+      setImageFile(file);
       setImageDataUrl("pdf");
       setStep("review");
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = async (ev) => {
-      const dataUrl = ev.target?.result as string;
+    setStep("scanning");
+    try {
+      const { dataUrl, base64, mediaType, normalizedFile } = await normalizeImage(file);
+      setImageFile(normalizedFile);
       setImageDataUrl(dataUrl);
-      const base64 = dataUrl.split(",")[1];
-      const mt = file.type as "image/jpeg" | "image/png" | "image/webp";
-      setStep("scanning");
-      try {
-        const result = await analyzeInvoice(
-          base64,
-          mt,
-          fornecedores.map((f) => f.name)
-        );
-        setForm((f) => ({ ...f, ...result }));
-        // If AI recognised a supplier that matches a known fornecedor, pre-select it
-        const matched = fornecedores.find(
-          (f) => f.name.toLowerCase() === result.supplier?.toLowerCase()
-        );
-        if (matched) {
-          setSelectedFornecedorId(matched.id);
-          setFornecedorQuery(matched.name);
-        }
-      } catch {
-        setError("Não foi possível analisar a imagem. Podes preencher manualmente.");
-      } finally {
-        setStep("review");
+      const result = await analyzeInvoice(base64, mediaType, fornecedores.map((f) => f.name));
+      setForm((f) => ({ ...f, ...result }));
+      const matched = fornecedores.find(
+        (f) => f.name.toLowerCase() === result.supplier?.toLowerCase()
+      );
+      if (matched) {
+        setSelectedFornecedorId(matched.id);
+        setFornecedorQuery(matched.name);
       }
-    };
-    reader.readAsDataURL(file);
+    } catch {
+      setError("Não foi possível analisar a imagem. Podes preencher manualmente.");
+    } finally {
+      setStep("review");
+    }
   }
 
   function update(field: keyof InvoiceData, value: string | number) {
