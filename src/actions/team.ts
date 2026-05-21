@@ -2,7 +2,7 @@
 
 import { updateTeamMemberRole, updateTeamMemberProfile, adminUpdateTeamMemberContact, createTeamMember } from "@/lib/notion";
 import type { TeamMember } from "@/lib/notion";
-import { revalidatePath, revalidateTag } from "next/cache";
+import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 
 export async function updateTeamMemberProfileAction(
@@ -50,7 +50,6 @@ export async function adminUpdateTeamMemberContactAction(
   }
   try {
     await adminUpdateTeamMemberContact(memberId, data);
-    revalidateTag("team-members");
     revalidatePath("/admin/users");
     return {};
   } catch (err) {
@@ -70,7 +69,6 @@ export async function createTeamMemberAction(
   }
   try {
     await createTeamMember(data);
-    revalidateTag("team-members");
     revalidatePath("/admin/users");
     return {};
   } catch (err) {
