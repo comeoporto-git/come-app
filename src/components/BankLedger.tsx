@@ -109,7 +109,14 @@ function ExpensePicker({
               </div>
               <div className="shrink-0 text-right">
                 <p className="text-xs font-bold text-gray-700">{fmtEur(Math.abs(e.totalCost))}</p>
-                {e.invoiceImageUrl && <p className="text-[10px] text-blue-400">📄</p>}
+                {e.invoiceImageUrl && (
+                  <span
+                    className="text-[10px] text-blue-400 hover:text-blue-600 cursor-pointer"
+                    onClick={(ev) => { ev.stopPropagation(); window.open(e.invoiceImageUrl!, "_blank", "noopener,noreferrer"); }}
+                  >
+                    📄 Ver fatura
+                  </span>
+                )}
               </div>
             </button>
           ))

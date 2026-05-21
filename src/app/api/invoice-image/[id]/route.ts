@@ -23,8 +23,20 @@ export async function GET(
 
     if (!url) return new NextResponse("No file", { status: 404 });
 
-    // Redirect to the fresh signed URL
-    return NextResponse.redirect(url);
+    // Proxy the file content so we control Content-Disposition (Notion S3 may
+    // force a download; we always want inline display for PDFs and images).
+    const fileRes = await fetch(url);
+    if (!fileRes.ok) return new NextResponse("File unavailable", { status: 502 });
+
+    const contentType = fileRes.headers.get("content-type") ?? "application/octet-stream";
+    return new NextResponse(fileRes.body, {
+      status: 200,
+      headers: {
+        "Content-Type": contentType,
+        "Content-Disposition": "inline",
+        "Cache-Control": "private, max-age=3600",
+      },
+    });
   } catch {
     return new NextResponse("Not found", { status: 404 });
   }
