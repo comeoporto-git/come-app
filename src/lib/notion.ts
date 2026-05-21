@@ -288,6 +288,52 @@ export async function updateTeamMemberRole(
   });
 }
 
+export async function adminUpdateTeamMemberContact(
+  memberId: string,
+  data: { email: string; phone: string; iban: string },
+): Promise<void> {
+  await notion.pages.update({
+    page_id: memberId,
+    properties: {
+      email: { email: data.email || null },
+      Contact: { phone_number: data.phone || null },
+    } as Parameters<typeof notion.pages.update>[0]["properties"],
+  });
+  try {
+    await notion.pages.update({
+      page_id: memberId,
+      properties: {
+        IBAN: { url: data.iban || null },
+      } as Parameters<typeof notion.pages.update>[0]["properties"],
+    });
+  } catch { /* column may not exist */ }
+}
+
+export async function createTeamMember(
+  data: { name: string; email: string; phone: string; iban: string; role: TeamMember["role"] },
+): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const page = await notion.pages.create({
+    parent: { database_id: TEAM_DB },
+    properties: {
+      Name:    { title: [{ text: { content: data.name } }] },
+      email:   { email: data.email || null },
+      Contact: { phone_number: data.phone || null },
+      Role:    { select: { name: data.role } },
+    },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any);
+  if (data.iban) {
+    try {
+      await notion.pages.update({
+        page_id: page.id,
+        properties: { IBAN: { url: data.iban } },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any);
+    } catch { /* column may not exist */ }
+  }
+}
+
 // ── Tours (Sales DB) ──────────────────────────────────────────────────────────
 //
 // Property name mapping (our code → Notion Sales DB):

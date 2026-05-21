@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.88.0",
+    "@auth/pg-adapter": "^1.11.2",
     "@neondatabase/serverless": "^1.0.2",
     "@notionhq/client": "^2.2.15",
     "@vercel/blob": "^2.3.3",
@@ -18,7 +19,8 @@
     "plaid": "^41.4.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "react-plaid-link": "^4.1.1"
+    "react-plaid-link": "^4.1.1",
+    "resend": "^6.12.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
