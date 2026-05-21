@@ -39,12 +39,6 @@ export function UserManagement({ members: initialMembers }: { members: TeamMembe
 
   return (
     <div>
-      <ul className="divide-y divide-gray-50">
-        {members.map((m) => (
-          <UserRow key={m.id} member={m} onUpdated={handleMemberUpdated} />
-        ))}
-      </ul>
-
       {showAddForm ? (
         <AddMemberForm
           onCancel={() => setShowAddForm(false)}
@@ -53,12 +47,18 @@ export function UserManagement({ members: initialMembers }: { members: TeamMembe
       ) : (
         <button
           onClick={() => setShowAddForm(true)}
-          className="w-full px-5 py-3 text-sm text-[#667470] font-medium hover:bg-gray-50 transition-colors flex items-center gap-2 border-t border-gray-50"
+          className="w-full px-5 py-3 text-sm text-[#667470] font-medium hover:bg-gray-50 transition-colors flex items-center gap-2 border-b border-gray-50"
         >
           <span className="text-lg leading-none">+</span>
           Adicionar membro
         </button>
       )}
+
+      <ul className="divide-y divide-gray-50">
+        {members.map((m) => (
+          <UserRow key={m.id} member={m} onUpdated={handleMemberUpdated} />
+        ))}
+      </ul>
     </div>
   );
 }
