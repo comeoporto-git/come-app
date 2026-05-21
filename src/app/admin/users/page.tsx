@@ -52,7 +52,7 @@ export default async function AdminUsersPage() {
           <div className="px-5 py-4 border-b border-gray-50">
             <h2 className="text-sm font-semibold text-[#32373c]">Equipa</h2>
             <p className="text-xs text-gray-400 mt-0.5">
-              Clica no role para alterar · {teamMembers.length} membros
+              {teamMembers.length} membros
             </p>
           </div>
           {teamMembers.length === 0 ? (
