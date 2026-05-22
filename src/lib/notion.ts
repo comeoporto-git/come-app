@@ -942,12 +942,25 @@ export async function getAccountantTransactions(): Promise<Transaction[]> {
 export async function getTransactionsNeedingInvoice(): Promise<Transaction[]> {
   const res = await notion.databases.query({
     database_id: TRANSACTIONS_DB,
-    filter: { property: "Precisa de Fatura", select: { equals: "Sim" } },
+    filter: {
+      or: [
+        { property: "Precisa de Fatura", select: { equals: "Sim" } },
+        { property: "Status", select: { equals: "Pending Payment" } },
+        { property: "Status", select: { equals: "Pending Receipt" } },
+      ],
+    },
     sorts: [{ property: "Data", direction: "descending" }],
     page_size: 100,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any);
-  const transactions = (res.results as PageObjectResponse[]).map(mapTransaction);
+  const transactions = (res.results as PageObjectResponse[])
+    .map(mapTransaction)
+    // For Pending Payment entries, only include those still missing a receipt
+    .filter((t) =>
+      t.precisaDeFatura === "Sim" ||
+      ((t.status === "Pending Payment" || t.status === "Pending Receipt") &&
+        !t.invoiceId && !t.invoiceImageUrl)
+    );
   return resolveTourNamesForTransactions(transactions);
 }
 
