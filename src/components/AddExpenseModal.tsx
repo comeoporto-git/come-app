@@ -668,6 +668,7 @@ export function AddExpenseModal({
                   <div>
                     <span className="text-sm text-gray-700">Ainda não pago</span>
                     <p className="text-xs text-gray-400">Aparece em Transferências em Falta</p>
+                    <p className="text-xs text-gray-400">Não aplicavel a despesas pagas pelos Guias/Chefs.</p>
                   </div>
                 </label>
               )}
