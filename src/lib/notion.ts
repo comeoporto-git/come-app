@@ -1277,6 +1277,7 @@ export async function getGuideExpenses(): Promise<Transaction[]> {
     const ibanByName = Object.fromEntries(teamMembers.map((m) => [m.name.toLowerCase(), m.iban]));
 
     const tourMemberMap: Record<string, { guide?: string; chef?: string; driver?: string }> = {};
+    const tourNameMap: Record<string, string> = {};
     for (let i = 0; i < uniqueTourIds.length; i++) {
       const page = tourPages[i] as PageObjectResponse | null;
       if (!page || !("properties" in page)) continue;
@@ -1285,23 +1286,25 @@ export async function getGuideExpenses(): Promise<Transaction[]> {
         chef:   relation(getProp(page, "Chef"))[0],
         driver: relation(getProp(page, "Driver 1"))[0],
       };
+      tourNameMap[uniqueTourIds[i]] = text(getProp(page, "ID"));
     }
 
     return transactions.map((t) => {
+      const tourName = t.tourId ? (tourNameMap[t.tourId] ?? "") : "";
       // Old honorários (legacy paymentMethod) or new company-paid pending payments:
       // supplier is a team member name — look up IBAN by name
       if (t.paymentMethod === "Honorários" || (t.status === "Pending Payment" && t.whoPaid === "Company")) {
         const iban = ibanByName[t.supplier.toLowerCase()];
-        return { ...t, paidByName: t.supplier, payeeIban: iban ?? "" };
+        return { ...t, tourName, paidByName: t.supplier, payeeIban: iban ?? "" };
       }
-      if (!t.tourId) return t;
+      if (!t.tourId) return { ...t, tourName };
       const members = tourMemberMap[t.tourId];
-      if (!members) return t;
+      if (!members) return { ...t, tourName };
       const memberId = t.paymentMethod === "Pelo Chef" ? members.chef
                      : t.paymentMethod === "Pelo Driver" ? members.driver
                      : members.guide;
       const member = memberId ? memberById[memberId] : undefined;
-      return { ...t, paidByName: member?.name ?? "", payeeIban: member?.iban ?? "" };
+      return { ...t, tourName, paidByName: member?.name ?? "", payeeIban: member?.iban ?? "" };
     });
   } catch { return []; }
 }

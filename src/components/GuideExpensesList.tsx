@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import Link from "next/link";
 import type { Transaction } from "@/lib/notion";
 import { uploadComprovantivoAction, markTransferenciaFeitaAction } from "@/actions/transactions";
 import { useRouter } from "next/navigation";
@@ -74,8 +75,16 @@ function GuideExpenseRow({ expense }: { expense: Transaction }) {
           {expense.payeeIban && (
             <IbanCopy iban={expense.payeeIban} />
           )}
-          {expense.tourName && (
-            <p className="text-xs text-gray-400">Serviço: {expense.tourName}</p>
+          {expense.tourName && expense.tourId && (
+            <p className="text-xs text-gray-400">
+              Serviço:{" "}
+              <Link
+                href={`/guide/tours/${expense.tourId}`}
+                className="text-[#667470] font-medium hover:underline"
+              >
+                {expense.tourName}
+              </Link>
+            </p>
           )}
           {expense.invoiceId && (
             <p className="text-xs text-gray-400">Fatura: {expense.invoiceId}</p>
