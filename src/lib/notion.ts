@@ -32,7 +32,7 @@ function text(prop: unknown): string {
   if (!prop || typeof prop !== "object") return "";
   const p = prop as Record<string, unknown>;
   if (p.type === "title")       return (p.title as { plain_text: string }[])[0]?.plain_text ?? "";
-  if (p.type === "rich_text")   return (p.rich_text as { plain_text: string }[])[0]?.plain_text ?? "";
+  if (p.type === "rich_text")   return (p.rich_text as { plain_text: string }[]).map((b) => b.plain_text).join("") ?? "";
   if (p.type === "email")       return (p.email as string) ?? "";
   if (p.type === "phone_number") return (p.phone_number as string) ?? "";
   if (p.type === "select")      return (p.select as { name: string } | null)?.name ?? "";
