@@ -41,16 +41,41 @@ function formatDate(iso: string | null): string {
   });
 }
 
+function dateKey(iso: string | null): string {
+  if (!iso) return "";
+  return new Date(iso).toLocaleDateString("pt-PT", {
+    timeZone: "Europe/Lisbon",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+}
+
+function getDuplicateDates(tours: Tour[]): Set<string> {
+  const counts = new Map<string, number>();
+  for (const t of tours) {
+    const key = dateKey(t.date);
+    if (key) counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  const duplicates = new Set<string>();
+  for (const [key, count] of counts) {
+    if (count > 1) duplicates.add(key);
+  }
+  return duplicates;
+}
+
 function TourCard({
   tour,
   past,
   guideName,
   isMyTour,
+  hasDuplicate,
 }: {
   tour: Tour;
   past?: boolean;
   guideName?: string;
   isMyTour?: boolean;
+  hasDuplicate?: boolean;
 }) {
   const ts = typeStyle(tour.serviceType);
   const isCanceled = tour.status === "Canceled" || tour.status === "Cancelled";
@@ -63,14 +88,21 @@ function TourCard({
             : past
               ? "bg-white/60 border-white/20"
               : "bg-white border-gray-100"
-        } text-[#32373c] ${isCanceled ? "" : (ts?.border ?? "")}`}
+        } text-[#32373c] ${isCanceled ? "" : (ts?.border ?? "")} ${hasDuplicate && !isCanceled ? "ring-2 ring-amber-400" : ""}`}
       >
         <div className="flex items-start justify-between gap-3 p-5">
           <div className="flex-1 min-w-0 space-y-1">
             <p className={`font-semibold text-sm ${past ? "text-[#32373c]/70" : "text-[#32373c]"}`}>
               {tour.saleId}
             </p>
-            <p className="text-xs text-gray-500">{formatDate(tour.date)}</p>
+            <p className="text-xs text-gray-500 flex items-center gap-1">
+              {formatDate(tour.date)}
+              {hasDuplicate && (
+                <span className="inline-flex items-center gap-0.5 text-amber-600 font-semibold bg-amber-50 px-1.5 py-0 rounded-full text-[10px] leading-5">
+                  ⚠ same day
+                </span>
+              )}
+            </p>
             {tour.serviceName && (
               <p className="text-xs text-gray-600">{tour.serviceName}</p>
             )}
@@ -130,6 +162,9 @@ export function TourTabs({
 
   const visibleUpcoming = filterTours(upcoming, query, teamMap);
   const visiblePast     = filterTours(past,     query, teamMap);
+
+  const duplicateUpcoming = getDuplicateDates(upcoming);
+  const duplicatePast     = getDuplicateDates(past);
 
   return (
     <div className="space-y-4">
@@ -198,6 +233,7 @@ export function TourTabs({
                 tour={tour}
                 guideName={teamMap?.[tour.teamId ?? ""]}
                 isMyTour={!!currentUserId && tour.teamId === currentUserId}
+                hasDuplicate={duplicateUpcoming.has(dateKey(tour.date))}
               />
             ))}
           </ul>
@@ -215,6 +251,7 @@ export function TourTabs({
               past
               guideName={teamMap?.[tour.teamId ?? ""]}
               isMyTour={!!currentUserId && tour.teamId === currentUserId}
+              hasDuplicate={duplicatePast.has(dateKey(tour.date))}
             />
           ))}
         </ul>
