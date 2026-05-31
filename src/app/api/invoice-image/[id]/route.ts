@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { notion } from "@/lib/notion";
-import type { PageObjectResponse } from "@notionhq/client/build/src/api-endpoints";
+import { supabase } from "@/lib/notion";
 import { auth } from "@/lib/auth";
 
 export async function GET(
@@ -13,18 +12,15 @@ export async function GET(
   const { id } = await params;
 
   try {
-    const page = (await notion.pages.retrieve({ page_id: id })) as PageObjectResponse;
-    const fatura = (page.properties as Record<string, unknown>)["Fatura"] as {
-      files?: Array<{ type: string; file?: { url: string }; external?: { url: string } }>;
-    };
+    const { data } = await supabase
+      .from("transactions")
+      .select("fatura_url")
+      .eq("id", id)
+      .maybeSingle();
 
-    const file = fatura?.files?.[0];
-    const url = file?.file?.url ?? file?.external?.url;
-
+    const url = data?.fatura_url;
     if (!url) return new NextResponse("No file", { status: 404 });
 
-    // Proxy the file content so we control Content-Disposition (Notion S3 may
-    // force a download; we always want inline display for PDFs and images).
     const fileRes = await fetch(url);
     if (!fileRes.ok) return new NextResponse("File unavailable", { status: 502 });
 

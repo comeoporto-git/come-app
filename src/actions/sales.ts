@@ -1,6 +1,6 @@
 "use server";
 
-import { notion, updateSaleStatus } from "@/lib/notion";
+import { supabase, updateSaleStatus } from "@/lib/notion";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 
@@ -21,20 +21,17 @@ export async function markSaleInvoicedAction(
       return { error: "Forbidden" };
     }
 
-    // Update earnings transaction directly — Valor must be positive (income, not expense)
-    await notion.pages.update({
-      page_id: existingTransactionId,
-      properties: {
-        Data: { date: { start: data.date } },
-        "Valor Sem IVA": { number: data.taxFree },
-        "IVA 23%": { number: data.iva23 },
-        Valor: { number: data.totalAmount }, // positive for earnings
-        ...(data.invoiceImageUrl
-          ? { Fatura: { files: [{ type: "external", name: "fatura", external: { url: data.invoiceImageUrl } }] } }
-          : {}),
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any,
-    });
+    // Earnings transactions have a positive Valor — do not negate
+    const updates: Record<string, unknown> = {
+      data:          data.date,
+      valor_sem_iva: data.taxFree,
+      iva_23:        data.iva23,
+      valor:         data.totalAmount,
+    };
+    if (data.invoiceImageUrl) updates.fatura_url = data.invoiceImageUrl;
+
+    const { error } = await supabase.from("transactions").update(updates).eq("id", existingTransactionId);
+    if (error) throw new Error(error.message);
 
     await updateSaleStatus(saleNotionId, "Invoiced");
 
