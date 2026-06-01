@@ -12,7 +12,7 @@ export default async function NovoServicoPage() {
   const session = await auth();
   if (!session) redirect("/login");
   const role = session.user.role;
-  if (role !== "Admin" && role !== "Super Guide") redirect("/");
+  if (role !== "Admin") redirect("/admin/gestao-servicos");
 
   const serviceTypes = await getServiceTypesList();
 

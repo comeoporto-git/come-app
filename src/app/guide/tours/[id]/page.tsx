@@ -5,6 +5,7 @@ import {
   getExpensesAndEarningsForTour,
   getFornecedores,
   getTeamMembers,
+  deleteSale,
 } from "@/lib/notion";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
@@ -15,6 +16,7 @@ import { AddExpenseButton } from "@/components/AddExpenseButton";
 import { TeamPicker } from "@/components/TeamPicker";
 import { ServiceInfoEditor } from "@/components/ServiceInfoEditor";
 import { MapsLink } from "@/components/MapsLink";
+import { DeleteSaleButton } from "@/components/DeleteSaleButton";
 
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
@@ -328,6 +330,17 @@ async function TourPageContent({
               Fechar Serviço e Despesas
             </button>
           </form>
+        )}
+
+        {/* Delete Sale — only admins */}
+        {role === "Admin" && (
+          <DeleteSaleButton
+            action={async () => {
+              "use server";
+              await deleteSale(id);
+              redirect("/admin/servicos");
+            }}
+          />
         )}
       </main>
     </>
