@@ -72,17 +72,30 @@ export default async function GestaoToursPage() {
 
       <main className="max-w-2xl mx-auto px-4 py-8 space-y-8">
 
-        {/* Serviços button */}
-        <Link href="/admin/servicos">
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex items-center gap-4 hover:border-[#667470]/30 active:scale-[0.98] transition-all cursor-pointer">
-            <div className="w-12 h-12 rounded-2xl bg-[#667470]/10 flex items-center justify-center text-2xl shrink-0">🗓️</div>
-            <div>
-              <p className="font-bold text-[#32373c]">Serviços</p>
-              <p className="text-sm text-gray-400">Ver todos os serviços</p>
+        {/* Quick actions */}
+        <div className="flex flex-col gap-3">
+          <Link href="/admin/servicos">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex items-center gap-4 hover:border-[#667470]/30 active:scale-[0.98] transition-all cursor-pointer">
+              <div className="w-12 h-12 rounded-2xl bg-[#667470]/10 flex items-center justify-center text-2xl shrink-0">🗓️</div>
+              <div>
+                <p className="font-bold text-[#32373c]">Serviços</p>
+                <p className="text-sm text-gray-400">Ver todos os serviços</p>
+              </div>
+              <span className="ml-auto text-gray-300 text-lg">→</span>
             </div>
-            <span className="ml-auto text-gray-300 text-lg">→</span>
-          </div>
-        </Link>
+          </Link>
+
+          <Link href="/admin/gestao-servicos/novo">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex items-center gap-4 hover:border-[#667470]/30 active:scale-[0.98] transition-all cursor-pointer">
+              <div className="w-12 h-12 rounded-2xl bg-[#667470]/10 flex items-center justify-center text-2xl shrink-0">➕</div>
+              <div>
+                <p className="font-bold text-[#32373c]">Novo Serviço</p>
+                <p className="text-sm text-gray-400">Criar um novo tipo de serviço</p>
+              </div>
+              <span className="ml-auto text-gray-300 text-lg">→</span>
+            </div>
+          </Link>
+        </div>
 
         <div className="pt-2" />
 

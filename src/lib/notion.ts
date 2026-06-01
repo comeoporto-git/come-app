@@ -270,6 +270,40 @@ export async function createTeamMember(
   });
 }
 
+// ── Services ──────────────────────────────────────────────────────────────────
+
+export async function createService(data: {
+  name: string;
+  type?: string;
+  equipa?: string[];
+  pax_2_3?: number | null;
+  pax_4_6?: number | null;
+  pax_7_plus?: number | null;
+  valor_chef_2_3?: number | null;
+  valor_chef_4_6?: number | null;
+  valor_chef_7_10?: number | null;
+  valor_copa?: number | null;
+  valor_driver?: number | null;
+  processo?: string;
+}): Promise<void> {
+  const { error } = await supabase.from("services").insert({
+    id:              crypto.randomUUID(),
+    name:            data.name,
+    type:            data.type            || null,
+    equipa:          data.equipa?.length  ? data.equipa : null,
+    pax_2_3:         data.pax_2_3         ?? null,
+    pax_4_6:         data.pax_4_6         ?? null,
+    pax_7_plus:      data.pax_7_plus      ?? null,
+    valor_chef_2_3:  data.valor_chef_2_3  ?? null,
+    valor_chef_4_6:  data.valor_chef_4_6  ?? null,
+    valor_chef_7_10: data.valor_chef_7_10 ?? null,
+    valor_copa:      data.valor_copa      ?? null,
+    valor_driver:    data.valor_driver    ?? null,
+    processo:        data.processo        || null,
+  });
+  if (error) throw new Error(`createService: ${error.message}`);
+}
+
 // ── Tours (Sales table) ───────────────────────────────────────────────────────
 
 export async function getServicesWithMissingInfo(): Promise<Tour[]> {
