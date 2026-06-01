@@ -304,6 +304,37 @@ export async function createService(data: {
   if (error) throw new Error(`createService: ${error.message}`);
 }
 
+export async function getServiceTypesList(): Promise<{ id: string; name: string }[]> {
+  const { data } = await supabase.from("services").select("id, name").order("name");
+  return (data ?? []).map((r) => ({ id: r.id, name: r.name }));
+}
+
+export async function createSale(data: {
+  serviceId: string;
+  date: string;
+  status?: string;
+  notionId?: string;
+  numGuests?: number | null;
+  meetingPoint?: string;
+  notes?: string;
+  phoneNumber?: string;
+  names?: string;
+}): Promise<void> {
+  const { error } = await supabase.from("sales").insert({
+    id:               crypto.randomUUID(),
+    service_id:       data.serviceId,
+    date:             data.date,
+    status:           data.status          || "Pending",
+    notion_id:        data.notionId        || null,
+    number_of_guests: data.numGuests       ?? null,
+    meeting_point:    data.meetingPoint    || null,
+    notes:            data.notes           || null,
+    phone_number:     data.phoneNumber     || null,
+    names:            data.names           || null,
+  });
+  if (error) throw new Error(`createSale: ${error.message}`);
+}
+
 // ── Tours (Sales table) ───────────────────────────────────────────────────────
 
 export async function getServicesWithMissingInfo(): Promise<Tour[]> {

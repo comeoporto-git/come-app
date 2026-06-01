@@ -2,7 +2,7 @@
 
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { createService } from "@/lib/notion";
+import { getServiceTypesList, createSale } from "@/lib/notion";
 import Image from "next/image";
 import Link from "next/link";
 import { signOut } from "@/lib/auth";
@@ -14,40 +14,30 @@ export default async function NovoServicoPage() {
   const role = session.user.role;
   if (role !== "Admin" && role !== "Super Guide") redirect("/");
 
+  const serviceTypes = await getServiceTypesList();
+
   async function handleCreate(formData: FormData) {
     "use server";
 
-    const name = (formData.get("name") as string)?.trim();
-    if (!name) return;
+    const serviceId = (formData.get("serviceId") as string)?.trim();
+    const date      = (formData.get("date")      as string)?.trim();
+    if (!serviceId || !date) return;
 
-    const toNum = (key: string) => {
-      const v = (formData.get(key) as string)?.trim();
-      const n = parseFloat(v);
-      return isNaN(n) ? null : n;
-    };
+    const numGuests = parseInt(formData.get("numGuests") as string);
 
-    const equipaRaw = (formData.get("equipa") as string) ?? "";
-    const equipa = equipaRaw
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-
-    await createService({
-      name,
-      type:            (formData.get("type") as string)?.trim() || undefined,
-      equipa:          equipa.length ? equipa : undefined,
-      pax_2_3:         toNum("pax_2_3"),
-      pax_4_6:         toNum("pax_4_6"),
-      pax_7_plus:      toNum("pax_7_plus"),
-      valor_chef_2_3:  toNum("valor_chef_2_3"),
-      valor_chef_4_6:  toNum("valor_chef_4_6"),
-      valor_chef_7_10: toNum("valor_chef_7_10"),
-      valor_copa:      toNum("valor_copa"),
-      valor_driver:    toNum("valor_driver"),
-      processo:        (formData.get("processo") as string)?.trim() || undefined,
+    await createSale({
+      serviceId,
+      date,
+      status:       (formData.get("status")       as string) || "Pending",
+      notionId:     (formData.get("notionId")      as string)?.trim() || undefined,
+      numGuests:    isNaN(numGuests) ? null : numGuests,
+      meetingPoint: (formData.get("meetingPoint")  as string)?.trim() || undefined,
+      notes:        (formData.get("notes")         as string)?.trim() || undefined,
+      phoneNumber:  (formData.get("phoneNumber")   as string)?.trim() || undefined,
+      names:        (formData.get("names")         as string)?.trim() || undefined,
     });
 
-    redirect("/admin/gestao-servicos");
+    redirect("/admin/servicos");
   }
 
   return (
@@ -74,7 +64,7 @@ export default async function NovoServicoPage() {
       </header>
 
       <main className="max-w-2xl mx-auto px-4 py-8">
-        <NewServiceForm action={handleCreate} />
+        <NewServiceForm serviceTypes={serviceTypes} action={handleCreate} />
       </main>
     </div>
   );

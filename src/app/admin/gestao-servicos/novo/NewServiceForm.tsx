@@ -1,28 +1,20 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 
-const EQUIPA_OPTIONS = ["Guia", "Chef", "Driver", "Copa"];
-const TYPE_OPTIONS   = ["Food Tour", "Private", "VIP", "Corporate", "Other"];
+type ServiceType = { id: string; name: string };
+type Props = {
+  serviceTypes: ServiceType[];
+  action: (fd: FormData) => Promise<void>;
+};
 
-type Props = { action: (fd: FormData) => Promise<void> };
-
-export default function NewServiceForm({ action }: Props) {
-  const formRef  = useRef<HTMLFormElement>(null);
+export default function NewServiceForm({ serviceTypes, action }: Props) {
   const [loading, setLoading] = useState(false);
-  const [selected, setSelected] = useState<string[]>([]);
-
-  function toggleRole(role: string) {
-    setSelected((prev) =>
-      prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role],
-    );
-  }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setLoading(true);
     const fd = new FormData(e.currentTarget);
-    fd.set("equipa", selected.join(","));
     try {
       await action(fd);
     } finally {
@@ -31,143 +23,119 @@ export default function NewServiceForm({ action }: Props) {
   }
 
   return (
-    <form ref={formRef} onSubmit={handleSubmit} className="space-y-6">
-      {/* Basic info */}
+    <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Core details */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="px-5 py-4 border-b border-gray-50">
-          <h2 className="text-sm font-semibold text-[#32373c]">Informação Básica</h2>
+          <h2 className="text-sm font-semibold text-[#32373c]">Detalhes</h2>
         </div>
         <div className="px-5 py-4 space-y-4">
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Nome *</label>
-            <input
-              name="name"
-              required
-              placeholder="Ex: Old School to New School + Chef"
-              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#667470] transition-colors"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Tipo</label>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Service *</label>
             <select
-              name="type"
+              name="serviceId"
+              required
               className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#667470] transition-colors bg-white"
             >
-              <option value="">— Selecionar —</option>
-              {TYPE_OPTIONS.map((t) => (
-                <option key={t} value={t}>{t}</option>
+              <option value="">— Selecionar serviço —</option>
+              {serviceTypes.map((s) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
               ))}
             </select>
           </div>
+
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Processo</label>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Data e Hora *</label>
             <input
-              name="processo"
-              placeholder="URL ou referência do processo"
+              name="date"
+              type="datetime-local"
+              required
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#667470] transition-colors"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Estado</label>
+            <select
+              name="status"
+              defaultValue="Pending"
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#667470] transition-colors bg-white"
+            >
+              <option value="Pending">Pending</option>
+              <option value="Confirmed">Confirmed</option>
+              <option value="Cancelled">Cancelled</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Referência</label>
+            <input
+              name="notionId"
+              placeholder="Ex: 2575, MyBookpack 001…"
               className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#667470] transition-colors"
             />
           </div>
         </div>
       </div>
 
-      {/* Equipa */}
+      {/* Guests */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="px-5 py-4 border-b border-gray-50">
-          <h2 className="text-sm font-semibold text-[#32373c]">Equipa necessária</h2>
-          <p className="text-xs text-gray-400 mt-0.5">Funções obrigatórias para este serviço</p>
-        </div>
-        <div className="px-5 py-4 flex flex-wrap gap-2">
-          {EQUIPA_OPTIONS.map((role) => {
-            const active = selected.includes(role);
-            return (
-              <button
-                key={role}
-                type="button"
-                onClick={() => toggleRole(role)}
-                className={`text-sm px-3 py-1.5 rounded-xl border font-medium transition-all ${
-                  active
-                    ? "bg-[#667470] text-white border-[#667470]"
-                    : "bg-white text-gray-500 border-gray-200 hover:border-[#667470]/40"
-                }`}
-              >
-                {role}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Pricing */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="px-5 py-4 border-b border-gray-50">
-          <h2 className="text-sm font-semibold text-[#32373c]">Preço por Pax</h2>
-          <p className="text-xs text-gray-400 mt-0.5">Valor cobrado ao cliente por pessoa</p>
-        </div>
-        <div className="px-5 py-4 grid grid-cols-3 gap-3">
-          {([["pax_2_3", "2–3 pax"], ["pax_4_6", "4–6 pax"], ["pax_7_plus", "7+ pax"]] as const).map(([name, label]) => (
-            <div key={name}>
-              <label className="block text-xs font-medium text-gray-500 mb-1">{label}</label>
-              <div className="relative">
-                <input
-                  name={name}
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  placeholder="0"
-                  className="w-full border border-gray-200 rounded-xl pl-6 pr-3 py-2 text-sm focus:outline-none focus:border-[#667470] transition-colors"
-                />
-                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400">€</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Staff rates */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="px-5 py-4 border-b border-gray-50">
-          <h2 className="text-sm font-semibold text-[#32373c]">Valores de Equipa</h2>
-          <p className="text-xs text-gray-400 mt-0.5">Pagamento por função</p>
+          <h2 className="text-sm font-semibold text-[#32373c]">Participantes</h2>
         </div>
         <div className="px-5 py-4 space-y-4">
           <div>
-            <p className="text-xs font-medium text-gray-500 mb-2">Chef</p>
-            <div className="grid grid-cols-3 gap-3">
-              {([["valor_chef_2_3", "2–3 pax"], ["valor_chef_4_6", "4–6 pax"], ["valor_chef_7_10", "7–10 pax"]] as const).map(([name, label]) => (
-                <div key={name}>
-                  <label className="block text-xs text-gray-400 mb-1">{label}</label>
-                  <div className="relative">
-                    <input
-                      name={name}
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      placeholder="0"
-                      className="w-full border border-gray-200 rounded-xl pl-6 pr-3 py-2 text-sm focus:outline-none focus:border-[#667470] transition-colors"
-                    />
-                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400">€</span>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Nº de Pessoas</label>
+            <input
+              name="numGuests"
+              type="number"
+              min="1"
+              placeholder="0"
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#667470] transition-colors"
+            />
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            {([["valor_copa", "Copa"], ["valor_driver", "Driver"]] as const).map(([name, label]) => (
-              <div key={name}>
-                <label className="block text-xs font-medium text-gray-500 mb-1">{label}</label>
-                <div className="relative">
-                  <input
-                    name={name}
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    placeholder="0"
-                    className="w-full border border-gray-200 rounded-xl pl-6 pr-3 py-2 text-sm focus:outline-none focus:border-[#667470] transition-colors"
-                  />
-                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400">€</span>
-                </div>
-              </div>
-            ))}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Nomes</label>
+            <input
+              name="names"
+              placeholder="Ex: João, Maria, Pedro…"
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#667470] transition-colors"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Contacto</label>
+            <input
+              name="phoneNumber"
+              type="tel"
+              placeholder="+351 9XX XXX XXX"
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#667470] transition-colors"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Logistics */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-50">
+          <h2 className="text-sm font-semibold text-[#32373c]">Logística</h2>
+        </div>
+        <div className="px-5 py-4 space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Ponto de Encontro</label>
+            <input
+              name="meetingPoint"
+              placeholder="Ex: Praça da Ribeira"
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#667470] transition-colors"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Notas</label>
+            <textarea
+              name="notes"
+              rows={3}
+              placeholder="Informações adicionais…"
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#667470] transition-colors resize-none"
+            />
           </div>
         </div>
       </div>
