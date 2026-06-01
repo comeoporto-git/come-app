@@ -216,7 +216,7 @@ async function TourPageContent({
             </section>
 
             {/* Emails — Super Guide / Admin only */}
-            {canSeeFinancials && <SaleEmails emails={emails} />}
+            {canSeeFinancials && <SaleEmails emails={emails} threadIds={tour.threadIds} />}
 
             {/* Team */}
             <section className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">

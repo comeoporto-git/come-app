@@ -36,8 +36,21 @@ function groupByThread(emails: EmailMessage[]): ThreadGroup[] {
   return [...map.entries()].map(([threadId, messages]) => ({ threadId, messages }));
 }
 
-export function SaleEmails({ emails }: { emails: EmailMessage[] }) {
-  if (emails.length === 0) return null;
+export function SaleEmails({ emails, threadIds }: { emails: EmailMessage[]; threadIds: string[] }) {
+  if (threadIds.length === 0) return null;
+
+  if (emails.length === 0) {
+    return (
+      <section className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="px-4 py-3 border-b border-gray-50">
+          <h2 className="text-sm font-semibold text-gray-700">Emails</h2>
+        </div>
+        <div className="px-4 py-4 text-xs text-gray-400">
+          {threadIds.length} thread{threadIds.length !== 1 ? "s" : ""} linked — não foi possível carregar
+        </div>
+      </section>
+    );
+  }
 
   const threads = groupByThread(emails);
 
