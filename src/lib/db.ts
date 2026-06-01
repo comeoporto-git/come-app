@@ -1,6 +1,14 @@
-import { neon } from "@neondatabase/serverless";
+import postgres from "postgres";
 
-// Connection is created per-request (serverless-safe)
+// Singleton connection — postgres.js handles pooling internally
+let _sql: ReturnType<typeof postgres> | null = null;
+
 export function getDb() {
-  return neon(process.env.DATABASE_URL!);
+  if (!_sql) {
+    _sql = postgres(process.env.DATABASE_URL!, {
+      ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
+      max: 5,
+    });
+  }
+  return _sql;
 }

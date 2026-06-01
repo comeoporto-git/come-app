@@ -20,10 +20,10 @@ export async function GET() {
     const rows = await sql`SELECT COUNT(*) as count FROM bank_transactions`;
     txnCount = Number(rows[0].count);
     tableExists = true;
-    recentTxns = await sql`
+    recentTxns = (await sql`
       SELECT transaction_id, transaction_date, credit_debit, amount, merchant_name
       FROM bank_transactions ORDER BY transaction_date DESC LIMIT 5
-    `;
+    `) as unknown as unknown[];
   } catch {
     tableExists = false;
   }

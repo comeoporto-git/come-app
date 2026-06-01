@@ -67,7 +67,7 @@ export type PlaidItem = {
 export async function getPlaidItems(): Promise<PlaidItem[]> {
   const sql = getDb();
   const rows = await sql`SELECT * FROM plaid_items ORDER BY created_at ASC`;
-  return rows as PlaidItem[];
+  return rows as unknown as PlaidItem[];
 }
 
 export async function updateCursor(itemId: string, cursor: string): Promise<void> {
