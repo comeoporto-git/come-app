@@ -824,7 +824,7 @@ export async function verifyTransaction(pageId: string, verified: boolean): Prom
 }
 
 export async function archiveTransaction(pageId: string): Promise<void> {
-  await supabase.from("transactions").update({ status: "Archived" }).eq("id", pageId);
+  await supabase.from("transactions").delete().eq("id", pageId);
 }
 
 export async function markTransferenciaFeita(pageId: string): Promise<void> {
