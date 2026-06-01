@@ -12,15 +12,21 @@ export async function getSaleEmails(saleId: string): Promise<EmailMessage[]> {
   const secret  = process.env.ADDON_SECRET;
   if (!baseUrl || !secret) return [];
 
+  const url = `${baseUrl}/api/addon/sale-emails?saleId=${saleId}`;
   try {
-    const res = await fetch(`${baseUrl}/api/addon/sale-emails?saleId=${saleId}`, {
+    const res = await fetch(url, {
       headers: { Authorization: `Bearer ${secret}` },
       next: { revalidate: 300 },
     });
-    if (!res.ok) return [];
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      console.error(`[getSaleEmails] ${res.status} from ${url}: ${text}`);
+      return [];
+    }
     const data = await res.json();
     return (data.emails ?? []) as EmailMessage[];
-  } catch {
+  } catch (err) {
+    console.error(`[getSaleEmails] fetch failed for ${url}:`, err);
     return [];
   }
 }
