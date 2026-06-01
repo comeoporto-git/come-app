@@ -17,6 +17,7 @@ import { TeamPicker } from "@/components/TeamPicker";
 import { ServiceInfoEditor } from "@/components/ServiceInfoEditor";
 import { MapsLink } from "@/components/MapsLink";
 import { DeleteSaleButton } from "@/components/DeleteSaleButton";
+import { EarningList } from "@/components/EarningList";
 
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
@@ -262,30 +263,14 @@ async function TourPageContent({
         )}
 
         {/* Earning transactions — Super Guide / Admin only */}
-        {canSeeFinancials && earnings.length > 0 && (
-          <section>
-            <h2 className="text-sm font-semibold text-gray-700 mb-3">
-              Faturação
-              <span className="ml-2 text-gray-400 font-normal">€{faturacao.toFixed(2)}</span>
-            </h2>
-            <ul className="flex flex-col gap-2">
-              {earnings.map((e) => (
-                <li key={e.id} className="bg-emerald-50 border border-emerald-100 rounded-2xl px-4 py-3 flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-emerald-800 truncate">
-                      {e.supplier.replace(/^IN\s*-\s*/, "")}
-                    </p>
-                    {e.invoiceId && (
-                      <p className="text-xs text-emerald-600 mt-0.5">{e.invoiceId}</p>
-                    )}
-                  </div>
-                  <p className="text-sm font-bold text-emerald-700 shrink-0">
-                    +€{e.totalCost.toFixed(2)}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          </section>
+        {canSeeFinancials && (
+          <EarningList
+            earnings={earnings}
+            tourId={id}
+            isAdmin={role === "Admin"}
+            tourDate={tour.date}
+            tourReference={tour.saleId}
+          />
         )}
 
         {/* Expenses */}

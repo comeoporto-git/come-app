@@ -98,6 +98,20 @@ export async function markInvoiceCollectedAction(
   revalidatePath("/super-guide/invoices");
 }
 
+export async function markAiScanFailedAction(
+  transactionId: string,
+  invoiceImageUrl: string,
+): Promise<void> {
+  await requireAuth();
+  await updateTransaction(transactionId, {
+    invoiceImageUrl,
+    precisaDeFatura: "AI Scan Falhou",
+  });
+  revalidatePath("/admin/em-falta");
+  revalidatePath("/admin/invoices");
+  revalidatePath("/super-guide/invoices");
+}
+
 export async function logExpenseAction(
   data: Omit<Transaction, "id" | "accountantVerified">
 ): Promise<{ id?: string; error?: string }> {
@@ -282,4 +296,95 @@ export async function deleteExpenseAction(
   await archiveTransaction(transactionId);
   revalidatePath(`/guide/tours/${tourId}`);
   revalidatePath("/accountant");
+}
+
+// ── Earning actions ───────────────────────────────────────────────────────────
+
+export async function createEarningAction(
+  tourId: string,
+  data: {
+    reference: string;
+    date: string;
+    invoiceId: string;
+    taxFree: number;
+    iva6: number;
+    iva13: number;
+    iva23: number;
+    totalCost: number;
+    invoiceImageUrl?: string;
+  }
+): Promise<{ error?: string }> {
+  const session = await requireAuth();
+  if (session.user.role !== "Admin") {
+    return { error: "Forbidden" };
+  }
+  try {
+    await createTransaction({
+      supplier:      "IN - " + (data.reference || ""),
+      fornecedorId:  null,
+      date:          data.date,
+      invoiceId:     data.invoiceId,
+      taxFree:       data.taxFree,
+      iva6:          data.iva6,
+      iva13:         data.iva13,
+      iva23:         data.iva23,
+      totalCost:     data.totalCost,
+      whoPaid:       "Company",
+      paymentMethod: "COME",
+      status:        "Pending Payment",
+      tourId,
+      bankReference: "",
+      invoiceImageUrl: data.invoiceImageUrl,
+      precisaDeFatura: "",
+    });
+    revalidatePath(`/guide/tours/${tourId}`);
+    return {};
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+export async function editEarningAction(
+  transactionId: string,
+  tourId: string,
+  data: {
+    reference: string;
+    date: string;
+    invoiceId: string;
+    taxFree: number;
+    iva6: number;
+    iva13: number;
+    iva23: number;
+    totalCost: number;
+    invoiceImageUrl?: string;
+  }
+): Promise<void> {
+  const session = await requireAuth();
+  if (session.user.role !== "Admin") {
+    throw new Error("Forbidden");
+  }
+  await updateTransaction(transactionId, {
+    supplier:  "IN - " + (data.reference || ""),
+    date:      data.date,
+    invoiceId: data.invoiceId,
+    taxFree:   data.taxFree,
+    iva6:      data.iva6,
+    iva13:     data.iva13,
+    iva23:     data.iva23,
+    totalCost: data.totalCost,
+    ...(data.invoiceImageUrl ? { invoiceImageUrl: data.invoiceImageUrl } : {}),
+  });
+  revalidatePath(`/guide/tours/${tourId}`);
+}
+
+export async function deleteEarningAction(
+  transactionId: string,
+  tourId: string,
+): Promise<void> {
+  const session = await requireAuth();
+  if (session.user.role !== "Admin") {
+    throw new Error("Forbidden");
+  }
+  await archiveTransaction(transactionId);
+  revalidatePath(`/guide/tours/${tourId}`);
 }
