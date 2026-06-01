@@ -16,7 +16,7 @@ export default async function SuperGuideTransferenciasPage() {
   return (
     <div className="min-h-screen bg-[#667470] text-[#32373c]">
       <header className="bg-[#7b8b87] sticky top-0 z-10">
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link href="/super-guide" className="text-white/40 hover:text-white transition-colors text-lg leading-none">←</Link>
             <Link href="/">
@@ -35,7 +35,7 @@ export default async function SuperGuideTransferenciasPage() {
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-4 py-8">
+      <main className="max-w-4xl mx-auto px-4 py-8">
         <section className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="px-5 py-4 border-b border-gray-50 flex items-center justify-between">
             <div>

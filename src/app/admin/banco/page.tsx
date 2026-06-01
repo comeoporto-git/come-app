@@ -25,7 +25,7 @@ export default async function BancoPage({
   return (
     <div className="min-h-screen bg-[#667470] text-[#32373c]">
       <header className="bg-[#7b8b87] sticky top-0 z-10">
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link href="/admin/contabilidade" className="text-white/40 hover:text-white transition-colors text-lg leading-none">←</Link>
             <Link href="/">
@@ -42,7 +42,7 @@ export default async function BancoPage({
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-4 py-8 flex flex-col gap-4">
+      <main className="max-w-4xl mx-auto px-4 py-8 flex flex-col gap-4">
         {params.bank_connected && (
           <div className="bg-green-50 border border-green-200 rounded-2xl px-5 py-3 text-sm text-green-700 font-medium">
             ✅ Conta bancária ligada com sucesso!

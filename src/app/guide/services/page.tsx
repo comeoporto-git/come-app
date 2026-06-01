@@ -67,7 +67,7 @@ export default async function GuideDashboard() {
     <div className="min-h-screen bg-[#667470] text-[#32373c]">
       {/* Header */}
       <header className="bg-[#7b8b87] sticky top-0 z-10">
-        <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
           {isSuperGuide && (
             <Link href="/super-guide" className="text-white/40 hover:text-white transition-colors text-lg leading-none mr-2">
               ←
@@ -102,7 +102,7 @@ export default async function GuideDashboard() {
         </div>
       </header>
 
-      <main className="max-w-lg mx-auto px-4 py-8 space-y-8">
+      <main className="max-w-4xl mx-auto px-4 py-8 space-y-8">
         {/* Today */}
         {todays.length > 0 && (
           <section>

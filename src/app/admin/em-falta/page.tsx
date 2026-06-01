@@ -20,7 +20,7 @@ export default async function EmFaltaPage() {
   return (
     <div className="min-h-screen bg-[#667470] text-[#32373c]">
       <header className="bg-[#7b8b87] sticky top-0 z-10">
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link href="/admin/contabilidade" className="text-white/40 hover:text-white transition-colors text-lg leading-none">←</Link>
             <Link href="/">
@@ -37,7 +37,7 @@ export default async function EmFaltaPage() {
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-4 py-8">
+      <main className="max-w-4xl mx-auto px-4 py-8">
         <div className="flex flex-col gap-4">
 
         {/* Faturas a Emitir */}

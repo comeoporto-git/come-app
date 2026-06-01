@@ -31,7 +31,7 @@ export default async function AdminPage({
   return (
     <div className="min-h-screen bg-[#667470] text-[#32373c]">
       <header className="bg-[#7b8b87] sticky top-0 z-10">
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
           <Link href="/">
             <Image
             src="https://comeoporto.com/wp-content/uploads/2023/08/cropped-COME-Porto-Food-Tours-Logo-Black-.png"
@@ -52,7 +52,7 @@ export default async function AdminPage({
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-4 py-8 space-y-4">
+      <main className="max-w-5xl mx-auto px-4 py-8 space-y-4">
         {/* Status banners */}
         {params.bank_connected && (
           <div className="bg-green-50 border border-green-200 rounded-2xl px-5 py-3 text-sm text-green-700 font-medium">
@@ -65,7 +65,7 @@ export default async function AdminPage({
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {/* Gestão de Serviços */}
           <Link href="/admin/gestao-servicos">
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex flex-col gap-3 hover:border-[#667470]/30 active:scale-[0.98] transition-all cursor-pointer relative min-h-[120px]">

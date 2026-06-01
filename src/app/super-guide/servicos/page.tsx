@@ -47,7 +47,7 @@ export default async function SuperGuideServicosPage() {
   return (
     <div className="min-h-screen bg-[#667470] text-[#32373c]">
       <header className="bg-[#7b8b87] sticky top-0 z-10">
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link href="/super-guide/gestao-servicos" className="text-white/40 hover:text-white transition-colors text-lg leading-none">
               ←
@@ -71,7 +71,7 @@ export default async function SuperGuideServicosPage() {
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-4 py-8 space-y-8">
+      <main className="max-w-5xl mx-auto px-4 py-8 space-y-8">
         {todays.length > 0 && (
           <section>
             <h2 className="text-xs font-bold uppercase tracking-widest text-white/80 mb-3">

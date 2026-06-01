@@ -48,7 +48,7 @@ export default async function AdminToursPage() {
   return (
     <div className="min-h-screen bg-[#667470] text-[#32373c]">
       <header className="bg-[#7b8b87] sticky top-0 z-10">
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link href="/admin" className="text-white/40 hover:text-white transition-colors text-lg leading-none">
               ←
@@ -73,7 +73,7 @@ export default async function AdminToursPage() {
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-4 py-8 space-y-8">
+      <main className="max-w-5xl mx-auto px-4 py-8 space-y-8">
         {/* Today */}
         {todays.length > 0 && (
           <section>

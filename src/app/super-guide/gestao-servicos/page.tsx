@@ -47,7 +47,7 @@ export default async function SuperGuideGestaoServicosPage() {
   return (
     <div className="min-h-screen bg-[#667470] text-[#32373c]">
       <header className="bg-[#7b8b87] sticky top-0 z-10">
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link href="/super-guide" className="text-white/40 hover:text-white transition-colors text-lg leading-none">←</Link>
             <Link href="/">
@@ -67,22 +67,25 @@ export default async function SuperGuideGestaoServicosPage() {
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-4 py-8 space-y-8">
+      <main className="max-w-6xl mx-auto px-4 py-8">
+        <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-6 items-start">
 
-        <Link href="/super-guide/servicos">
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex items-center gap-4 hover:border-[#667470]/30 active:scale-[0.98] transition-all cursor-pointer">
-            <div className="w-12 h-12 rounded-2xl bg-[#667470]/10 flex items-center justify-center text-2xl shrink-0">🗓️</div>
-            <div>
-              <p className="font-bold text-[#32373c]">Serviços</p>
-              <p className="text-sm text-gray-400">Ver todos os serviços</p>
-            </div>
-            <span className="ml-auto text-gray-300 text-lg">→</span>
+          {/* Left: Quick actions */}
+          <div className="flex flex-col gap-3">
+            <Link href="/super-guide/servicos">
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex items-center gap-4 hover:border-[#667470]/30 active:scale-[0.98] transition-all cursor-pointer">
+                <div className="w-12 h-12 rounded-2xl bg-[#667470]/10 flex items-center justify-center text-2xl shrink-0">🗓️</div>
+                <div>
+                  <p className="font-bold text-[#32373c]">Serviços</p>
+                  <p className="text-sm text-gray-400">Ver todos os serviços</p>
+                </div>
+                <span className="ml-auto text-gray-300 text-lg">→</span>
+              </div>
+            </Link>
           </div>
-        </Link>
 
-        <div className="pt-2" />
-
-        <div className="space-y-6">
+          {/* Right: Alert sections */}
+          <div className="space-y-6">
           <section className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
             <div className="px-5 py-4 border-b border-gray-50 flex items-center justify-between">
               <div>
@@ -192,8 +195,9 @@ export default async function SuperGuideGestaoServicosPage() {
               </ul>
             )}
           </section>
-        </div>
+          </div>
 
+        </div>
       </main>
     </div>
   );

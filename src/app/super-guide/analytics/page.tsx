@@ -44,7 +44,7 @@ export default async function SuperGuideAnalyticsPage() {
   return (
     <div className="min-h-screen bg-[#667470] text-[#32373c]">
       <header className="bg-[#7b8b87] sticky top-0 z-10">
-        <div className="max-w-3xl mx-auto px-4 py-3 flex items-center gap-3">
+        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center gap-3">
           <Link href="/super-guide" className="text-white/40 hover:text-white transition-colors text-lg leading-none">←</Link>
           <Link href="/">
             <Image
@@ -60,7 +60,7 @@ export default async function SuperGuideAnalyticsPage() {
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-4 py-6">
+      <main className="max-w-6xl mx-auto px-4 py-6">
         <AnalyticsDashboard
           tours={tours}
           transactions={transactions}

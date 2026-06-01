@@ -16,7 +16,7 @@ export default async function FaturasClientesPage() {
   return (
     <div className="min-h-screen bg-[#667470] text-[#32373c]">
       <header className="bg-[#7b8b87] sticky top-0 z-10">
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link href="/admin/em-falta" className="text-white/40 hover:text-white transition-colors text-lg leading-none">←</Link>
             <Link href="/">
@@ -35,7 +35,7 @@ export default async function FaturasClientesPage() {
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-4 py-6">
+      <main className="max-w-4xl mx-auto px-4 py-6">
         {sales.length === 0 ? (
           <div className="text-center py-16 text-white/50">
             <p className="text-lg">Sem faturas a emitir</p>
