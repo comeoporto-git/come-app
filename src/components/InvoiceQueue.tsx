@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { Transaction, Fornecedor } from "@/lib/notion";
 import { InvoiceCollectionModal } from "@/components/InvoiceCollectionModal";
 
-type Tab = "pending" | "done";
+type Tab = "pending" | "done" | "failed";
 
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
@@ -19,16 +19,19 @@ function formatDate(iso: string | null): string {
 export function InvoiceQueue({
   needingInvoice,
   treated,
+  aiScanFailed,
   fornecedores,
 }: {
   needingInvoice: Transaction[];
   treated: Transaction[];
+  aiScanFailed: Transaction[];
   fornecedores: Fornecedor[];
 }) {
   const [tab, setTab] = useState<Tab>("pending");
   const [selected, setSelected] = useState<Transaction | null>(null);
 
-  const list = tab === "pending" ? needingInvoice : treated;
+  const list = tab === "pending" ? needingInvoice : tab === "done" ? treated : aiScanFailed;
+  const isClickable = tab !== "done";
 
   return (
     <>
@@ -61,6 +64,23 @@ export function InvoiceQueue({
         >
           Tratadas{treated.length > 0 ? ` · ${treated.length}` : ""}
         </button>
+        <button
+          onClick={() => setTab("failed")}
+          className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-colors ${
+            tab === "failed"
+              ? "bg-white text-[#32373c] shadow-sm"
+              : "bg-white/20 text-white/70 hover:bg-white/30"
+          }`}
+        >
+          Scan Falhou
+          {aiScanFailed.length > 0 && (
+            <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full font-bold ${
+              tab === "failed" ? "bg-amber-100 text-amber-700" : "bg-amber-500/70 text-white"
+            }`}>
+              {aiScanFailed.length}
+            </span>
+          )}
+        </button>
       </div>
 
       {/* List */}
@@ -71,6 +91,11 @@ export function InvoiceQueue({
               <div className="text-5xl mb-3">🎉</div>
               <p className="text-white font-semibold">Tudo tratado!</p>
               <p className="text-white/50 text-sm mt-1">Sem faturas em falta.</p>
+            </>
+          ) : tab === "failed" ? (
+            <>
+              <div className="text-5xl mb-3">✅</div>
+              <p className="text-white/50 text-sm">Sem scans falhados.</p>
             </>
           ) : (
             <>
@@ -84,9 +109,9 @@ export function InvoiceQueue({
           {list.map((t) => (
             <li key={t.id}>
               <button
-                onClick={() => tab === "pending" && setSelected(t)}
+                onClick={() => isClickable && setSelected(t)}
                 className={`w-full text-left rounded-2xl p-4 border shadow-sm transition-all ${
-                  tab === "pending"
+                  isClickable
                     ? "bg-white border-gray-100 hover:shadow-md active:scale-[0.98] cursor-pointer"
                     : "bg-white/70 border-white/20 cursor-default"
                 }`}
@@ -111,6 +136,10 @@ export function InvoiceQueue({
                     {tab === "done" ? (
                       <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">
                         ✓ Tratada
+                      </span>
+                    ) : tab === "failed" ? (
+                      <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">
+                        Scan falhou
                       </span>
                     ) : (
                       <span className="text-xs bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full font-medium">

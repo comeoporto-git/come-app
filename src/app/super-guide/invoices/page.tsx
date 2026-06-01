@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth";
 import {
   getTransactionsNeedingInvoice,
   getTransactionsTreated,
+  getAiScanFailedTransactions,
   getFornecedores,
 } from "@/lib/notion";
 import { redirect } from "next/navigation";
@@ -17,9 +18,10 @@ export default async function SuperGuidePage() {
     redirect("/");
   }
 
-  const [needingInvoice, treated, fornecedores] = await Promise.all([
+  const [needingInvoice, treated, aiScanFailed, fornecedores] = await Promise.all([
     getTransactionsNeedingInvoice(),
     getTransactionsTreated(),
+    getAiScanFailedTransactions(),
     getFornecedores(),
   ]);
 
@@ -71,6 +73,7 @@ export default async function SuperGuidePage() {
         <InvoiceQueue
           needingInvoice={needingInvoice}
           treated={treated}
+          aiScanFailed={aiScanFailed}
           fornecedores={fornecedores}
         />
       </main>

@@ -3,7 +3,7 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { analyzeInvoice, type InvoiceData } from "@/actions/invoice";
-import { markInvoiceCollectedAction, createFornecedorAction } from "@/actions/transactions";
+import { markInvoiceCollectedAction, createFornecedorAction, markAiScanFailedAction } from "@/actions/transactions";
 import type { Transaction, Fornecedor } from "@/lib/notion";
 
 type Step = "capture" | "scanning" | "review";
@@ -32,8 +32,12 @@ export function InvoiceCollectionModal({
   onClose: () => void;
 }) {
   const router = useRouter();
-  const [step, setStep] = useState<Step>("capture");
+  const isAiScanFailed = transaction.precisaDeFatura === "AI Scan Falhou";
+  const [step, setStep] = useState<Step>(
+    isAiScanFailed && transaction.invoiceImageUrl ? "review" : "capture"
+  );
   const [error, setError] = useState("");
+  const [aiScanFailed, setAiScanFailed] = useState(isAiScanFailed);
   const [saving, setSaving] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
 
@@ -51,7 +55,9 @@ export function InvoiceCollectionModal({
   const [creatingFornecedor, setCreatingFornecedor] = useState(false);
 
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imageDataUrl, setImageDataUrl] = useState("");
+  const [imageDataUrl, setImageDataUrl] = useState(
+    isAiScanFailed && transaction.invoiceImageUrl ? transaction.invoiceImageUrl : ""
+  );
   const [form, setForm] = useState<InvoiceData>({
     ...EMPTY_FORM,
     supplier: transaction.supplier,
@@ -116,6 +122,7 @@ export function InvoiceCollectionModal({
     const file = e.target.files?.[0];
     if (!file) return;
     setError("");
+    setAiScanFailed(false);
 
     if (file.type === "application/pdf") {
       setImageFile(file);
@@ -125,8 +132,10 @@ export function InvoiceCollectionModal({
     }
 
     setStep("scanning");
+    let capturedNormalizedFile: File | null = null;
     try {
       const { dataUrl, base64, mediaType, normalizedFile } = await normalizeImage(file);
+      capturedNormalizedFile = normalizedFile;
       setImageFile(normalizedFile);
       setImageDataUrl(dataUrl);
       const result = await analyzeInvoice(base64, mediaType, fornecedores.map((f) => f.name));
@@ -139,7 +148,22 @@ export function InvoiceCollectionModal({
         setFornecedorQuery(matched.name);
       }
     } catch {
-      setError("Não foi possível analisar a imagem. Podes preencher manualmente.");
+      setAiScanFailed(true);
+      if (capturedNormalizedFile) {
+        setError("Scan IA falhou — a foto foi guardada. Podes preencher manualmente.");
+        try {
+          const fd = new FormData();
+          fd.append("file", capturedNormalizedFile);
+          const res = await fetch("/api/upload", { method: "POST", body: fd });
+          if (res.ok) {
+            const { url } = await res.json() as { url: string };
+            await markAiScanFailedAction(transaction.id, url);
+            router.refresh();
+          }
+        } catch { /* ignore upload errors — photo still in review */ }
+      } else {
+        setError("Não foi possível analisar a imagem. Podes preencher manualmente.");
+      }
     } finally {
       setStep("review");
     }
@@ -296,6 +320,11 @@ export function InvoiceCollectionModal({
           {/* STEP: review */}
           {step === "review" && (
             <>
+              {aiScanFailed && !error && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm text-amber-700">
+                  Scan IA falhou — preenche os campos manualmente.
+                </div>
+              )}
               {/* Image preview / PDF indicator */}
               {imageDataUrl === "pdf" ? (
                 <div className="flex items-center gap-3 p-3 rounded-xl border border-gray-200 bg-gray-50">

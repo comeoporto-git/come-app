@@ -49,6 +49,7 @@ export type Tour = {
   teamId: string | null;
   expensesClosed: boolean;
   serviceEquipa: string[];
+  threadIds: string[];
 };
 
 export type TourWithMissingStaff = Tour & { missingRoles: string[] };
@@ -134,6 +135,9 @@ function mapSaleRow(row: any): Tour {
     teamId:        row.guide_id      ?? null,
     expensesClosed: row.expenses_closed === "Closed",
     serviceEquipa: row.services?.equipa ?? [],
+    threadIds: row.thread_ids
+      ? String(row.thread_ids).split(",").map((s: string) => s.trim()).filter(Boolean)
+      : [],
   };
 }
 

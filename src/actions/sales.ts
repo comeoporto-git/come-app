@@ -1,6 +1,35 @@
 "use server";
 
 import { supabase, updateSaleStatus } from "@/lib/notion";
+import { revalidatePath as _revalidatePath } from "next/cache";
+
+export async function createSaleAction(data: {
+  notion_id: string;
+  date: string;
+  type: string;
+  status: string;
+  number_of_guests: number | null;
+  service_id: string | null;
+  client_id: string | null;
+  names: string;
+  phone_number: string;
+  meeting_point: string;
+  notes: string;
+}): Promise<{ id?: string; error?: string }> {
+  try {
+    const { data: row, error } = await supabase
+      .from("sales")
+      .insert(data)
+      .select("id")
+      .single();
+    if (error) throw new Error(error.message);
+    _revalidatePath("/admin/gestao-servicos");
+    _revalidatePath("/admin/servicos");
+    return { id: row.id };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
+}
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 

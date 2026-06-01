@@ -1,17 +1,20 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { signOut } from "@/lib/auth";
-import { getGuideExpenses, getFinalisedSalesCount } from "@/lib/notion";
+import { getGuideExpenses, getFinalisedSalesCount, getAiScanFailedTransactions, getFornecedores } from "@/lib/notion";
 import Image from "next/image";
 import Link from "next/link";
+import { AiScanFailedSection } from "@/components/AiScanFailedSection";
 
 export default async function EmFaltaPage() {
   const session = await auth();
   if (!session || session.user.role !== "Admin") redirect("/");
 
-  const [guideExpenses, finalisedCount] = await Promise.all([
+  const [guideExpenses, finalisedCount, aiScanFailed, fornecedores] = await Promise.all([
     getGuideExpenses(),
     getFinalisedSalesCount(),
+    getAiScanFailedTransactions(),
+    getFornecedores(),
   ]);
 
   return (
@@ -82,6 +85,9 @@ export default async function EmFaltaPage() {
             <span className="text-gray-300 text-lg flex-shrink-0">→</span>
           </div>
         </Link>
+
+        {/* Scan IA Falhou */}
+        <AiScanFailedSection transactions={aiScanFailed} fornecedores={fornecedores} />
 
         </div>
       </main>
