@@ -357,6 +357,7 @@ export async function createSale(data: {
     data:            data.date,
     conta_pagamento: "COME",
     type:            "Earning",
+    status:          "Pending Payment",
     valor:           valorComIva || null,
     sale_id:         saleId,
   });
@@ -580,7 +581,7 @@ async function getRawTransactionsForTour(tourId: string): Promise<Transaction[]>
     const { data } = await supabase.from("transactions")
       .select(TX_SELECT)
       .eq("sale_id", tourId)
-      .neq("status", "Archived")
+      .or("status.is.null,status.neq.Archived")
       .order("data", { ascending: false });
     return (data ?? []).map(mapTransactionRow);
   } catch { return []; }
