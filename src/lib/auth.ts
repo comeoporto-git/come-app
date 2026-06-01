@@ -2,7 +2,7 @@ import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
 import Resend from "next-auth/providers/resend";
 import PgAdapter from "@auth/pg-adapter";
-import { Pool } from "@neondatabase/serverless";
+import { Pool } from "pg";
 import { getTeamMemberByEmail } from "@/lib/notion";
 import type { TeamMember } from "@/lib/notion";
 
