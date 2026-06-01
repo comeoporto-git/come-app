@@ -19,7 +19,10 @@ declare module "next-auth" {
   }
 }
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined,
+});
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PgAdapter(pool),
