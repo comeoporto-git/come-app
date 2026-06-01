@@ -335,6 +335,15 @@ export async function createSale(data: {
   if (saleError) throw new Error(`createSale: ${saleError.message}`);
 }
 
+export async function deleteSale(id: string): Promise<void> {
+  // Delete transactions first (no cascade defined in schema)
+  const { error: txError } = await supabase.from("transactions").delete().eq("sale_id", id);
+  if (txError) throw new Error(`deleteSale transactions: ${txError.message}`);
+
+  const { error } = await supabase.from("sales").delete().eq("id", id);
+  if (error) throw new Error(`deleteSale: ${error.message}`);
+}
+
 // ── Tours (Sales table) ───────────────────────────────────────────────────────
 
 export async function getServicesWithMissingInfo(): Promise<Tour[]> {
