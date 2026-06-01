@@ -487,6 +487,7 @@ async function getRawTransactionsForTour(tourId: string): Promise<Transaction[]>
     const { data } = await supabase.from("transactions")
       .select(TX_SELECT)
       .eq("sale_id", tourId)
+      .neq("status", "Archived")
       .order("data", { ascending: false });
     return (data ?? []).map(mapTransactionRow);
   } catch { return []; }
@@ -541,6 +542,7 @@ export async function getTransactionsForMatching(): Promise<Transaction[]> {
   const { data } = await supabase.from("transactions")
     .select(TX_SELECT)
     .eq("metodo_pagamento", "Cartão COME")
+    .neq("status", "Archived")
     .limit(100);
   return (data ?? []).map(mapTransactionRow).filter((t) => !t.supplier.startsWith("IN -"));
 }
@@ -548,6 +550,7 @@ export async function getTransactionsForMatching(): Promise<Transaction[]> {
 export async function getAccountantTransactions(): Promise<Transaction[]> {
   const { data } = await supabase.from("transactions")
     .select(TX_SELECT)
+    .neq("status", "Archived")
     .order("data", { ascending: false })
     .limit(100);
   return (data ?? []).map(mapTransactionRow).filter((t) => !t.supplier.startsWith("IN -"));
@@ -711,6 +714,7 @@ export async function getAnalyticsTransactions(): Promise<Transaction[]> {
     while (true) {
       const { data } = await supabase.from("transactions")
         .select(TX_SELECT)
+        .neq("status", "Archived")
         .order("data", { ascending: false })
         .range(from, from + PAGE - 1);
       if (!data?.length) break;
@@ -727,6 +731,7 @@ export async function getGuideExpenses(): Promise<Transaction[]> {
     const { data } = await supabase.from("transactions")
       .select(`*, sales!transactions_sale_id_fkey(notion_id, guide_id, chef_id, driver_id)`)
       .eq("transferencia_feita", false)
+      .neq("status", "Archived")
       .or([
         "metodo_pagamento.eq.Pelo Guia",
         "metodo_pagamento.eq.Pelo Chef",
