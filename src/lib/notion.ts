@@ -320,19 +320,47 @@ export async function createSale(data: {
   phoneNumber?: string;
   names?: string;
 }): Promise<void> {
-  const { error } = await supabase.from("sales").insert({
-    id:               crypto.randomUUID(),
+  const saleId = crypto.randomUUID();
+
+  const { error: saleError } = await supabase.from("sales").insert({
+    id:               saleId,
     service_id:       data.serviceId,
     date:             data.date,
-    status:           data.status          || "Pending",
-    notion_id:        data.notionId        || null,
-    number_of_guests: data.numGuests       ?? null,
-    meeting_point:    data.meetingPoint    || null,
-    notes:            data.notes           || null,
-    phone_number:     data.phoneNumber     || null,
-    names:            data.names           || null,
+    status:           data.status       || "Pending",
+    notion_id:        data.notionId     || null,
+    number_of_guests: data.numGuests    ?? null,
+    meeting_point:    data.meetingPoint || null,
+    notes:            data.notes        || null,
+    phone_number:     data.phoneNumber  || null,
+    names:            data.names        || null,
   });
-  if (error) throw new Error(`createSale: ${error.message}`);
+  if (saleError) throw new Error(`createSale: ${saleError.message}`);
+
+  // Fetch service pricing to calculate the earning amount
+  const { data: svc } = await supabase
+    .from("services")
+    .select("name, pax_2_3, pax_4_6, pax_7_plus")
+    .eq("id", data.serviceId)
+    .maybeSingle();
+
+  const n = data.numGuests ?? 0;
+  const p23    = svc?.pax_2_3    ?? 0;
+  const p46    = svc?.pax_4_6    ?? 0;
+  const p7plus = svc?.pax_7_plus ?? 0;
+  const pricePerPax = n >= 7 ? p7plus : n >= 4 ? p46 : p23;
+  const effectiveGuests = n === 1 ? 2 : n;
+  const valorComIva = pricePerPax * effectiveGuests * 1.23;
+
+  const { error: txError } = await supabase.from("transactions").insert({
+    id:              crypto.randomUUID(),
+    notion_id:       "IN - " + (data.notionId ?? ""),
+    data:            data.date,
+    conta_pagamento: "COME",
+    type:            "Earning",
+    valor:           valorComIva || null,
+    sale_id:         saleId,
+  });
+  if (txError) throw new Error(`createSale earning tx: ${txError.message}`);
 }
 
 // ── Tours (Sales table) ───────────────────────────────────────────────────────
