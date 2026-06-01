@@ -422,9 +422,18 @@ export async function updateTourTeam(
   if (error) throw new Error(`updateTourTeam: ${error.message}`);
 }
 
+const SALE_SELECT_WITH_PRICES = `
+  *,
+  clients(name),
+  services(name, type, equipa, pax_2_3, pax_4_6, pax_7_plus),
+  guide:team!sales_guide_id_fkey(name),
+  chef:team!sales_chef_id_fkey(name),
+  driver:team!sales_driver_id_fkey(name)
+`.trim();
+
 export async function getFinalisedSales(): Promise<FinalisedSale[]> {
   const { data } = await supabase.from("sales")
-    .select(`${SALE_SELECT}, services(pax_2_3, pax_4_6, pax_7_plus)`)
+    .select(SALE_SELECT_WITH_PRICES)
     .eq("status", "Finalised")
     .order("date", { ascending: false });
 
