@@ -398,7 +398,7 @@ export async function getRecentSyncLogs(limit = 5): Promise<SyncLog[]> {
     const rows = await sql`
       SELECT * FROM sync_logs ORDER BY ran_at DESC LIMIT ${limit}
     `;
-    return rows as SyncLog[];
+    return rows as unknown as SyncLog[];
   } catch {
     return []; // table may not exist yet
   }
@@ -422,5 +422,5 @@ export async function getStoredTransactions(
         ORDER BY transaction_date DESC, id DESC
         LIMIT ${limit}
       `;
-  return rows as StoredTransaction[];
+  return rows as unknown as StoredTransaction[];
 }

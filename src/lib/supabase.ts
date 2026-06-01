@@ -25,7 +25,7 @@ export async function getRecentCorrections(limit = 5): Promise<AiCorrection[]> {
     ORDER BY created_at DESC
     LIMIT ${limit}
   `;
-  return rows as AiCorrection[];
+  return rows as unknown as AiCorrection[];
 }
 
 // ── Supplier Mappings (Learning Loop) ────────────────────────────────────────
@@ -63,7 +63,7 @@ export async function getSupplierMappings(): Promise<SupplierMapping[]> {
     ORDER BY confirmed_count DESC
     LIMIT 50
   `;
-  return rows as SupplierMapping[];
+  return rows as unknown as SupplierMapping[];
 }
 
 // ── System Prompt Builders ────────────────────────────────────────────────────
