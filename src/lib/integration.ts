@@ -16,7 +16,7 @@ export async function getSaleEmails(saleId: string): Promise<EmailMessage[]> {
   try {
     const res = await fetch(url, {
       headers: { Authorization: `Bearer ${secret}` },
-      next: { revalidate: 300 },
+      cache: 'no-store',
     });
     if (!res.ok) {
       const text = await res.text().catch(() => "");
