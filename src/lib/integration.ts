@@ -12,7 +12,7 @@ export async function getSaleEmails(saleId: string): Promise<EmailMessage[]> {
   const secret  = process.env.ADDON_SECRET;
   if (!baseUrl || !secret) return [];
 
-  const url = `${baseUrl}/api/addon/sale-emails?saleId=${saleId}`;
+  const url = `${baseUrl}/api/addon/edit-context?emails=true&saleId=${saleId}`;
   try {
     const res = await fetch(url, {
       headers: { Authorization: `Bearer ${secret}` },
