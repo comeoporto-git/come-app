@@ -1,15 +1,183 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import type { Transaction, Fornecedor } from "@/lib/notion";
 import { EditExpenseModal } from "./EditExpenseModal";
 import { EditEarningModal } from "./EditEarningModal";
 
-const MONTHS_PT = [
-  "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
-];
+// ── Date helpers ──────────────────────────────────────────────────────────────
+
+function todayStr() {
+  return new Date().toISOString().split("T")[0];
+}
+
+function daysAgo(n: number) {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return d.toISOString().split("T")[0];
+}
+
+function firstOfMonth(date = new Date()) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-01`;
+}
+
+function lastOfMonth(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth() + 1, 0).toISOString().split("T")[0];
+}
+
+function firstOfYear(year = new Date().getFullYear()) {
+  return `${year}-01-01`;
+}
+
+function lastOfYear(year: number) {
+  return `${year}-12-31`;
+}
+
+const MONTHS_SHORT = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+
+function formatRange(from: string, to: string): string {
+  const f = new Date(from + "T00:00:00");
+  const t = new Date(to   + "T00:00:00");
+  const fy = f.getFullYear(), ty = t.getFullYear();
+  const fm = MONTHS_SHORT[f.getMonth()], tm = MONTHS_SHORT[t.getMonth()];
+  if (from === to) return `${f.getDate()} ${fm} ${fy}`;
+  if (fy === ty) {
+    if (f.getMonth() === t.getMonth())
+      return `${f.getDate()}–${t.getDate()} ${tm} ${ty}`;
+    return `${f.getDate()} ${fm} – ${t.getDate()} ${tm} ${ty}`;
+  }
+  return `${f.getDate()} ${fm} ${fy} – ${t.getDate()} ${tm} ${ty}`;
+}
+
+// ── Presets ───────────────────────────────────────────────────────────────────
+
+function getPresets() {
+  const now = new Date();
+  const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const prevYear  = now.getFullYear() - 1;
+  return [
+    { label: "Hoje",           from: todayStr(),           to: todayStr() },
+    { label: "Últimos 7 dias", from: daysAgo(6),           to: todayStr() },
+    { label: "Últimos 30 dias",from: daysAgo(29),          to: todayStr() },
+    { label: "Este mês",       from: firstOfMonth(now),    to: todayStr() },
+    { label: "Último mês",     from: firstOfMonth(prevMonth), to: lastOfMonth(prevMonth) },
+    { label: "Este ano",       from: firstOfYear(),        to: todayStr() },
+    { label: "Último ano",     from: firstOfYear(prevYear), to: lastOfYear(prevYear) },
+  ];
+}
+
+// ── DateRangeControl ──────────────────────────────────────────────────────────
+
+function DateRangeControl({ from, to }: { from: string; to: string }) {
+  const router  = useRouter();
+  const [open, setOpen]         = useState(false);
+  const [customFrom, setCustomFrom] = useState(from);
+  const [customTo,   setCustomTo]   = useState(to);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setCustomFrom(from);
+    setCustomTo(to);
+  }, [from, to]);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClick(e: MouseEvent) {
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [open]);
+
+  function navigate(f: string, t: string) {
+    router.push(`?from=${f}&to=${t}`);
+    setOpen(false);
+  }
+
+  const presets = getPresets();
+  const activePreset = presets.find((p) => p.from === from && p.to === to);
+
+  return (
+    <div className="relative" ref={panelRef}>
+      {/* Trigger button */}
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between gap-2 bg-white rounded-2xl px-4 py-3 text-sm font-semibold text-[#32373c] shadow-sm hover:bg-gray-50 active:scale-[0.99] transition-all"
+      >
+        <span className="flex items-center gap-2">
+          <span className="text-base">📅</span>
+          <span>{activePreset?.label ?? formatRange(from, to)}</span>
+        </span>
+        <span className={`text-gray-400 text-xs transition-transform ${open ? "rotate-180" : ""}`}>▾</span>
+      </button>
+
+      {/* Panel */}
+      {open && (
+        <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden z-20">
+          {/* Preset grid */}
+          <div className="p-3 grid grid-cols-2 gap-2">
+            {presets.map((p) => {
+              const active = p.from === from && p.to === to;
+              return (
+                <button
+                  key={p.label}
+                  onClick={() => navigate(p.from, p.to)}
+                  className={`text-left px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                    active
+                      ? "bg-[#667470] text-white"
+                      : "bg-gray-50 text-[#32373c] hover:bg-[#667470]/10"
+                  }`}
+                >
+                  {p.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Custom range */}
+          <div className="border-t border-gray-100 px-3 py-3 space-y-2">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Período personalizado</p>
+            <div className="flex items-center gap-2">
+              <div className="flex-1">
+                <label className="text-xs text-gray-400 mb-1 block">De</label>
+                <input
+                  type="date"
+                  value={customFrom}
+                  max={customTo}
+                  onChange={(e) => setCustomFrom(e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-[#32373c] focus:outline-none focus:border-[#667470]/50"
+                />
+              </div>
+              <div className="flex-1">
+                <label className="text-xs text-gray-400 mb-1 block">Até</label>
+                <input
+                  type="date"
+                  value={customTo}
+                  min={customFrom}
+                  max={todayStr()}
+                  onChange={(e) => setCustomTo(e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-[#32373c] focus:outline-none focus:border-[#667470]/50"
+                />
+              </div>
+            </div>
+            <button
+              onClick={() => navigate(customFrom, customTo)}
+              disabled={!customFrom || !customTo || customFrom > customTo}
+              className="w-full bg-[#32373c] text-white font-semibold py-2.5 rounded-xl text-sm disabled:opacity-40 hover:bg-[#1a2018] transition-colors"
+            >
+              Aplicar
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Status / colour maps ──────────────────────────────────────────────────────
 
 const STATUS_COLORS: Record<string, string> = {
   Paid:                       "bg-green-100 text-green-700",
@@ -30,66 +198,40 @@ const STATUS_LABELS: Record<string, string> = {
 type TypeFilter   = "Todas" | "Despesas" | "Receitas";
 type StatusFilter = "Todos" | "Pendentes" | "Paid" | "Em Falta";
 
+// ── Main component ────────────────────────────────────────────────────────────
+
 export function TransactionsList({
   transactions,
   fornecedores,
-  year,
-  month,
+  from,
+  to,
 }: {
   transactions: Transaction[];
   fornecedores: Fornecedor[];
-  year: number;
-  month: number;
+  from: string;
+  to: string;
 }) {
-  const router = useRouter();
   const [search, setSearch]             = useState("");
   const [typeFilter, setTypeFilter]     = useState<TypeFilter>("Todas");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("Todos");
   const [editing, setEditing]           = useState<Transaction | null>(null);
 
-  function navigate(y: number, m: number) {
-    router.push(`?year=${y}&month=${m}`);
-  }
-
-  function prevMonth() {
-    let m = month - 1, y = year;
-    if (m < 1) { m = 12; y--; }
-    navigate(y, m);
-  }
-
-  function nextMonth() {
-    let m = month + 1, y = year;
-    if (m > 12) { m = 1; y++; }
-    navigate(y, m);
-  }
-
-  const now = new Date();
-  const isCurrentMonth = year === now.getFullYear() && month === now.getMonth() + 1;
-
   const filtered = useMemo(() => {
     return transactions.filter((t) => {
       const isEarning = t.supplier.startsWith("IN -");
-
-      if (typeFilter === "Despesas" && isEarning) return false;
+      if (typeFilter === "Despesas" && isEarning)  return false;
       if (typeFilter === "Receitas" && !isEarning) return false;
-
-      if (statusFilter === "Pendentes") {
-        if (t.status !== "Pending Payment" && t.status !== "Pending Receipt") return false;
-      } else if (statusFilter === "Paid") {
-        if (t.status !== "Paid") return false;
-      } else if (statusFilter === "Em Falta") {
-        if (t.status !== "Flag: Missing Bank Entry") return false;
-      }
-
+      if (statusFilter === "Pendentes" && t.status !== "Pending Payment" && t.status !== "Pending Receipt") return false;
+      if (statusFilter === "Paid"     && t.status !== "Paid") return false;
+      if (statusFilter === "Em Falta" && t.status !== "Flag: Missing Bank Entry") return false;
       if (search) {
         const q = search.toLowerCase();
-        const matches =
-          t.supplier.toLowerCase().includes(q) ||
-          t.invoiceId.toLowerCase().includes(q) ||
-          (t.tourName ?? "").toLowerCase().includes(q);
-        if (!matches) return false;
+        if (
+          !t.supplier.toLowerCase().includes(q) &&
+          !t.invoiceId.toLowerCase().includes(q) &&
+          !(t.tourName ?? "").toLowerCase().includes(q)
+        ) return false;
       }
-
       return true;
     });
   }, [transactions, typeFilter, statusFilter, search]);
@@ -101,25 +243,8 @@ export function TransactionsList({
 
   return (
     <div className="space-y-4">
-      {/* Month navigator */}
-      <div className="flex items-center justify-between bg-white/20 rounded-2xl px-4 py-3">
-        <button
-          onClick={prevMonth}
-          className="text-white/70 hover:text-white transition-colors text-lg font-bold w-8 text-center"
-        >
-          ‹
-        </button>
-        <span className="text-white font-semibold text-sm">
-          {MONTHS_PT[month - 1]} {year}
-        </span>
-        <button
-          onClick={nextMonth}
-          disabled={isCurrentMonth}
-          className="text-white/70 hover:text-white transition-colors text-lg font-bold w-8 text-center disabled:opacity-30 disabled:cursor-not-allowed"
-        >
-          ›
-        </button>
-      </div>
+      {/* Date range control */}
+      <DateRangeControl from={from} to={to} />
 
       {/* Search */}
       <input
@@ -137,9 +262,7 @@ export function TransactionsList({
             key={t}
             onClick={() => setTypeFilter(t)}
             className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
-              typeFilter === t
-                ? "bg-white text-[#32373c]"
-                : "bg-white/25 text-white hover:bg-white/35"
+              typeFilter === t ? "bg-white text-[#32373c]" : "bg-white/25 text-white hover:bg-white/35"
             }`}
           >
             {t}
@@ -154,9 +277,7 @@ export function TransactionsList({
             key={s}
             onClick={() => setStatusFilter(s)}
             className={`px-3 py-1 rounded-xl text-xs font-medium transition-colors ${
-              statusFilter === s
-                ? "bg-white text-[#32373c]"
-                : "bg-white/20 text-white/80 hover:bg-white/30"
+              statusFilter === s ? "bg-white text-[#32373c]" : "bg-white/20 text-white/80 hover:bg-white/30"
             }`}
           >
             {s === "Paid" ? "Pago" : s}
@@ -181,13 +302,11 @@ export function TransactionsList({
       {/* Transaction list */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         {filtered.length === 0 ? (
-          <div className="py-12 text-center text-sm text-gray-400">
-            Sem transações
-          </div>
+          <div className="py-12 text-center text-sm text-gray-400">Sem transações</div>
         ) : (
           <ul className="divide-y divide-gray-50">
             {filtered.map((tx) => {
-              const isEarning = tx.supplier.startsWith("IN -");
+              const isEarning  = tx.supplier.startsWith("IN -");
               const displayName = isEarning
                 ? tx.supplier.replace(/^IN\s*-\s*/i, "") || "Receita"
                 : tx.supplier || "—";
@@ -200,11 +319,9 @@ export function TransactionsList({
                   onClick={() => setEditing(tx)}
                   className="px-4 py-3 flex items-center gap-3 cursor-pointer hover:bg-gray-50 active:bg-gray-100 transition-colors"
                 >
-                  <div
-                    className={`w-8 h-8 rounded-xl flex items-center justify-center text-base shrink-0 font-bold ${
-                      isEarning ? "bg-green-50 text-green-600" : "bg-red-50 text-red-500"
-                    }`}
-                  >
+                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-base shrink-0 font-bold ${
+                    isEarning ? "bg-green-50 text-green-600" : "bg-red-50 text-red-500"
+                  }`}>
                     {isEarning ? "+" : "-"}
                   </div>
 
@@ -216,7 +333,7 @@ export function TransactionsList({
                         <span className="text-xs text-[#667470] truncate max-w-[120px]">{tx.tourName}</span>
                       )}
                       {tx.invoiceId && (
-                        <span className="text-xs text-gray-400 truncate">Fatura: {tx.invoiceId}</span>
+                        <span className="text-xs text-gray-400">Fatura: {tx.invoiceId}</span>
                       )}
                     </div>
                   </div>
@@ -236,7 +353,9 @@ export function TransactionsList({
         )}
       </div>
 
-      <p className="text-center text-xs text-white/40 pb-4">{filtered.length} de {transactions.length} transações</p>
+      <p className="text-center text-xs text-white/40 pb-4">
+        {filtered.length} de {transactions.length} transações
+      </p>
 
       {editing && !editing.supplier.startsWith("IN -") && (
         <EditExpenseModal

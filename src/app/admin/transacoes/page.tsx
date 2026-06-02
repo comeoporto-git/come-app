@@ -6,21 +6,28 @@ import { TransactionsList } from "@/components/TransactionsList";
 import Image from "next/image";
 import Link from "next/link";
 
+function defaultRange() {
+  const now = new Date();
+  const to   = now.toISOString().split("T")[0];
+  const from = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+  return { from, to };
+}
+
 export default async function TransacoesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ year?: string; month?: string }>;
+  searchParams: Promise<{ from?: string; to?: string }>;
 }) {
   const session = await auth();
   if (!session || session.user.role !== "Admin") redirect("/");
 
   const params = await searchParams;
-  const now = new Date();
-  const year  = parseInt(params.year  ?? String(now.getFullYear()),      10);
-  const month = parseInt(params.month ?? String(now.getMonth() + 1), 10);
+  const def = defaultRange();
+  const from = params.from ?? def.from;
+  const to   = params.to   ?? def.to;
 
   const [transactions, fornecedores] = await Promise.all([
-    getAllTransactionsAdmin(year, month),
+    getAllTransactionsAdmin(from, to),
     getFornecedores(),
   ]);
 
@@ -53,8 +60,8 @@ export default async function TransacoesPage({
         <TransactionsList
           transactions={transactions}
           fornecedores={fornecedores}
-          year={year}
-          month={month}
+          from={from}
+          to={to}
         />
       </main>
     </div>
