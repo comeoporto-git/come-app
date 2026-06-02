@@ -85,6 +85,18 @@ export default async function ContabilidadePage() {
             </div>
           </Link>
 
+          {/* Todas as Transações */}
+          <Link href="/admin/transacoes">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex items-center gap-4 hover:border-[#667470]/30 active:scale-[0.98] transition-all cursor-pointer">
+              <div className="w-12 h-12 rounded-2xl bg-teal-50 flex items-center justify-center text-2xl shrink-0">🗒️</div>
+              <div>
+                <p className="font-bold text-[#32373c]">Todas as Transações</p>
+                <p className="text-sm text-gray-400">Ver e editar despesas e receitas</p>
+              </div>
+              <span className="ml-auto text-gray-300 text-lg">→</span>
+            </div>
+          </Link>
+
           {/* Contabilidade */}
           <Link href="/accountant">
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex items-center gap-4 hover:border-[#667470]/30 active:scale-[0.98] transition-all cursor-pointer">

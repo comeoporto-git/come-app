@@ -688,6 +688,15 @@ export async function getAccountantTransactions(): Promise<Transaction[]> {
   return (data ?? []).map(mapTransactionRow).filter((t) => !t.supplier.startsWith("IN -"));
 }
 
+export async function getAllTransactionsAdmin(): Promise<Transaction[]> {
+  const { data } = await supabase.from("transactions")
+    .select(TX_SELECT)
+    .neq("status", "Archived")
+    .order("data", { ascending: false })
+    .limit(500);
+  return (data ?? []).map(mapTransactionRow);
+}
+
 export async function getTransactionsNeedingInvoice(): Promise<Transaction[]> {
   const { data } = await supabase.from("transactions")
     .select(TX_SELECT)
