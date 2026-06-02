@@ -215,9 +215,6 @@ async function TourPageContent({
               </div>
             </section>
 
-            {/* Emails — Super Guide / Admin only */}
-            {canSeeFinancials && <SaleEmails emails={emails} threadIds={tour.threadIds} />}
-
             {/* Team */}
             <section className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="px-4 py-3 border-b border-gray-50">
@@ -259,6 +256,9 @@ async function TourPageContent({
                 )}
               </div>
             </section>
+
+            {/* Emails — Super Guide / Admin only */}
+            {canSeeFinancials && <SaleEmails emails={emails} threadIds={tour.threadIds} />}
           </div>
 
           {/* Right column: KPIs + Earnings + Expenses + Actions */}

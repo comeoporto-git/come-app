@@ -86,6 +86,7 @@ export type Transaction = {
   comprovantivoUrl?: string;
   paidByName?: string;
   payeeIban?: string;
+  contaPagamento?: string;
 };
 
 export type Fornecedor = {
@@ -165,6 +166,7 @@ function mapTransactionRow(row: any): Transaction {
     precisaDeFatura:    (row.precisa_fatura ?? "") as Transaction["precisaDeFatura"],
     transferenciaFeita: row.transferencia_feita ?? false,
     comprovantivoUrl:   row.comprovativo_url    ?? undefined,
+    contaPagamento:     row.conta_pagamento     ?? undefined,
   };
 }
 
@@ -894,6 +896,7 @@ export async function updateTransaction(
   if (data.bankReference     !== undefined) updates.id_banco            = data.bankReference;
   if (data.invoiceImageUrl)                 updates.fatura_url          = data.invoiceImageUrl;
   if (data.precisaDeFatura   !== undefined) updates.precisa_fatura      = data.precisaDeFatura || null;
+  if (data.contaPagamento    !== undefined) updates.conta_pagamento     = data.contaPagamento || null;
   await supabase.from("transactions").update(updates).eq("id", pageId);
 }
 

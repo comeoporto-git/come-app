@@ -9,6 +9,7 @@ type FormState = {
   reference: string;
   date: string;
   invoiceId: string;
+  contaPagamento: string;
   base6: number;
   base13: number;
   base23: number;
@@ -42,10 +43,11 @@ export function EditEarningModal({
   const rawRef = transaction.supplier.replace(/^IN\s*-\s*/i, "");
 
   const [form, setForm] = useState<FormState>({
-    reference: rawRef,
-    date:      transaction.date ?? new Date().toISOString().slice(0, 10),
-    invoiceId: transaction.invoiceId,
-    base6:     transaction.iva6  ? transaction.iva6  / 0.06 : 0,
+    reference:      rawRef,
+    date:           transaction.date ?? new Date().toISOString().slice(0, 10),
+    invoiceId:      transaction.invoiceId,
+    contaPagamento: transaction.contaPagamento ?? "",
+    base6:          transaction.iva6  ? transaction.iva6  / 0.06 : 0,
     base13:    transaction.iva13 ? transaction.iva13 / 0.13 : 0,
     base23:    transaction.iva23 ? transaction.iva23 / 0.23 : 0,
     taxFree:   transaction.taxFree,
@@ -132,14 +134,15 @@ export function EditEarningModal({
         }
       }
       await editEarningAction(transaction.id, tourId, {
-        reference:  form.reference,
-        date:       form.date,
-        invoiceId:  form.invoiceId,
-        taxFree:    form.taxFree,
-        iva6:       form.iva6,
-        iva13:      form.iva13,
-        iva23:      form.iva23,
-        totalCost:  form.totalCost,
+        reference:      form.reference,
+        date:           form.date,
+        invoiceId:      form.invoiceId,
+        taxFree:        form.taxFree,
+        iva6:           form.iva6,
+        iva13:          form.iva13,
+        iva23:          form.iva23,
+        totalCost:      form.totalCost,
+        contaPagamento: form.contaPagamento || undefined,
         ...(invoiceImageUrl ? { invoiceImageUrl } : {}),
       });
       router.refresh();
@@ -233,6 +236,18 @@ export function EditEarningModal({
                 <label className="text-xs text-gray-500 mb-1 block">Nº Fatura</label>
                 <input type="text" value={form.invoiceId} onChange={(e) => update("invoiceId", e.target.value)} className="input" />
               </div>
+            </div>
+
+            {/* Conta de Pagamento */}
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Conta de Pagamento</label>
+              <input
+                type="text"
+                value={form.contaPagamento}
+                onChange={(e) => update("contaPagamento", e.target.value)}
+                className="input"
+                placeholder="Ex: COME, Bernardo…"
+              />
             </div>
 
             {/* IVA */}

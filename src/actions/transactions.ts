@@ -356,6 +356,7 @@ export async function editEarningAction(
     iva13: number;
     iva23: number;
     totalCost: number;
+    contaPagamento?: string;
     invoiceImageUrl?: string;
   }
 ): Promise<void> {
@@ -364,14 +365,15 @@ export async function editEarningAction(
     throw new Error("Forbidden");
   }
   await updateTransaction(transactionId, {
-    supplier:  "IN - " + (data.reference || ""),
-    date:      data.date,
-    invoiceId: data.invoiceId,
-    taxFree:   data.taxFree,
-    iva6:      data.iva6,
-    iva13:     data.iva13,
-    iva23:     data.iva23,
-    totalCost: data.totalCost,
+    supplier:       "IN - " + (data.reference || ""),
+    date:           data.date,
+    invoiceId:      data.invoiceId,
+    taxFree:        data.taxFree,
+    iva6:           data.iva6,
+    iva13:          data.iva13,
+    iva23:          data.iva23,
+    totalCost:      data.totalCost,
+    contaPagamento: data.contaPagamento,
     ...(data.invoiceImageUrl ? { invoiceImageUrl: data.invoiceImageUrl } : {}),
   });
   revalidatePath(`/guide/tours/${tourId}`);
