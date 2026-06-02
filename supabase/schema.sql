@@ -89,6 +89,9 @@ CREATE TABLE IF NOT EXISTS sales (
   created_at        TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Unique index on notion_id (allows upsert from Gmail addon)
+CREATE UNIQUE INDEX IF NOT EXISTS sales_notion_id_unique ON sales(notion_id) WHERE notion_id IS NOT NULL;
+
 -- Additional team members on a sale (🧑🏼‍🍳 Team — many-to-many)
 CREATE TABLE IF NOT EXISTS sales_team (
   sale_id   UUID REFERENCES sales(id) ON DELETE CASCADE,
