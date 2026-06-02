@@ -398,7 +398,10 @@ export async function getRecentSyncLogs(limit = 5): Promise<SyncLog[]> {
     const rows = await sql`
       SELECT * FROM sync_logs ORDER BY ran_at DESC LIMIT ${limit}
     `;
-    return rows as unknown as SyncLog[];
+    return (rows as unknown as SyncLog[]).map((r) => ({
+      ...r,
+      errors: Array.isArray(r.errors) ? r.errors : [],
+    }));
   } catch {
     return []; // table may not exist yet
   }

@@ -113,7 +113,8 @@ export default async function BancoPage({
             </div>
             <ul className="divide-y divide-gray-50">
               {syncLogs.map((log) => {
-                const hasError = !!log.fatal_error || log.errors.length > 0;
+                const errors = Array.isArray(log.errors) ? log.errors : [];
+                const hasError = !!log.fatal_error || errors.length > 0;
                 const date = new Date(log.ran_at).toLocaleString("pt-PT", {
                   day: "2-digit", month: "2-digit", year: "numeric",
                   hour: "2-digit", minute: "2-digit", timeZone: "Europe/Lisbon",
@@ -140,9 +141,9 @@ export default async function BancoPage({
                     {log.fatal_error && (
                       <p className="text-xs text-red-500 mt-1.5 font-mono break-all">{log.fatal_error}</p>
                     )}
-                    {log.errors.length > 0 && (
+                    {errors.length > 0 && (
                       <ul className="mt-1.5 space-y-0.5">
-                        {log.errors.map((e, i) => (
+                        {errors.map((e, i) => (
                           <li key={i} className="text-xs text-orange-500 font-mono break-all">• {e}</li>
                         ))}
                       </ul>
