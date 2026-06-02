@@ -3,13 +3,17 @@
 import { useState } from "react";
 
 type ServiceType = { id: string; name: string };
+type Client      = { id: string; name: string };
 type Props = {
   serviceTypes: ServiceType[];
+  clients:      Client[];
   action: (fd: FormData) => Promise<void>;
 };
 
-export default function NewServiceForm({ serviceTypes, action }: Props) {
-  const [loading, setLoading] = useState(false);
+export default function NewServiceForm({ serviceTypes, clients, action }: Props) {
+  const [loading, setLoading]         = useState(false);
+  const [newClient, setNewClient]     = useState(false);
+  const [clientQuery, setClientQuery] = useState("");
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -42,6 +46,38 @@ export default function NewServiceForm({ serviceTypes, action }: Props) {
                 <option key={s.id} value={s.id}>{s.name}</option>
               ))}
             </select>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-medium text-gray-500">Cliente</label>
+              <button
+                type="button"
+                onClick={() => { setNewClient(!newClient); setClientQuery(""); }}
+                className="text-xs text-[#667470] hover:text-[#32373c] font-medium"
+              >
+                {newClient ? "← Selecionar existente" : "+ Novo cliente"}
+              </button>
+            </div>
+            {newClient ? (
+              <input
+                name="newClientName"
+                value={clientQuery}
+                onChange={(e) => setClientQuery(e.target.value)}
+                placeholder="Nome do novo cliente…"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#667470] transition-colors"
+              />
+            ) : (
+              <select
+                name="clientId"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#667470] transition-colors bg-white"
+              >
+                <option value="">— Selecionar cliente —</option>
+                {clients.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            )}
           </div>
 
           <div>

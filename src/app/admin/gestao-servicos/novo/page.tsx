@@ -2,7 +2,7 @@
 
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { getServiceTypesList, createSale } from "@/lib/notion";
+import { getServiceTypesList, getClientsList, createNewClient, createSale } from "@/lib/notion";
 import Image from "next/image";
 import Link from "next/link";
 import { signOut } from "@/lib/auth";
@@ -14,24 +14,34 @@ export default async function NovoServicoPage() {
   const role = session.user.role;
   if (role !== "Admin") redirect("/admin/gestao-servicos");
 
-  const serviceTypes = await getServiceTypesList();
+  const [serviceTypes, clients] = await Promise.all([
+    getServiceTypesList(),
+    getClientsList(),
+  ]);
 
   async function handleCreate(formData: FormData) {
     "use server";
 
-    const serviceId = (formData.get("serviceId") as string)?.trim();
-    const date      = (formData.get("date")      as string)?.trim();
+    const serviceId   = (formData.get("serviceId")   as string)?.trim();
+    const date        = (formData.get("date")         as string)?.trim();
     if (!serviceId || !date) return;
 
-    const startTime = (formData.get("startTime") as string)?.trim() || undefined;
-    const endTime   = (formData.get("endTime")   as string)?.trim() || undefined;
-    const numGuests = parseInt(formData.get("numGuests") as string);
+    const startTime   = (formData.get("startTime")   as string)?.trim() || undefined;
+    const endTime     = (formData.get("endTime")      as string)?.trim() || undefined;
+    const numGuests   = parseInt(formData.get("numGuests") as string);
+    const newClientName = (formData.get("newClientName") as string)?.trim();
+    let clientId      = (formData.get("clientId")    as string)?.trim() || undefined;
+
+    if (newClientName) {
+      clientId = await createNewClient(newClientName);
+    }
 
     await createSale({
       serviceId,
       date,
       startTime,
       endTime,
+      clientId,
       status:       (formData.get("status")       as string) || "Pending",
       notionId:     (formData.get("notionId")      as string)?.trim() || undefined,
       numGuests:    isNaN(numGuests) ? null : numGuests,
@@ -68,7 +78,7 @@ export default async function NovoServicoPage() {
       </header>
 
       <main className="max-w-2xl mx-auto px-4 py-8">
-        <NewServiceForm serviceTypes={serviceTypes} action={handleCreate} />
+        <NewServiceForm serviceTypes={serviceTypes} clients={clients} action={handleCreate} />
       </main>
     </div>
   );

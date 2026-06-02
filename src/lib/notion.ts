@@ -315,11 +315,25 @@ export async function getServiceTypesList(): Promise<{ id: string; name: string 
   return (data ?? []).map((r) => ({ id: r.id, name: r.name }));
 }
 
+export async function getClientsList(): Promise<{ id: string; name: string }[]> {
+  const { data } = await supabase.from("clients").select("id, name").order("name");
+  return (data ?? []).map((r) => ({ id: r.id, name: r.name }));
+}
+
+export async function createNewClient(name: string): Promise<string> {
+  const { data, error } = await supabase.from("clients")
+    .insert({ name: name.trim() })
+    .select("id").single();
+  if (error) throw new Error(`createNewClient: ${error.message}`);
+  return data.id;
+}
+
 export async function createSale(data: {
   serviceId: string;
   date: string;
   status?: string;
   notionId?: string;
+  clientId?: string;
   numGuests?: number | null;
   meetingPoint?: string;
   notes?: string;
@@ -334,6 +348,7 @@ export async function createSale(data: {
     date:             data.date,
     status:           data.status       || "Pending",
     notion_id:        data.notionId     || null,
+    client_id:        data.clientId     || null,
     number_of_guests: data.numGuests    ?? null,
     meeting_point:    data.meetingPoint || null,
     notes:            data.notes        || null,

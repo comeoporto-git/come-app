@@ -22,24 +22,6 @@ BEGIN
   FROM services
   WHERE id = NEW.service_id;
 
-  -- Only proceed for services that are in the automation list
-  IF v_service_name NOT IN (
-    'Old School to New School',
-    'Cooking Class at Barro Restaurant',
-    'Cooking Class at Chefs House',
-    'Fisherman Road + Chef',
-    'Fisherman Road',
-    'Old School to New School + Chef',
-    'Chef + Sommelier em Casa Tradicional Português - Porto',
-    'Chef + Sommelier em CasaAlta Gastronomia - Douro',
-    'Chef + Sommelier em Casa Nova Cozinha Portuguesa - Douro',
-    'Chef + Sommelier em Casa Tradicional Português - Douro',
-    'Surprise Surprise Douro (Motorista COME)',
-    'Surprise Surprise Douro (Motorista DMC)'
-  ) THEN
-    RETURN NEW;
-  END IF;
-
   -- Skip if an earning transaction already exists for this sale
   IF EXISTS (
     SELECT 1 FROM transactions WHERE sale_id = NEW.id AND type = 'Earning'
