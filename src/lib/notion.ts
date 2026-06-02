@@ -910,11 +910,11 @@ export async function createTransaction(
     iva_6:            data.iva6,
     iva_13:           data.iva13,
     iva_23:           data.iva23,
-    valor:            -(Math.abs(data.totalCost)),
+    valor:            data.supplier?.startsWith("IN -") ? Math.abs(data.totalCost) : -(Math.abs(data.totalCost)),
     pago_por:         data.whoPaid        || null,
     metodo_pagamento: data.paymentMethod  || null,
     status:           data.status         || null,
-    type:             "Expense",
+    type:             data.supplier?.startsWith("IN -") ? "Earning" : "Expense",
     conta_pagamento:  "COME",
     sale_id:          data.tourId         ?? null,
     fatura_url:       data.invoiceImageUrl ?? null,
@@ -939,7 +939,10 @@ export async function updateTransaction(
   if (data.iva6              !== undefined) updates.iva_6               = data.iva6;
   if (data.iva13             !== undefined) updates.iva_13              = data.iva13;
   if (data.iva23             !== undefined) updates.iva_23              = data.iva23;
-  if (data.totalCost         !== undefined) updates.valor               = -(Math.abs(data.totalCost));
+  if (data.totalCost         !== undefined) {
+    const isEarning = data.supplier !== undefined && data.supplier.startsWith("IN -");
+    updates.valor = isEarning ? Math.abs(data.totalCost) : -(Math.abs(data.totalCost));
+  }
   if (data.whoPaid           !== undefined) updates.pago_por            = data.whoPaid;
   if (data.paymentMethod     !== undefined) updates.metodo_pagamento    = data.paymentMethod;
   if (data.status            !== undefined) updates.status              = data.status;

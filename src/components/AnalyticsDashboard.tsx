@@ -193,7 +193,7 @@ export function AnalyticsDashboard({
       if (!t.date || !t.supplier.startsWith("IN -")) continue;
       const y = new Date(t.date).getFullYear();
       if (!map[y]) map[y] = { services: 0, futureSvcs: 0, revenue: 0 };
-      map[y].revenue -= t.totalCost;
+      map[y].revenue += t.totalCost;
     }
     return Object.entries(map)
       .map(([year, d]) => ({
@@ -284,7 +284,7 @@ export function AnalyticsDashboard({
       if (!tx.supplier.startsWith("IN -") || !tx.tourId) continue;
       const s = tourStatusMap[tx.tourId];
       if (!s) continue;
-      revenueByStatus[s] = (revenueByStatus[s] ?? 0) - tx.totalCost;
+      revenueByStatus[s] = (revenueByStatus[s] ?? 0) + tx.totalCost;
     }
     const topRevenueByStatus = Object.entries(revenueByStatus).sort((a, b) => b[1] - a[1]);
     const maxRevenueByStatus = Math.max(...topRevenueByStatus.map(([, v]) => v), 1);
@@ -358,7 +358,7 @@ export function AnalyticsDashboard({
       if (!tx.supplier.startsWith("IN -") || !tx.tourId) continue;
       const cid = tourClientMap[tx.tourId];
       if (!cid) continue;
-      revenueByClient[cid] = (revenueByClient[cid] ?? 0) - tx.totalCost;
+      revenueByClient[cid] = (revenueByClient[cid] ?? 0) + tx.totalCost;
     }
     const topClientsByRevenue = Object.entries(revenueByClient)
       .sort(([, a], [, b]) => b - a).slice(0, 10)
@@ -369,7 +369,7 @@ export function AnalyticsDashboard({
     const expenses      = txns.filter((t) => !t.supplier.startsWith("IN -"));
     const earnings      = txns.filter((t) => t.supplier.startsWith("IN -"));
     const totalExpenses = expenses.reduce((s, t) => s + t.totalCost, 0);
-    const totalEarnings = -earnings.reduce((s, t) => s + t.totalCost, 0);
+    const totalEarnings = earnings.reduce((s, t) => s + t.totalCost, 0);
     const expPerTour    = pastCompleted.length > 0 ? totalExpenses / pastCompleted.length : 0;
     const byMethod: Record<string, number> = {};
     for (const t of expenses) {

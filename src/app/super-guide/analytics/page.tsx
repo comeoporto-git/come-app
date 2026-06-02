@@ -33,7 +33,7 @@ export default async function SuperGuideAnalyticsPage() {
     if (!tx.supplier.startsWith("IN -") || !tx.tourId) continue;
     const cid = tourClientMap[tx.tourId];
     if (!cid) continue;
-    clientRevenue[cid] = (clientRevenue[cid] ?? 0) - tx.totalCost;
+    clientRevenue[cid] = (clientRevenue[cid] ?? 0) + tx.totalCost;
   }
   const topByRevenue = Object.entries(clientRevenue)
     .sort(([, a], [, b]) => b - a).slice(0, 20).map(([id]) => id);
