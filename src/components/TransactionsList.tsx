@@ -1,9 +1,15 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import type { Transaction, Fornecedor } from "@/lib/notion";
 import { EditExpenseModal } from "./EditExpenseModal";
 import { EditEarningModal } from "./EditEarningModal";
+
+const MONTHS_PT = [
+  "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
+];
 
 const STATUS_COLORS: Record<string, string> = {
   Paid:                       "bg-green-100 text-green-700",
@@ -27,14 +33,38 @@ type StatusFilter = "Todos" | "Pendentes" | "Paid" | "Em Falta";
 export function TransactionsList({
   transactions,
   fornecedores,
+  year,
+  month,
 }: {
   transactions: Transaction[];
   fornecedores: Fornecedor[];
+  year: number;
+  month: number;
 }) {
-  const [search, setSearch]           = useState("");
-  const [typeFilter, setTypeFilter]   = useState<TypeFilter>("Todas");
+  const router = useRouter();
+  const [search, setSearch]             = useState("");
+  const [typeFilter, setTypeFilter]     = useState<TypeFilter>("Todas");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("Todos");
-  const [editing, setEditing]         = useState<Transaction | null>(null);
+  const [editing, setEditing]           = useState<Transaction | null>(null);
+
+  function navigate(y: number, m: number) {
+    router.push(`?year=${y}&month=${m}`);
+  }
+
+  function prevMonth() {
+    let m = month - 1, y = year;
+    if (m < 1) { m = 12; y--; }
+    navigate(y, m);
+  }
+
+  function nextMonth() {
+    let m = month + 1, y = year;
+    if (m > 12) { m = 1; y++; }
+    navigate(y, m);
+  }
+
+  const now = new Date();
+  const isCurrentMonth = year === now.getFullYear() && month === now.getMonth() + 1;
 
   const filtered = useMemo(() => {
     return transactions.filter((t) => {
@@ -64,13 +94,33 @@ export function TransactionsList({
     });
   }, [transactions, typeFilter, statusFilter, search]);
 
-  const expenses  = filtered.filter((t) => !t.supplier.startsWith("IN -"));
-  const earnings  = filtered.filter((t) =>  t.supplier.startsWith("IN -"));
-  const totalOut  = expenses.reduce((s, t) => s + Math.abs(t.totalCost), 0);
-  const totalIn   = earnings.reduce((s, t) => s + Math.abs(t.totalCost), 0);
+  const expenses = filtered.filter((t) => !t.supplier.startsWith("IN -"));
+  const earnings = filtered.filter((t) =>  t.supplier.startsWith("IN -"));
+  const totalOut = expenses.reduce((s, t) => s + Math.abs(t.totalCost), 0);
+  const totalIn  = earnings.reduce((s, t) => s + Math.abs(t.totalCost), 0);
 
   return (
     <div className="space-y-4">
+      {/* Month navigator */}
+      <div className="flex items-center justify-between bg-white/20 rounded-2xl px-4 py-3">
+        <button
+          onClick={prevMonth}
+          className="text-white/70 hover:text-white transition-colors text-lg font-bold w-8 text-center"
+        >
+          ‹
+        </button>
+        <span className="text-white font-semibold text-sm">
+          {MONTHS_PT[month - 1]} {year}
+        </span>
+        <button
+          onClick={nextMonth}
+          disabled={isCurrentMonth}
+          className="text-white/70 hover:text-white transition-colors text-lg font-bold w-8 text-center disabled:opacity-30 disabled:cursor-not-allowed"
+        >
+          ›
+        </button>
+      </div>
+
       {/* Search */}
       <input
         type="search"

@@ -688,12 +688,16 @@ export async function getAccountantTransactions(): Promise<Transaction[]> {
   return (data ?? []).map(mapTransactionRow).filter((t) => !t.supplier.startsWith("IN -"));
 }
 
-export async function getAllTransactionsAdmin(): Promise<Transaction[]> {
+export async function getAllTransactionsAdmin(year: number, month: number): Promise<Transaction[]> {
+  const start = `${year}-${String(month).padStart(2, "0")}-01`;
+  // new Date(year, month, 0) gives the last day of `month` (1-indexed)
+  const end = new Date(year, month, 0).toISOString().split("T")[0];
   const { data } = await supabase.from("transactions")
     .select(TX_SELECT)
     .neq("status", "Archived")
-    .order("data", { ascending: false })
-    .limit(500);
+    .gte("data", start)
+    .lte("data", end)
+    .order("data", { ascending: false });
   return (data ?? []).map(mapTransactionRow);
 }
 

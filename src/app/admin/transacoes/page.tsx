@@ -6,12 +6,21 @@ import { TransactionsList } from "@/components/TransactionsList";
 import Image from "next/image";
 import Link from "next/link";
 
-export default async function TransacoesPage() {
+export default async function TransacoesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ year?: string; month?: string }>;
+}) {
   const session = await auth();
   if (!session || session.user.role !== "Admin") redirect("/");
 
+  const params = await searchParams;
+  const now = new Date();
+  const year  = parseInt(params.year  ?? String(now.getFullYear()),      10);
+  const month = parseInt(params.month ?? String(now.getMonth() + 1), 10);
+
   const [transactions, fornecedores] = await Promise.all([
-    getAllTransactionsAdmin(),
+    getAllTransactionsAdmin(year, month),
     getFornecedores(),
   ]);
 
@@ -41,7 +50,12 @@ export default async function TransacoesPage() {
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-6">
-        <TransactionsList transactions={transactions} fornecedores={fornecedores} />
+        <TransactionsList
+          transactions={transactions}
+          fornecedores={fornecedores}
+          year={year}
+          month={month}
+        />
       </main>
     </div>
   );
