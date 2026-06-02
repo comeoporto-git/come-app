@@ -240,6 +240,7 @@ export function InvoiceCollectionModal({
         totalCost: form.totalCost,
         invoiceImageUrl,
         fornecedorId: selectedFornecedorId || null,
+        supplier: transaction.supplier,
       });
       router.refresh();
       onClose();
@@ -273,7 +274,7 @@ export function InvoiceCollectionModal({
           {/* Transaction summary */}
           <div className="bg-gray-50 rounded-xl px-4 py-3 flex items-center justify-between">
             <div className="text-sm text-gray-500">{transaction.date ?? "—"}</div>
-            <div className="text-sm font-semibold text-gray-800">€{transaction.totalCost.toFixed(2)}</div>
+            <div className="text-sm font-semibold text-gray-800">€{Math.abs(transaction.totalCost).toFixed(2)}</div>
           </div>
 
           {error && (

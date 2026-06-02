@@ -90,16 +90,18 @@ export async function markInvoiceCollectedAction(
     totalCost: number;
     invoiceImageUrl?: string;
     fornecedorId?: string | null;
+    supplier?: string;
   }
 ): Promise<void> {
   const session = await requireAuth();
   if (session.user.role !== "Super Guide" && session.user.role !== "Admin") {
     throw new Error("Forbidden");
   }
-  const { fornecedorId, ...rest } = data;
+  const { fornecedorId, supplier, ...rest } = data;
   await updateTransaction(transactionId, {
     ...rest,
     ...(fornecedorId !== undefined ? { fornecedorId } : {}),
+    ...(supplier ? { supplier } : {}),
     precisaDeFatura: "Sim tratado",
     status: data.invoiceId ? "Paid" : "Pending Receipt",
   });
