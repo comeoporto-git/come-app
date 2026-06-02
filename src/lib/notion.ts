@@ -749,6 +749,7 @@ export async function getMatchedTransactionMap(): Promise<Record<string, Transac
         .not("id_banco", "is", null)
         .neq("id_banco", "")
         .order("data", { ascending: false })
+        .order("id",   { ascending: true })
         .range(from, from + PAGE - 1);
       if (!data?.length) break;
       for (const row of data) {
@@ -802,6 +803,7 @@ async function fetchAllLinkable(): Promise<{ expenses: Transaction[]; earnings: 
         .select(TX_SELECT)
         .or("id_banco.is.null,id_banco.eq.")
         .order("data", { ascending: false })
+        .order("id",   { ascending: true })
         .range(from, from + PAGE - 1);
       if (!data?.length) break;
       for (const row of data) {
