@@ -54,7 +54,7 @@ export function EditEarningModal({
     iva6:      transaction.iva6,
     iva13:     transaction.iva13,
     iva23:     transaction.iva23,
-    totalCost: transaction.totalCost,
+    totalCost: Math.abs(transaction.totalCost),
   });
 
   function update(field: keyof FormState, value: string | number) {

@@ -25,7 +25,7 @@ export function EarningList({
   const [saving, setSaving]     = useState(false);
   const [error, setError]       = useState("");
 
-  const faturacao = earnings.reduce((s, e) => s + e.totalCost, 0);
+  const faturacao = -earnings.reduce((s, e) => s + e.totalCost, 0);
 
   async function handleCreate(fd: FormData) {
     setSaving(true);
@@ -109,7 +109,7 @@ export function EarningList({
                     {e.invoiceId && <p className="text-xs text-emerald-600">{e.invoiceId}</p>}
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="text-sm font-bold text-emerald-700">+€{e.totalCost.toFixed(2)}</p>
+                    <p className="text-sm font-bold text-emerald-700">+€{(-e.totalCost).toFixed(2)}</p>
                     {e.status && (
                       <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-medium">
                         {e.status}

@@ -122,7 +122,7 @@ async function TourPageContent({
   if (!tour) notFound();
 
   const totalSpent = transactions.reduce((s, t) => s + t.totalCost, 0); // negative values
-  const faturacao  = earnings.reduce((s, t) => s + t.totalCost, 0);
+  const faturacao  = -earnings.reduce((s, t) => s + t.totalCost, 0);   // stored negative, negate to display positive
   const lucro      = faturacao + totalSpent; // totalSpent is negative, so this subtracts
   const margem     = faturacao > 0 ? (lucro / faturacao) * 100 : null;
   const isClosed   = tour.expensesClosed;
