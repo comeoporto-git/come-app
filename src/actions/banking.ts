@@ -11,6 +11,8 @@ import {
   getLinkableEarnings,
   updateTransaction,
   archiveTransaction,
+  updateSaleStatus,
+  supabase,
 } from "@/lib/notion";
 import { getStoredTransactions } from "@/lib/enablebanking";
 import { getDb } from "@/lib/db";
@@ -21,6 +23,17 @@ import { auth } from "@/lib/auth";
 // Cartão COME card purchases settle within 3 days
 const CARD_MATCH_WINDOW_MS = 3 * 24 * 60 * 60 * 1000;
 const AMOUNT_TOLERANCE     = 0.02; // 2 cents
+
+async function markSalePaidIfEarning(transactionId: string): Promise<void> {
+  const { data } = await supabase
+    .from("transactions")
+    .select("notion_id, sale_id")
+    .eq("id", transactionId)
+    .maybeSingle();
+  if (data?.sale_id && data?.notion_id?.startsWith("IN -")) {
+    await updateSaleStatus(data.sale_id, "Paid");
+  }
+}
 
 async function requireAdmin() {
   const session = await auth();
@@ -81,6 +94,7 @@ export async function manualMatchAction(
 ): Promise<void> {
   await requireAdmin();
   await updateTransaction(invoiceId, { status: "Paid", bankReference });
+  await markSalePaidIfEarning(invoiceId);
   await archiveTransaction(bankTransactionId);
   revalidatePath("/admin/reconciliation");
 }
@@ -96,9 +110,8 @@ export async function linkBankTransactionAction(
   placeholderNotionId?: string, // Notion ID of the "Unmatched Bank Entry" placeholder, if known
 ): Promise<void> {
   await requireAdmin();
-  // Link the bank reference to the chosen Notion expense
   await updateTransaction(notionExpenseId, { status: "Paid", bankReference: bankTxnId });
-  // Archive the unmatched placeholder if one exists
+  await markSalePaidIfEarning(notionExpenseId);
   if (placeholderNotionId) {
     await archiveTransaction(placeholderNotionId);
   }
