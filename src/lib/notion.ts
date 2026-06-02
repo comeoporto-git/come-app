@@ -334,6 +334,8 @@ export async function createSale(data: {
   status?: string;
   notionId?: string;
   clientId?: string;
+  guideId?: string;
+  chefId?: string;
   numGuests?: number | null;
   meetingPoint?: string;
   notes?: string;
@@ -349,6 +351,8 @@ export async function createSale(data: {
     status:           data.status       || "Pending",
     notion_id:        data.notionId     || null,
     client_id:        data.clientId     || null,
+    guide_id:         data.guideId      || null,
+    chef_id:          data.chefId       || null,
     number_of_guests: data.numGuests    ?? null,
     meeting_point:    data.meetingPoint || null,
     notes:            data.notes        || null,

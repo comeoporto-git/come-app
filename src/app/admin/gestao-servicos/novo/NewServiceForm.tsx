@@ -4,13 +4,16 @@ import { useState } from "react";
 
 type ServiceType = { id: string; name: string };
 type Client      = { id: string; name: string };
+type Member      = { id: string; name: string };
 type Props = {
   serviceTypes: ServiceType[];
   clients:      Client[];
+  guides:       Member[];
+  chefs:        Member[];
   action: (fd: FormData) => Promise<void>;
 };
 
-export default function NewServiceForm({ serviceTypes, clients, action }: Props) {
+export default function NewServiceForm({ serviceTypes, clients, guides, chefs, action }: Props) {
   const [loading, setLoading]         = useState(false);
   const [newClient, setNewClient]     = useState(false);
   const [clientQuery, setClientQuery] = useState("");
@@ -129,6 +132,41 @@ export default function NewServiceForm({ serviceTypes, clients, action }: Props)
               placeholder="Ex: 2575, MyBookpack 001…"
               className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#667470] transition-colors"
             />
+          </div>
+        </div>
+      </div>
+
+      {/* Team */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-50">
+          <h2 className="text-sm font-semibold text-[#32373c]">Equipa</h2>
+        </div>
+        <div className="px-5 py-4 space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Guia</label>
+              <select
+                name="guideId"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#667470] transition-colors bg-white"
+              >
+                <option value="">— Nenhum —</option>
+                {guides.map((g) => (
+                  <option key={g.id} value={g.id}>{g.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Chef</label>
+              <select
+                name="chefId"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#667470] transition-colors bg-white"
+              >
+                <option value="">— Nenhum —</option>
+                {chefs.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
       </div>

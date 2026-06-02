@@ -2,7 +2,7 @@
 
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { getServiceTypesList, getClientsList, createNewClient, createSale } from "@/lib/notion";
+import { getServiceTypesList, getClientsList, getTeamMembers, createNewClient, createSale } from "@/lib/notion";
 import Image from "next/image";
 import Link from "next/link";
 import { signOut } from "@/lib/auth";
@@ -14,10 +14,13 @@ export default async function NovoServicoPage() {
   const role = session.user.role;
   if (role !== "Admin") redirect("/admin/gestao-servicos");
 
-  const [serviceTypes, clients] = await Promise.all([
+  const [serviceTypes, clients, teamMembers] = await Promise.all([
     getServiceTypesList(),
     getClientsList(),
+    getTeamMembers(),
   ]);
+  const guides = teamMembers.filter(m => m.role === "Guide" || m.role === "Super Guide");
+  const chefs  = teamMembers.filter(m => m.role === "Chef");
 
   async function handleCreate(formData: FormData) {
     "use server";
@@ -36,12 +39,17 @@ export default async function NovoServicoPage() {
       clientId = await createNewClient(newClientName);
     }
 
+    const guideId = (formData.get("guideId") as string)?.trim() || undefined;
+    const chefId  = (formData.get("chefId")  as string)?.trim() || undefined;
+
     await createSale({
       serviceId,
       date,
       startTime,
       endTime,
       clientId,
+      guideId,
+      chefId,
       status:       (formData.get("status")       as string) || "Pending",
       notionId:     (formData.get("notionId")      as string)?.trim() || undefined,
       numGuests:    isNaN(numGuests) ? null : numGuests,
@@ -78,7 +86,7 @@ export default async function NovoServicoPage() {
       </header>
 
       <main className="max-w-2xl mx-auto px-4 py-8">
-        <NewServiceForm serviceTypes={serviceTypes} clients={clients} action={handleCreate} />
+        <NewServiceForm serviceTypes={serviceTypes} clients={clients} guides={guides} chefs={chefs} action={handleCreate} />
       </main>
     </div>
   );
