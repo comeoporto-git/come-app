@@ -50,6 +50,8 @@ export type Tour = {
   expensesClosed: boolean;
   serviceEquipa: string[];
   threadIds: string[];
+  startTime: string | null;
+  endTime: string | null;
 };
 
 export type TourWithMissingStaff = Tour & { missingRoles: string[] };
@@ -139,6 +141,8 @@ function mapSaleRow(row: any): Tour {
     threadIds: row.thread_ids
       ? String(row.thread_ids).split(",").map((s: string) => s.trim()).filter(Boolean)
       : [],
+    startTime: row.start_time ? String(row.start_time).slice(0, 5) : null,
+    endTime:   row.end_time   ? String(row.end_time).slice(0, 5)   : null,
   };
 }
 
@@ -499,15 +503,40 @@ export async function updateSaleStatus(saleId: string, status: string): Promise<
 
 export async function updateTourServiceInfo(
   tourId: string,
-  data: { numGuests: number | null; names: string; phoneNumber: string; notes: string; meetingPoint: string },
+  data: {
+    numGuests: number | null;
+    names: string;
+    phoneNumber: string;
+    notes: string;
+    meetingPoint: string;
+    status?: string;
+    type?: string;
+    notionId?: string;
+    serviceId?: string;
+    clientId?: string;
+    date?: string;
+    startTime?: string | null;
+    endTime?: string | null;
+  },
 ): Promise<void> {
-  const { error } = await supabase.from("sales").update({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const updates: Record<string, any> = {
     number_of_guests: data.numGuests    ?? null,
     names:            data.names        || null,
     phone_number:     data.phoneNumber  || null,
     notes:            data.notes        || null,
     meeting_point:    data.meetingPoint || null,
-  }).eq("id", tourId);
+  };
+  if (data.status    !== undefined) updates.status      = data.status    || null;
+  if (data.type      !== undefined) updates.type        = data.type      || null;
+  if (data.notionId  !== undefined) updates.notion_id   = data.notionId  || null;
+  if (data.serviceId !== undefined) updates.service_id  = data.serviceId || null;
+  if (data.clientId  !== undefined) updates.client_id   = data.clientId  || null;
+  if (data.date      !== undefined) updates.date        = data.date      || null;
+  if (data.startTime !== undefined) updates.start_time  = data.startTime || null;
+  if (data.endTime   !== undefined) updates.end_time    = data.endTime   || null;
+
+  const { error } = await supabase.from("sales").update(updates).eq("id", tourId);
   if (error) throw new Error(`updateTourServiceInfo: ${error.message}`);
 }
 

@@ -50,6 +50,14 @@ export async function updateTourServiceInfoAction(
     phoneNumber: string;
     notes: string;
     meetingPoint: string;
+    status?: string;
+    type?: string;
+    notionId?: string;
+    serviceId?: string;
+    clientId?: string;
+    date?: string;
+    startTime?: string | null;
+    endTime?: string | null;
   },
 ): Promise<{ error?: string }> {
   const session = await requireAuth();

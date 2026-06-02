@@ -5,6 +5,8 @@ import {
   getExpensesAndEarningsForTour,
   getFornecedores,
   getTeamMembers,
+  getServiceTypesList,
+  getClientsList,
   deleteSale,
 } from "@/lib/notion";
 import { redirect, notFound } from "next/navigation";
@@ -99,14 +101,16 @@ async function TourPageContent({
   const canEditTeam = role === "Super Guide" || role === "Admin";
   const canSeeFinancials = role === "Super Guide" || role === "Admin";
 
-  const [tour, txResult, fornecedores, teamMembers, emails] = await Promise.all([
+  const [tour, txResult, fornecedores, teamMembers, emails, servicesList, clientsList] = await Promise.all([
     getTourById(id),
     isChef
       ? getChefTransactionsForTour(id).then((t) => ({ expenses: t, earnings: [] }))
-      : getExpensesAndEarningsForTour(id),  // single Notion query instead of two
+      : getExpensesAndEarningsForTour(id),
     getFornecedores(),
     getTeamMembers(),
     canSeeFinancials ? getSaleEmails(id) : Promise.resolve([]),
+    canEditTeam ? getServiceTypesList() : Promise.resolve([]),
+    canEditTeam ? getClientsList()      : Promise.resolve([]),
   ]);
 
   const transactions = canSeeFinancials ? txResult.expenses : txResult.expenses;
@@ -158,12 +162,20 @@ async function TourPageContent({
                     status={tour.status}
                     serviceType={tour.serviceType}
                     serviceName={tour.serviceName}
+                    serviceId={tour.service}
                     clientName={tour.clientName}
+                    clientId={tour.client}
                     numGuests={tour.numGuests}
                     names={tour.names}
                     phoneNumber={tour.phoneNumber}
                     notes={tour.notes}
                     meetingPoint={tour.meetingPoint}
+                    notionId={tour.saleId}
+                    date={tour.date}
+                    startTime={tour.startTime}
+                    endTime={tour.endTime}
+                    services={servicesList}
+                    clients={clientsList}
                   />
                 ) : (
                   <>
