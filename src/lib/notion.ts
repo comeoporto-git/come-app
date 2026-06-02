@@ -325,6 +325,8 @@ export async function createSale(data: {
   notes?: string;
   phoneNumber?: string;
   names?: string;
+  startTime?: string;
+  endTime?: string;
 }): Promise<void> {
   const { error: saleError } = await supabase.from("sales").insert({
     id:               crypto.randomUUID(),
@@ -337,6 +339,8 @@ export async function createSale(data: {
     notes:            data.notes        || null,
     phone_number:     data.phoneNumber  || null,
     names:            data.names        || null,
+    start_time:       data.startTime    || null,
+    end_time:         data.endTime      || null,
   });
   if (saleError) throw new Error(`createSale: ${saleError.message}`);
 }

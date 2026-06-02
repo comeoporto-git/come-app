@@ -23,11 +23,15 @@ export default async function NovoServicoPage() {
     const date      = (formData.get("date")      as string)?.trim();
     if (!serviceId || !date) return;
 
+    const startTime = (formData.get("startTime") as string)?.trim() || undefined;
+    const endTime   = (formData.get("endTime")   as string)?.trim() || undefined;
     const numGuests = parseInt(formData.get("numGuests") as string);
 
     await createSale({
       serviceId,
       date,
+      startTime,
+      endTime,
       status:       (formData.get("status")       as string) || "Pending",
       notionId:     (formData.get("notionId")      as string)?.trim() || undefined,
       numGuests:    isNaN(numGuests) ? null : numGuests,

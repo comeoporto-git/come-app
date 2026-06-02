@@ -76,6 +76,8 @@ CREATE TABLE IF NOT EXISTS sales (
   email_link        TEXT,
   driver_type       TEXT,
   expenses_closed   TEXT,
+  start_time        TIME,
+  end_time          TIME,
   gcal_event_id     TEXT,
   synced_at         DATE,
   thread_ids        TEXT,

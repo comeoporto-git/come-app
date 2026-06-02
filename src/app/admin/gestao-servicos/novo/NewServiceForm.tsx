@@ -45,13 +45,32 @@ export default function NewServiceForm({ serviceTypes, action }: Props) {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Data e Hora *</label>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Data *</label>
             <input
               name="date"
-              type="datetime-local"
+              type="date"
               required
               className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#667470] transition-colors"
             />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Hora de Início</label>
+              <input
+                name="startTime"
+                type="time"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#667470] transition-colors"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Hora de Fim</label>
+              <input
+                name="endTime"
+                type="time"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#667470] transition-colors"
+              />
+            </div>
           </div>
 
           <div>
