@@ -197,6 +197,15 @@ const STATUS_LABELS: Record<string, string> = {
 
 type TypeFilter   = "Todas" | "Despesas" | "Receitas";
 type StatusFilter = "Todos" | "Pendentes" | "Paid" | "Em Falta";
+type SortKey      = "date_desc" | "date_asc" | "amount_desc" | "amount_asc" | "name_asc";
+
+const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+  { key: "date_desc",   label: "Data ↓" },
+  { key: "date_asc",    label: "Data ↑" },
+  { key: "amount_desc", label: "Valor ↓" },
+  { key: "amount_asc",  label: "Valor ↑" },
+  { key: "name_asc",    label: "Nome A–Z" },
+];
 
 // ── Main component ────────────────────────────────────────────────────────────
 
@@ -214,10 +223,11 @@ export function TransactionsList({
   const [search, setSearch]             = useState("");
   const [typeFilter, setTypeFilter]     = useState<TypeFilter>("Todas");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("Todos");
+  const [sort, setSort]                 = useState<SortKey>("date_desc");
   const [editing, setEditing]           = useState<Transaction | null>(null);
 
   const filtered = useMemo(() => {
-    return transactions.filter((t) => {
+    const list = transactions.filter((t) => {
       const isEarning = t.supplier.startsWith("IN -");
       if (typeFilter === "Despesas" && isEarning)  return false;
       if (typeFilter === "Receitas" && !isEarning) return false;
@@ -234,7 +244,17 @@ export function TransactionsList({
       }
       return true;
     });
-  }, [transactions, typeFilter, statusFilter, search]);
+
+    return [...list].sort((a, b) => {
+      switch (sort) {
+        case "date_asc":    return (a.date ?? "").localeCompare(b.date ?? "");
+        case "date_desc":   return (b.date ?? "").localeCompare(a.date ?? "");
+        case "amount_desc": return Math.abs(b.totalCost) - Math.abs(a.totalCost);
+        case "amount_asc":  return Math.abs(a.totalCost) - Math.abs(b.totalCost);
+        case "name_asc":    return a.supplier.localeCompare(b.supplier, "pt");
+      }
+    });
+  }, [transactions, typeFilter, statusFilter, search, sort]);
 
   const expenses = filtered.filter((t) => !t.supplier.startsWith("IN -"));
   const earnings = filtered.filter((t) =>  t.supplier.startsWith("IN -"));
@@ -281,6 +301,22 @@ export function TransactionsList({
             }`}
           >
             {s === "Paid" ? "Pago" : s}
+          </button>
+        ))}
+      </div>
+
+      {/* Sort */}
+      <div className="flex gap-2 flex-wrap items-center">
+        <span className="text-xs text-white/50 font-medium">Ordenar:</span>
+        {SORT_OPTIONS.map(({ key, label }) => (
+          <button
+            key={key}
+            onClick={() => setSort(key)}
+            className={`px-3 py-1 rounded-xl text-xs font-medium transition-colors ${
+              sort === key ? "bg-white text-[#32373c]" : "bg-white/20 text-white/80 hover:bg-white/30"
+            }`}
+          >
+            {label}
           </button>
         ))}
       </div>
