@@ -13,6 +13,10 @@ function daysSince(dateStr: string | null): number | null {
   return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
 }
 
+function euros(n: number) {
+  return new Intl.NumberFormat("pt-PT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n);
+}
+
 const CATEGORY_COLORS: Record<string, string> = {
   DMC:       "bg-blue-100 text-blue-700",
   Events:    "bg-orange-100 text-orange-700",
@@ -39,11 +43,16 @@ function AccountCard({ account }: { account: CRMAccount }) {
       </Link>
       <div className="mt-2 flex items-center justify-between gap-2">
         <StageSelect accountId={account.id} currentStage={account.stage} />
-        {days !== null && (
-          <span className={`text-xs ${stale ? "text-orange-500 font-medium" : "text-gray-400"}`}>
-            {days === 0 ? "hoje" : `${days}d`}
-          </span>
-        )}
+        <div className="flex items-center gap-1.5 shrink-0">
+          {account.revenue != null && account.revenue > 0 && (
+            <span className="text-xs font-medium text-emerald-600">{euros(account.revenue)}</span>
+          )}
+          {days !== null && (
+            <span className={`text-xs ${stale ? "text-orange-500 font-medium" : "text-gray-400"}`}>
+              {days === 0 ? "hoje" : `${days}d`}
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -11,10 +11,19 @@ export default async function CRMPage() {
   const session = await auth();
   if (!session || session.user.role !== "Admin") redirect("/");
 
-  const [accounts, topClients] = await Promise.all([
+  const [rawAccounts, topClients] = await Promise.all([
     getCRMAccounts(),
-    getCRMTopClients(15),
+    getCRMTopClients(50),
   ]);
+
+  // Merge revenue into accounts and sort Client-stage by revenue desc
+  const revenueMap = new Map(topClients.map((c) => [c.id, c.revenue]));
+  const accounts = rawAccounts
+    .map((a) => ({ ...a, revenue: revenueMap.get(a.id) ?? 0 }))
+    .sort((a, b) => {
+      if (a.stage === "Client" && b.stage === "Client") return (b.revenue ?? 0) - (a.revenue ?? 0);
+      return 0;
+    });
 
   return (
     <div className="min-h-screen bg-[#667470] text-[#32373c]">
