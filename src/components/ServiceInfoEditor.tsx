@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { updateTourServiceInfoAction } from "@/actions/transactions";
 import { MapsLink } from "@/components/MapsLink";
 
@@ -144,7 +145,16 @@ export function ServiceInfoEditor({
           </div>
           {serviceType && <ReadField label="Tipo" value={serviceType} />}
           <ReadField label="Serviço"  value={serviceName || "—"} />
-          <ReadField label="Cliente"  value={clientName  || "—"} />
+          <div>
+            <p className="text-xs text-gray-500 mb-1">Cliente</p>
+            {clientId ? (
+              <Link href={`/admin/crm/accounts/${clientId}`} className="text-sm font-medium text-[#667470] hover:underline">
+                {clientName || "—"}
+              </Link>
+            ) : (
+              <p className="text-sm text-gray-800 font-medium">{clientName || "—"}</p>
+            )}
+          </div>
           <ReadField label="Nº de Pax" value={numGuests ? String(numGuests) : "—"} />
           <ReadField label="Nomes"    value={names || "—"} />
           <div>
