@@ -52,10 +52,10 @@ export function AccountStatsPanel({ stats }: { stats: CRMAccountStats }) {
           <p className="text-xs font-medium text-gray-500 mb-2">Serviços por mês</p>
           <div className="flex items-end gap-1 h-20">
             {recentMonths.map((m) => (
-              <div key={m.month} className="flex-1 flex flex-col items-center gap-0.5 group relative">
+              <div key={m.month} className="flex-1 h-20 flex flex-col justify-end group relative">
                 <div
                   className="w-full bg-[#667470]/70 rounded-t hover:bg-[#667470] transition-colors"
-                  style={{ height: `${Math.round((m.bookings / maxBookings) * 100)}%`, minHeight: m.bookings > 0 ? "4px" : "0" }}
+                  style={{ height: `${Math.round((m.bookings / maxBookings) * 100)}%`, minHeight: m.bookings > 0 ? "3px" : "0" }}
                 />
                 {/* Tooltip */}
                 <div className="absolute bottom-full mb-1 hidden group-hover:block bg-[#32373c] text-white text-xs rounded px-2 py-1 whitespace-nowrap z-10 pointer-events-none">
