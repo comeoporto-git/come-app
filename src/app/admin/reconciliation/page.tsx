@@ -13,7 +13,7 @@ import Link from "next/link";
 
 export default async function ReconciliationPage() {
   const session = await auth();
-  if (!session || session.user.role !== "Admin") redirect("/");
+  if (!session || (session.user.role !== "Admin" && session.user.role !== "Accountant")) redirect("/");
 
   // Fetch all data in parallel — individual failures return empty defaults
   // getLinkableTransactions() makes a SINGLE Notion query instead of two,
