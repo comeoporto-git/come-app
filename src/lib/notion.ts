@@ -1176,6 +1176,39 @@ export async function getWeeklyActions(weekOf: string): Promise<CRMWeeklyAction[
   }));
 }
 
+// ── CRM Client Sales ─────────────────────────────────────────────────────────
+
+export type ClientSale = {
+  id: string;
+  date: string | null;
+  status: string;
+  number_of_guests: number | null;
+  names: string | null;
+  service_name: string | null;
+  service_type: string | null;
+};
+
+export async function getClientSales(clientId: string): Promise<ClientSale[]> {
+  const { data, error } = await supabase
+    .from("sales")
+    .select("id, date, status, number_of_guests, names, services(name, type)")
+    .eq("client_id", clientId)
+    .order("date", { ascending: false });
+  if (error) throw new Error(`getClientSales: ${error.message}`);
+  return (data ?? []).map((row) => {
+    const svc = (Array.isArray(row.services) ? row.services[0] : row.services) as { name: string; type: string } | null;
+    return {
+      id: row.id,
+      date: row.date,
+      status: row.status ?? "Unknown",
+      number_of_guests: row.number_of_guests,
+      names: row.names,
+      service_name: svc?.name ?? null,
+      service_type: svc?.type ?? null,
+    };
+  });
+}
+
 // ── CRM Analytics ────────────────────────────────────────────────────────────
 
 export type CRMAccountStats = {

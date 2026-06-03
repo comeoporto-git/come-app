@@ -1,12 +1,13 @@
 import { auth } from "@/lib/auth";
 import { redirect, notFound } from "next/navigation";
-import { getCRMAccountById, getCRMActivities, getCRMAccountStats } from "@/lib/notion";
+import { getCRMAccountById, getCRMActivities, getCRMAccountStats, getClientSales } from "@/lib/notion";
 import { getCRMContactEmails } from "@/lib/integration";
 import type { EmailMessage } from "@/lib/integration";
 import Image from "next/image";
 import Link from "next/link";
 import { AccountDetailClient } from "@/components/crm/AccountDetailClient";
 import { AccountStatsPanel } from "@/components/crm/AccountStatsPanel";
+import { ClientSalesKanban } from "@/components/crm/ClientSalesKanban";
 import { CRMBreadcrumb } from "@/components/crm/CRMBreadcrumb";
 
 export default async function AccountDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -14,10 +15,11 @@ export default async function AccountDetailPage({ params }: { params: Promise<{ 
   if (!session || session.user.role !== "Admin") redirect("/");
 
   const { id } = await params;
-  const [account, activities, stats] = await Promise.all([
+  const [account, activities, stats, sales] = await Promise.all([
     getCRMAccountById(id),
     getCRMActivities(id),
     getCRMAccountStats(id),
+    getClientSales(id),
   ]);
   if (!account) notFound();
 
@@ -53,6 +55,7 @@ export default async function AccountDetailPage({ params }: { params: Promise<{ 
       <CRMBreadcrumb crumbs={[{ label: "CRM", href: "/admin/crm" }, { label: account.name }]} />
       <main className="max-w-5xl mx-auto px-4 py-6">
         <AccountDetailClient account={account} activities={activities} emailsPerContact={emailsPerContact} />
+        <ClientSalesKanban sales={sales} />
         <AccountStatsPanel stats={stats} />
       </main>
     </div>
