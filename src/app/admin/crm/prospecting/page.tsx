@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { ProspectingClient } from "@/components/crm/ProspectingClient";
+import { CRMBreadcrumb } from "@/components/crm/CRMBreadcrumb";
 
 export default async function ProspectingPage() {
   const session = await auth();
@@ -26,6 +27,7 @@ export default async function ProspectingPage() {
         </div>
       </header>
 
+      <CRMBreadcrumb crumbs={[{ label: "CRM", href: "/admin/crm" }, { label: "Prospecção IA" }]} />
       <main className="max-w-3xl mx-auto px-4 py-6">
         <ProspectingClient />
       </main>

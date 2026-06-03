@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getAllCRMContacts } from "@/lib/notion";
 import Image from "next/image";
 import Link from "next/link";
+import { CRMBreadcrumb } from "@/components/crm/CRMBreadcrumb";
 
 export default async function CRMContactsPage() {
   const session = await auth();
@@ -28,6 +29,7 @@ export default async function CRMContactsPage() {
         </div>
       </header>
 
+      <CRMBreadcrumb crumbs={[{ label: "CRM", href: "/admin/crm" }, { label: "Contactos" }]} />
       <main className="max-w-4xl mx-auto px-4 py-6">
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="px-5 py-4 border-b border-gray-50">

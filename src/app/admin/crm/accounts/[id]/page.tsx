@@ -6,6 +6,7 @@ import type { EmailMessage } from "@/lib/integration";
 import Image from "next/image";
 import Link from "next/link";
 import { AccountDetailClient } from "@/components/crm/AccountDetailClient";
+import { CRMBreadcrumb } from "@/components/crm/CRMBreadcrumb";
 
 export default async function AccountDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -47,6 +48,7 @@ export default async function AccountDetailPage({ params }: { params: Promise<{ 
         </div>
       </header>
 
+      <CRMBreadcrumb crumbs={[{ label: "CRM", href: "/admin/crm" }, { label: account.name }]} />
       <main className="max-w-5xl mx-auto px-4 py-6">
         <AccountDetailClient account={account} activities={activities} emailsPerContact={emailsPerContact} />
       </main>

@@ -4,6 +4,7 @@ import { getWeeklyActions, getLatestWeeklyActionsWeek } from "@/lib/notion";
 import Image from "next/image";
 import Link from "next/link";
 import { WeeklyActionsClient } from "@/components/crm/WeeklyActionsClient";
+import { CRMBreadcrumb } from "@/components/crm/CRMBreadcrumb";
 
 function getMondayOfThisWeek(): string {
   const now = new Date();
@@ -42,6 +43,7 @@ export default async function WeeklyActionsPage() {
         </div>
       </header>
 
+      <CRMBreadcrumb crumbs={[{ label: "CRM", href: "/admin/crm" }, { label: "Ações da Semana" }]} />
       <main className="max-w-3xl mx-auto px-4 py-6">
         <WeeklyActionsClient actions={actions} weekOf={weekOf} />
       </main>

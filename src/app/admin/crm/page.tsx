@@ -4,6 +4,7 @@ import { getCRMAccounts } from "@/lib/notion";
 import Image from "next/image";
 import Link from "next/link";
 import { PipelineBoard } from "@/components/crm/PipelineBoard";
+import { CRMBreadcrumb } from "@/components/crm/CRMBreadcrumb";
 
 export default async function CRMPage() {
   const session = await auth();
@@ -34,6 +35,7 @@ export default async function CRMPage() {
         </div>
       </header>
 
+      <CRMBreadcrumb crumbs={[{ label: "CRM" }]} />
       <main className="max-w-7xl mx-auto px-4 py-6">
         <PipelineBoard accounts={accounts} />
       </main>
