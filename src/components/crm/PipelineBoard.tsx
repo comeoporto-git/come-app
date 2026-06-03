@@ -58,6 +58,48 @@ function AccountCard({ account }: { account: CRMAccount }) {
   );
 }
 
+const COLUMN_LIMIT = 3;
+
+function PipelineColumn({ stage, accounts }: { stage: string; accounts: CRMAccount[] }) {
+  const [expanded, setExpanded] = useState(false);
+  const visible = expanded ? accounts : accounts.slice(0, COLUMN_LIMIT);
+  const hidden = accounts.length - COLUMN_LIMIT;
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-between mb-1">
+        <StageBadge stage={stage} />
+        <span className="text-xs text-gray-400">{accounts.length}</span>
+      </div>
+      {accounts.length === 0 ? (
+        <div className="border-2 border-dashed border-gray-100 rounded-xl h-20 flex items-center justify-center">
+          <span className="text-xs text-gray-300">—</span>
+        </div>
+      ) : (
+        <>
+          {visible.map((a) => <AccountCard key={a.id} account={a} />)}
+          {!expanded && hidden > 0 && (
+            <button
+              onClick={() => setExpanded(true)}
+              className="mt-1 w-full text-xs text-gray-400 hover:text-[#667470] py-1.5 border border-dashed border-gray-200 rounded-xl hover:border-[#667470]/40 transition-colors"
+            >
+              + {hidden} mais
+            </button>
+          )}
+          {expanded && accounts.length > COLUMN_LIMIT && (
+            <button
+              onClick={() => setExpanded(false)}
+              className="mt-1 w-full text-xs text-gray-400 hover:text-[#667470] py-1 transition-colors"
+            >
+              ↑ Menos
+            </button>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 export function PipelineBoard({ accounts }: { accounts: CRMAccount[] }) {
   const [showAdd, setShowAdd] = useState(false);
   const [activeStage, setActiveStage] = useState<string | null>(null);
@@ -129,19 +171,7 @@ export function PipelineBoard({ accounts }: { accounts: CRMAccount[] }) {
       {/* Kanban columns */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         {STAGES.map((stage) => (
-          <div key={stage} className="flex flex-col gap-2">
-            <div className="flex items-center justify-between mb-1">
-              <StageBadge stage={stage} />
-              <span className="text-xs text-gray-400">{byStage[stage].length}</span>
-            </div>
-            {byStage[stage].length === 0 ? (
-              <div className="border-2 border-dashed border-gray-100 rounded-xl h-20 flex items-center justify-center">
-                <span className="text-xs text-gray-300">—</span>
-              </div>
-            ) : (
-              byStage[stage].map((a) => <AccountCard key={a.id} account={a} />)
-            )}
-          </div>
+          <PipelineColumn key={stage} stage={stage} accounts={byStage[stage]} />
         ))}
       </div>
 
