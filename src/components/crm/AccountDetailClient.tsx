@@ -9,6 +9,8 @@ import { LogActivityModal } from "./LogActivityModal";
 import { StageSelect, StageBadge } from "./StageSelect";
 import { SaleEmails } from "@/components/SaleEmails";
 import { deleteCRMActivity, deleteCRMContact, updateCRMAccount, clearAccountEnrichment } from "@/actions/crm";
+import { AccountStatsPanel } from "./AccountStatsPanel";
+import type { CRMAccountStats } from "@/lib/notion";
 
 const CATEGORIES = ["DMC", "Events", "Hotel", "Corporate", "Other"];
 const CATEGORY_COLORS: Record<string, string> = {
@@ -116,14 +118,47 @@ function ContactCard({ contact, accountId }: { contact: CRMContact; accountId: s
   );
 }
 
+function ActivityPanel({
+  activities,
+  accountId,
+  onLog,
+  className = "",
+}: {
+  activities: CRMActivity[];
+  accountId: string;
+  onLog: () => void;
+  className?: string;
+}) {
+  return (
+    <div className={`bg-white rounded-2xl border border-gray-100 shadow-sm p-4 ${className}`}>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-sm font-semibold text-[#32373c]">Atividade</h2>
+        <button
+          onClick={onLog}
+          className="bg-[#667470] text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-[#556360] transition-colors"
+        >+ Registar</button>
+      </div>
+      {activities.length === 0 ? (
+        <p className="text-xs text-gray-400 text-center py-8">Sem atividades registadas</p>
+      ) : (
+        <div>
+          {activities.map((a) => <ActivityItem key={a.id} activity={a} accountId={accountId} />)}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function AccountDetailClient({
   account,
   activities,
   emailsPerContact = {},
+  stats,
 }: {
   account: CRMAccount;
   activities: CRMActivity[];
   emailsPerContact?: Record<string, EmailMessage[]>;
+  stats?: CRMAccountStats;
 }) {
   const [showAddContact, setShowAddContact] = useState(false);
   const [showLogActivity, setShowLogActivity] = useState(false);
@@ -397,26 +432,20 @@ export function AccountDetailClient({
           })}
         </div>
 
-        {/* Activity timeline */}
+        {/* Right column: Histórico de Vendas for clients, Atividade for others */}
         <div className="lg:col-span-3">
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-semibold text-[#32373c]">Atividade</h2>
-              <button
-                onClick={() => setShowLogActivity(true)}
-                className="bg-[#667470] text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-[#556360] transition-colors"
-              >+ Registar</button>
-            </div>
-            {activities.length === 0 ? (
-              <p className="text-xs text-gray-400 text-center py-8">Sem atividades registadas</p>
-            ) : (
-              <div>
-                {activities.map((a) => <ActivityItem key={a.id} activity={a} accountId={account.id} />)}
-              </div>
-            )}
-          </div>
+          {account.stage === "Client" && stats ? (
+            <AccountStatsPanel stats={stats} />
+          ) : (
+            <ActivityPanel activities={activities} accountId={account.id} onLog={() => setShowLogActivity(true)} />
+          )}
         </div>
       </div>
+
+      {/* Atividade moved to bottom for Client accounts */}
+      {account.stage === "Client" && (
+        <ActivityPanel activities={activities} accountId={account.id} onLog={() => setShowLogActivity(true)} className="mt-4" />
+      )}
 
       {/* Enrichment data */}
       {account.enrichment_data && (() => {

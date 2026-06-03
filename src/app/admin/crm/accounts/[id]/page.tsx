@@ -23,7 +23,6 @@ export default async function AccountDetailPage({ params }: { params: Promise<{ 
   ]);
   if (!account) notFound();
 
-  // Fetch emails for all contacts that have an email address
   const contacts = account.contacts ?? [];
   const emailsPerContact: Record<string, EmailMessage[]> = {};
   await Promise.all(
@@ -33,6 +32,8 @@ export default async function AccountDetailPage({ params }: { params: Promise<{ 
         emailsPerContact[c.id] = await getCRMContactEmails(c.email!);
       })
   );
+
+  const isClient = account.stage === "Client";
 
   return (
     <div className="min-h-screen bg-[#667470] text-[#32373c]">
@@ -54,9 +55,21 @@ export default async function AccountDetailPage({ params }: { params: Promise<{ 
 
       <CRMBreadcrumb crumbs={[{ label: "CRM", href: "/admin/crm" }, { label: account.name }]} />
       <main className="max-w-5xl mx-auto px-4 py-6">
-        <AccountDetailClient account={account} activities={activities} emailsPerContact={emailsPerContact} />
-        <ClientSalesKanban sales={sales} />
-        <AccountStatsPanel stats={stats} />
+        {/* AccountDetailClient handles the 2-col layout:
+            - Client stage: Contactos | Histórico de Vendas, then Atividade below
+            - Other stages: Contactos | Atividade */}
+        <AccountDetailClient
+          account={account}
+          activities={activities}
+          emailsPerContact={emailsPerContact}
+          stats={isClient ? stats : undefined}
+        />
+
+        {/* Serviços Kanban — client accounts only */}
+        {isClient && <ClientSalesKanban sales={sales} />}
+
+        {/* Stats panel for non-client accounts (no sales history to show inline) */}
+        {!isClient && stats.totalBookings > 0 && <AccountStatsPanel stats={stats} />}
       </main>
     </div>
   );
