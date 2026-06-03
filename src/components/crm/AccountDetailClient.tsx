@@ -8,7 +8,16 @@ import { AddContactModal } from "./AddContactModal";
 import { LogActivityModal } from "./LogActivityModal";
 import { StageSelect, StageBadge } from "./StageSelect";
 import { SaleEmails } from "@/components/SaleEmails";
-import { deleteCRMActivity, deleteCRMContact } from "@/actions/crm";
+import { deleteCRMActivity, deleteCRMContact, updateCRMAccount } from "@/actions/crm";
+
+const CATEGORIES = ["DMC", "Events", "Hotel", "Corporate", "Other"];
+const CATEGORY_COLORS: Record<string, string> = {
+  DMC:       "bg-blue-100 text-blue-700",
+  Events:    "bg-orange-100 text-orange-700",
+  Hotel:     "bg-teal-100 text-teal-700",
+  Corporate: "bg-indigo-100 text-indigo-700",
+  Other:     "bg-gray-100 text-gray-500",
+};
 
 const TYPE_ICONS: Record<string, string> = {
   call: "📞", email: "✉️", linkedin: "💼", meeting: "🤝", note: "📝",
@@ -122,6 +131,9 @@ export function AccountDetailClient({
   const [enrichMsg, setEnrichMsg] = useState<string | null>(null);
   const [isEnrichingContacts, setIsEnrichingContacts] = useState(false);
   const [enrichContactsMsg, setEnrichContactsMsg] = useState<string | null>(null);
+  const [isImportingGmail, setIsImportingGmail] = useState(false);
+  const [category, setCategory] = useState(account.category ?? "");
+  const [, startCategoryTransition] = useTransition();
 
   const contacts = account.contacts ?? [];
 
@@ -163,6 +175,37 @@ export function AccountDetailClient({
     }
   }
 
+  async function handleImportGmail() {
+    setIsImportingGmail(true);
+    setEnrichContactsMsg(null);
+    try {
+      const res = await fetch(`/api/crm/import-gmail-contacts/${account.id}`, { method: "POST" });
+      const data = await res.json();
+      if (res.ok) {
+        setEnrichContactsMsg(
+          data.count > 0
+            ? `${data.count} contacto${data.count !== 1 ? "s" : ""} importado${data.count !== 1 ? "s" : ""} do Gmail! A recarregar…`
+            : data.message ?? "Nenhum contacto novo encontrado"
+        );
+        if (data.count > 0) setTimeout(() => window.location.reload(), 1500);
+      } else {
+        setEnrichContactsMsg(data.error ?? "Erro");
+      }
+    } catch {
+      setEnrichContactsMsg("Erro de rede");
+    } finally {
+      setIsImportingGmail(false);
+    }
+  }
+
+  function handleCategoryChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const val = e.target.value;
+    setCategory(val);
+    startCategoryTransition(async () => {
+      await updateCRMAccount(account.id, { category: val || undefined });
+    });
+  }
+
   return (
     <>
       {showAddContact && <AddContactModal accountId={account.id} onClose={() => setShowAddContact(false)} />}
@@ -177,6 +220,11 @@ export function AccountDetailClient({
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-xl font-bold text-[#32373c]">{account.name}</h1>
               <StageBadge stage={account.stage} />
+              {category && (
+                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${CATEGORY_COLORS[category] ?? CATEGORY_COLORS.Other}`}>
+                  {category}
+                </span>
+              )}
             </div>
             <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-gray-500">
               {account.industry && <span>{account.industry}</span>}
@@ -192,6 +240,14 @@ export function AccountDetailClient({
             {account.notes && <p className="text-sm text-gray-600 mt-2 whitespace-pre-line">{account.notes}</p>}
           </div>
           <div className="flex items-center gap-2 flex-wrap shrink-0">
+            <select
+              value={category}
+              onChange={handleCategoryChange}
+              className="border border-gray-200 rounded-lg px-2 py-1 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-[#667470]/30"
+            >
+              <option value="">Categoria…</option>
+              {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
+            </select>
             <StageSelect accountId={account.id} currentStage={account.stage} />
             <button
               onClick={handleEnrich}
@@ -218,11 +274,20 @@ export function AccountDetailClient({
               <h2 className="text-sm font-semibold text-[#32373c]">Contactos</h2>
               <div className="flex items-center gap-2">
                 <button
+                  onClick={handleImportGmail}
+                  disabled={isImportingGmail}
+                  title="Importar contactos dos emails trocados no Gmail"
+                  className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 font-medium disabled:opacity-50 transition-colors"
+                >
+                  {isImportingGmail ? "A importar…" : "✉ Gmail"}
+                </button>
+                <span className="text-gray-200">|</span>
+                <button
                   onClick={handleEnrichContacts}
                   disabled={isEnrichingContacts}
                   className="flex items-center gap-1 text-xs text-purple-600 hover:text-purple-800 font-medium disabled:opacity-50 transition-colors"
                 >
-                  {isEnrichingContacts ? "A pesquisar…" : "✨ Pesquisar"}
+                  {isEnrichingContacts ? "A pesquisar…" : "✨ IA"}
                 </button>
                 <span className="text-gray-200">|</span>
                 <button

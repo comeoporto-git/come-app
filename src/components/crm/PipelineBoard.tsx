@@ -13,6 +13,14 @@ function daysSince(dateStr: string | null): number | null {
   return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
 }
 
+const CATEGORY_COLORS: Record<string, string> = {
+  DMC:       "bg-blue-100 text-blue-700",
+  Events:    "bg-orange-100 text-orange-700",
+  Hotel:     "bg-teal-100 text-teal-700",
+  Corporate: "bg-indigo-100 text-indigo-700",
+  Other:     "bg-gray-100 text-gray-500",
+};
+
 function AccountCard({ account }: { account: CRMAccount }) {
   const days = daysSince(account.last_contacted_at);
   const stale = days !== null && days > 14;
@@ -20,7 +28,12 @@ function AccountCard({ account }: { account: CRMAccount }) {
   return (
     <div className={`bg-white rounded-xl border shadow-sm p-3 hover:shadow-md transition-shadow group ${stale ? "border-orange-200" : "border-gray-100"}`}>
       <Link href={`/admin/crm/accounts/${account.id}`} className="block">
-        <p className="font-semibold text-sm text-[#32373c] truncate group-hover:text-[#667470] transition-colors">{account.name}</p>
+        <div className="flex items-start gap-1.5 flex-wrap">
+          <p className="font-semibold text-sm text-[#32373c] truncate group-hover:text-[#667470] transition-colors">{account.name}</p>
+          {account.category && (
+            <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium shrink-0 ${CATEGORY_COLORS[account.category] ?? CATEGORY_COLORS.Other}`}>{account.category}</span>
+          )}
+        </div>
         {account.industry && <p className="text-xs text-gray-400 mt-0.5 truncate">{account.industry}</p>}
         {account.pessoa && <p className="text-xs text-gray-500 mt-1 truncate">{account.pessoa}</p>}
       </Link>
@@ -39,8 +52,13 @@ function AccountCard({ account }: { account: CRMAccount }) {
 export function PipelineBoard({ accounts }: { accounts: CRMAccount[] }) {
   const [showAdd, setShowAdd] = useState(false);
   const [activeStage, setActiveStage] = useState<string | null>(null);
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
 
-  const filtered = activeStage ? accounts.filter((a) => a.stage === activeStage) : accounts;
+  const categories = [...new Set(accounts.map((a) => a.category).filter(Boolean))] as string[];
+
+  const filtered = accounts
+    .filter((a) => !activeStage || a.stage === activeStage)
+    .filter((a) => !activeCategory || a.category === activeCategory);
   const byStage = STAGES.reduce<Record<string, CRMAccount[]>>((acc, s) => {
     acc[s] = filtered.filter((a) => a.stage === s);
     return acc;
@@ -51,26 +69,45 @@ export function PipelineBoard({ accounts }: { accounts: CRMAccount[] }) {
     <>
       {showAdd && <AddAccountModal onClose={() => setShowAdd(false)} />}
 
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex gap-2 flex-wrap">
-          <button
-            onClick={() => setActiveStage(null)}
-            className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${activeStage === null ? "bg-[#667470] text-white" : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"}`}
-          >
-            Todas ({accounts.length})
-          </button>
-          {STAGES.map((s) => {
-            const count = accounts.filter((a) => a.stage === s).length;
-            return (
-              <button
-                key={s}
-                onClick={() => setActiveStage(activeStage === s ? null : s)}
-                className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${activeStage === s ? "bg-[#667470] text-white" : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"}`}
-              >
-                {s} ({count})
-              </button>
-            );
-          })}
+      <div className="flex items-start justify-between mb-4 gap-3 flex-wrap">
+        <div className="space-y-2">
+          <div className="flex gap-2 flex-wrap">
+            <button
+              onClick={() => setActiveStage(null)}
+              className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${activeStage === null && !activeCategory ? "bg-[#667470] text-white" : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"}`}
+            >
+              Todas ({accounts.length})
+            </button>
+            {STAGES.map((s) => {
+              const count = accounts.filter((a) => a.stage === s).length;
+              return (
+                <button
+                  key={s}
+                  onClick={() => setActiveStage(activeStage === s ? null : s)}
+                  className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${activeStage === s ? "bg-[#667470] text-white" : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"}`}
+                >
+                  {s} ({count})
+                </button>
+              );
+            })}
+          </div>
+          {categories.length > 0 && (
+            <div className="flex gap-2 flex-wrap">
+              {categories.map((cat) => {
+                const count = accounts.filter((a) => a.category === cat).length;
+                const colors = CATEGORY_COLORS[cat] ?? CATEGORY_COLORS.Other;
+                return (
+                  <button
+                    key={cat}
+                    onClick={() => setActiveCategory(activeCategory === cat ? null : cat)}
+                    className={`px-3 py-1 rounded-full text-xs font-medium border transition-all ${activeCategory === cat ? colors + " border-transparent" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}
+                  >
+                    {cat} ({count})
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
         <button
           onClick={() => setShowAdd(true)}

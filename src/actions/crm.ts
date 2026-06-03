@@ -50,6 +50,7 @@ export async function updateCRMAccount(
     phone_number: string;
     website: string;
     stage: string;
+    category: string;
     company_size: string;
     country: string;
     industry: string;

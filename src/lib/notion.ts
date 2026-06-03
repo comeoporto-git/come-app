@@ -1030,6 +1030,7 @@ export type CRMAccount = {
   phone_number: string | null;
   website: string | null;
   stage: string;
+  category: string | null;
   company_size: string | null;
   country: string | null;
   industry: string | null;
