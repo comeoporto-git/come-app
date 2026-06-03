@@ -80,7 +80,8 @@ Return 3–6 people. Only include people you are reasonably confident actually w
       });
     }
 
-    const text = response.content.filter((b) => b.type === "text").map((b) => b.text).join("");
+    const rawText = response.content.filter((b) => b.type === "text").map((b) => b.text).join("");
+    const text = rawText.replace(/```(?:json)?\s*/g, "").replace(/```/g, "");
     const jsonMatch = text.match(/\[[\s\S]*\]/);
     if (!jsonMatch) return NextResponse.json({ error: "No data from AI", raw: text }, { status: 500 });
 

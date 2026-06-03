@@ -81,12 +81,11 @@ Use your knowledge of real companies. If you don't know exact contact details, o
     }
 
     // Extract the final text content
-    let text = "";
+    let rawText = "";
     for (const block of response.content) {
-      if (block.type === "text") text = block.text;
+      if (block.type === "text") rawText = block.text;
     }
-
-    // Parse JSON from response
+    const text = rawText.replace(/```(?:json)?\s*/g, "").replace(/```/g, "");
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       return NextResponse.json({ error: "A IA não devolveu dados estruturados", raw: text }, { status: 500 });

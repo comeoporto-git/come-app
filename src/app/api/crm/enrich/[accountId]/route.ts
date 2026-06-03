@@ -72,11 +72,11 @@ Only include fields you're confident about. Leave empty strings for unknown fiel
       });
     }
 
-    let text = "";
+    let rawText = "";
     for (const block of response.content) {
-      if (block.type === "text") text = block.text;
+      if (block.type === "text") rawText = block.text;
     }
-
+    const text = rawText.replace(/```(?:json)?\s*/g, "").replace(/```/g, "");
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       return NextResponse.json({ error: "No structured data from AI" }, { status: 500 });

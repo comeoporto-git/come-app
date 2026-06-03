@@ -112,7 +112,8 @@ Return ONLY a JSON array (no markdown fences):
       messages: [{ role: "user", content: prompt }],
     });
 
-    const text = response.content.find((b) => b.type === "text")?.text ?? "";
+    const rawText = response.content.find((b) => b.type === "text")?.text ?? "";
+    const text = rawText.replace(/```(?:json)?\s*/g, "").replace(/```/g, "");
     const jsonMatch = text.match(/\[[\s\S]*\]/);
     if (!jsonMatch) {
       return NextResponse.json({ error: "No structured data from AI", raw: text }, { status: 500 });
