@@ -1019,3 +1019,168 @@ export async function resolvePageTitles(ids: string[]): Promise<Record<string, s
   );
   return map;
 }
+
+// ── CRM Types ─────────────────────────────────────────────────────────────────
+
+export type CRMAccount = {
+  id: string;
+  name: string;
+  pessoa: string | null;
+  email: string | null;
+  phone_number: string | null;
+  website: string | null;
+  stage: string;
+  company_size: string | null;
+  country: string | null;
+  industry: string | null;
+  linkedin_url: string | null;
+  notes: string | null;
+  last_contacted_at: string | null;
+  assigned_to: string | null;
+  assigned_name: string | null;
+  enriched_at: string | null;
+  enrichment_data: Record<string, unknown> | null;
+  created_at: string;
+  contacts?: CRMContact[];
+};
+
+export type CRMContact = {
+  id: string;
+  account_id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  country: string | null;
+  linkedin_url: string | null;
+  role: string | null;
+  is_primary: boolean;
+  created_at: string;
+};
+
+export type CRMActivity = {
+  id: string;
+  activitie: string;
+  description: string | null;
+  thread_link: string | null;
+  date: string | null;
+  scheduled_at: string | null;
+  type: string;
+  status: string;
+  sales_pipeline_id: string;
+  contact_id: string | null;
+  contact_name: string | null;
+  assigned_to: string | null;
+  assigned_name: string | null;
+  created_at: string;
+};
+
+export type CRMWeeklyAction = {
+  id: string;
+  week_of: string;
+  account_id: string;
+  account_name: string;
+  contact_id: string | null;
+  contact_name: string | null;
+  contact_email: string | null;
+  contact_phone: string | null;
+  action_type: string;
+  subject: string | null;
+  suggested_script: string | null;
+  priority: number;
+  status: string;
+  created_at: string;
+};
+
+// ── CRM Data Functions ────────────────────────────────────────────────────────
+
+export async function getCRMAccounts(stage?: string): Promise<CRMAccount[]> {
+  let query = supabase
+    .from("sales_pipeline")
+    .select(`*, team:assigned_to(name)`)
+    .order("created_at", { ascending: false });
+  if (stage) query = query.eq("stage", stage);
+  const { data, error } = await query;
+  if (error) throw new Error(`getCRMAccounts: ${error.message}`);
+  return (data ?? []).map((row) => ({
+    ...row,
+    assigned_name: (row.team as { name: string } | null)?.name ?? null,
+  }));
+}
+
+export async function getCRMAccountById(id: string): Promise<CRMAccount | null> {
+  const { data, error } = await supabase
+    .from("sales_pipeline")
+    .select(`*, team:assigned_to(name)`)
+    .eq("id", id)
+    .single();
+  if (error) return null;
+  const contacts = await getCRMContacts(id);
+  return {
+    ...data,
+    assigned_name: (data.team as { name: string } | null)?.name ?? null,
+    contacts,
+  };
+}
+
+export async function getCRMContacts(accountId: string): Promise<CRMContact[]> {
+  const { data, error } = await supabase
+    .from("crm_contacts")
+    .select("*")
+    .eq("account_id", accountId)
+    .order("is_primary", { ascending: false })
+    .order("created_at");
+  if (error) throw new Error(`getCRMContacts: ${error.message}`);
+  return data ?? [];
+}
+
+export async function getAllCRMContacts(): Promise<(CRMContact & { account_name: string })[]> {
+  const { data, error } = await supabase
+    .from("crm_contacts")
+    .select(`*, sales_pipeline:account_id(name)`)
+    .order("name");
+  if (error) throw new Error(`getAllCRMContacts: ${error.message}`);
+  return (data ?? []).map((row) => ({
+    ...row,
+    account_name: (row.sales_pipeline as { name: string } | null)?.name ?? "",
+  }));
+}
+
+export async function getCRMActivities(accountId: string): Promise<CRMActivity[]> {
+  const { data, error } = await supabase
+    .from("sales_activities")
+    .select(`*, crm_contacts:contact_id(name), team:assigned_to(name)`)
+    .eq("sales_pipeline_id", accountId)
+    .order("created_at", { ascending: false });
+  if (error) throw new Error(`getCRMActivities: ${error.message}`);
+  return (data ?? []).map((row) => ({
+    ...row,
+    contact_name: (row.crm_contacts as { name: string } | null)?.name ?? null,
+    assigned_name: (row.team as { name: string } | null)?.name ?? null,
+  }));
+}
+
+export async function getWeeklyActions(weekOf: string): Promise<CRMWeeklyAction[]> {
+  const { data, error } = await supabase
+    .from("crm_weekly_actions")
+    .select(`*, sales_pipeline:account_id(name), crm_contacts:contact_id(name, email, phone)`)
+    .eq("week_of", weekOf)
+    .order("priority");
+  if (error) throw new Error(`getWeeklyActions: ${error.message}`);
+  return (data ?? []).map((row) => ({
+    ...row,
+    account_name: (row.sales_pipeline as { name: string } | null)?.name ?? "",
+    contact_name: (row.crm_contacts as { name: string } | null)?.name ?? null,
+    contact_email: (row.crm_contacts as { email: string } | null)?.email ?? null,
+    contact_phone: (row.crm_contacts as { phone: string } | null)?.phone ?? null,
+  }));
+}
+
+export async function getLatestWeeklyActionsWeek(): Promise<string | null> {
+  const { data } = await supabase
+    .from("crm_weekly_actions")
+    .select("week_of")
+    .order("week_of", { ascending: false })
+    .limit(1)
+    .single();
+  return data?.week_of ?? null;
+}

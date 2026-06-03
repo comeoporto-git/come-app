@@ -1,0 +1,135 @@
+"use client";
+
+import { useState, useTransition } from "react";
+import { createCRMActivity } from "@/actions/crm";
+import type { CRMContact } from "@/lib/notion";
+
+const ACTIVITY_TYPES = [
+  { value: "call",     label: "Chamada",  icon: "📞" },
+  { value: "email",    label: "Email",    icon: "✉️" },
+  { value: "linkedin", label: "LinkedIn", icon: "💼" },
+  { value: "meeting",  label: "Reunião",  icon: "🤝" },
+  { value: "note",     label: "Nota",     icon: "📝" },
+];
+
+export function LogActivityModal({
+  accountId,
+  contacts,
+  onClose,
+}: {
+  accountId: string;
+  contacts: CRMContact[];
+  onClose: () => void;
+}) {
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const [type, setType] = useState("note");
+  const [status, setStatus] = useState("done");
+
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    setError(null);
+    startTransition(async () => {
+      const threadLink = fd.get("thread_link") as string;
+      // Extract Gmail thread ID from URL if pasted as full URL
+      const threadId = threadLink
+        ? threadLink.replace(/.*#[^/]+\//, "").trim()
+        : undefined;
+
+      const result = await createCRMActivity({
+        account_id: accountId,
+        title: fd.get("title") as string,
+        description: (fd.get("description") as string) || undefined,
+        thread_link: threadId || undefined,
+        type,
+        status,
+        contact_id: (fd.get("contact_id") as string) || undefined,
+        date: (fd.get("date") as string) || undefined,
+        scheduled_at: status === "todo" && fd.get("scheduled_at") ? (fd.get("scheduled_at") as string) : undefined,
+      });
+      if (result.error) { setError(result.error); return; }
+      onClose();
+    });
+  }
+
+  const today = new Date().toISOString().split("T")[0];
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-white px-5 pt-5 pb-3 border-b border-gray-100 flex items-center justify-between">
+          <h2 className="font-bold text-[#32373c]">Registar Atividade</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+        </div>
+        <form onSubmit={handleSubmit} className="px-5 py-4 space-y-3">
+          {/* Type selector */}
+          <div className="flex gap-2 flex-wrap">
+            {ACTIVITY_TYPES.map(({ value, label, icon }) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setType(value)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${type === value ? "bg-[#667470] text-white border-[#667470]" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}
+              >
+                <span>{icon}</span> {label}
+              </button>
+            ))}
+          </div>
+
+          {/* Status */}
+          <div className="flex gap-2">
+            <button type="button" onClick={() => setStatus("done")}
+              className={`flex-1 py-2 rounded-xl text-xs font-medium border transition-all ${status === "done" ? "bg-green-50 text-green-700 border-green-200" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
+              ✓ Feito
+            </button>
+            <button type="button" onClick={() => setStatus("todo")}
+              className={`flex-1 py-2 rounded-xl text-xs font-medium border transition-all ${status === "todo" ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>
+              ○ A fazer
+            </button>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Título *</label>
+            <input name="title" required className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#667470]/30" placeholder={`ex: ${ACTIVITY_TYPES.find((t) => t.value === type)?.label} com CEO`} />
+          </div>
+
+          {contacts.length > 0 && (
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Contacto</label>
+              <select name="contact_id" className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#667470]/30">
+                <option value="">—</option>
+                {contacts.map((c) => <option key={c.id} value={c.id}>{c.name}{c.role ? ` (${c.role})` : ""}</option>)}
+              </select>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">{status === "todo" ? "Data prevista" : "Data"}</label>
+            <input name="date" type="date" defaultValue={today} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#667470]/30" />
+          </div>
+
+          {type === "email" && (
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Link do thread Gmail (opcional)</label>
+              <input name="thread_link" className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#667470]/30" placeholder="https://mail.google.com/..." />
+            </div>
+          )}
+
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Notas</label>
+            <textarea name="description" rows={3} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#667470]/30 resize-none" />
+          </div>
+
+          {error && <p className="text-xs text-red-600">{error}</p>}
+          <div className="flex gap-2 pt-1">
+            <button type="button" onClick={onClose} className="flex-1 border border-gray-200 rounded-xl py-2.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors">Cancelar</button>
+            <button type="submit" disabled={isPending} className="flex-1 bg-[#667470] text-white rounded-xl py-2.5 text-sm font-medium hover:bg-[#556360] transition-colors disabled:opacity-50">
+              {isPending ? "A guardar…" : "Guardar"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}

@@ -66,6 +66,16 @@ export default async function AdminPage({
         )}
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {/* CRM */}
+          <Link href="/admin/crm">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex flex-col gap-3 hover:border-[#667470]/30 active:scale-[0.98] transition-all cursor-pointer relative min-h-[120px]">
+              <div className="w-12 h-12 rounded-2xl bg-orange-50 flex items-center justify-center text-2xl shrink-0">🎯</div>
+              <div>
+                <p className="font-bold text-[#32373c] text-sm leading-tight">CRM & Vendas</p>
+                <p className="text-xs text-gray-400 mt-0.5 leading-tight">Pipeline, Contactos, IA</p>
+              </div>
+            </div>
+          </Link>
           {/* Gestão de Serviços */}
           <Link href="/admin/gestao-servicos">
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex flex-col gap-3 hover:border-[#667470]/30 active:scale-[0.98] transition-all cursor-pointer relative min-h-[120px]">
