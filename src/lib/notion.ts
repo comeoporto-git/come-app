@@ -428,7 +428,7 @@ export async function getToursForGuide(email: string): Promise<Tour[]> {
     .select(SALE_SELECT)
     .eq("guide_id", member.id)
     .gte("date", today0())
-    .neq("expenses_closed", "Closed")
+    .or("expenses_closed.is.null,expenses_closed.neq.Closed")
     .order("date");
   return (data ?? []).map(mapSaleRow);
 }
@@ -452,7 +452,7 @@ export async function getToursForChef(email: string): Promise<Tour[]> {
     .select(SALE_SELECT)
     .eq("chef_id", member.id)
     .gte("date", today0())
-    .neq("expenses_closed", "Closed")
+    .or("expenses_closed.is.null,expenses_closed.neq.Closed")
     .order("date");
   return (data ?? []).map(mapSaleRow);
 }
