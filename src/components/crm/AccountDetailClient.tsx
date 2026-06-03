@@ -10,7 +10,8 @@ import { StageSelect, StageBadge } from "./StageSelect";
 import { SaleEmails } from "@/components/SaleEmails";
 import { deleteCRMActivity, deleteCRMContact, updateCRMAccount, clearAccountEnrichment } from "@/actions/crm";
 import { AccountStatsPanel } from "./AccountStatsPanel";
-import type { CRMAccountStats } from "@/lib/notion";
+import { ClientSalesKanban } from "./ClientSalesKanban";
+import type { CRMAccountStats, ClientSale } from "@/lib/notion";
 
 const CATEGORIES = ["DMC", "Events", "Hotel", "Corporate", "Other"];
 const CATEGORY_COLORS: Record<string, string> = {
@@ -118,7 +119,7 @@ function ContactCard({ contact, accountId }: { contact: CRMContact; accountId: s
   );
 }
 
-function ActivityPanel({
+export function ActivityPanel({
   activities,
   accountId,
   onLog,
@@ -130,7 +131,7 @@ function ActivityPanel({
   className?: string;
 }) {
   return (
-    <div className={`bg-white rounded-2xl border border-gray-100 shadow-sm p-4 ${className}`}>
+    <div className={`bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex flex-col flex-1 ${className}`}>
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-sm font-semibold text-[#32373c]">Atividade</h2>
         <button
@@ -154,11 +155,13 @@ export function AccountDetailClient({
   activities,
   emailsPerContact = {},
   stats,
+  sales,
 }: {
   account: CRMAccount;
   activities: CRMActivity[];
   emailsPerContact?: Record<string, EmailMessage[]>;
   stats?: CRMAccountStats;
+  sales?: ClientSale[];
 }) {
   const [showAddContact, setShowAddContact] = useState(false);
   const [showLogActivity, setShowLogActivity] = useState(false);
@@ -380,10 +383,10 @@ export function AccountDetailClient({
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 items-stretch">
         {/* Contacts panel */}
-        <div className="lg:col-span-2 space-y-3">
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+        <div className="lg:col-span-2 flex flex-col gap-3">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex-1">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-semibold text-[#32373c]">Contactos</h2>
               <div className="flex items-center gap-2">
@@ -433,7 +436,7 @@ export function AccountDetailClient({
         </div>
 
         {/* Right column: Histórico de Vendas for clients, Atividade for others */}
-        <div className="lg:col-span-3">
+        <div className="lg:col-span-3 flex flex-col">
           {account.stage === "Client" && stats ? (
             <AccountStatsPanel stats={stats} />
           ) : (
@@ -442,7 +445,8 @@ export function AccountDetailClient({
         </div>
       </div>
 
-      {/* Atividade moved to bottom for Client accounts */}
+      {/* Client accounts: Kanban then Atividade below */}
+      {account.stage === "Client" && sales && <ClientSalesKanban sales={sales} />}
       {account.stage === "Client" && (
         <ActivityPanel activities={activities} accountId={account.id} onLog={() => setShowLogActivity(true)} className="mt-4" />
       )}

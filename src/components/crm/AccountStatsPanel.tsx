@@ -21,7 +21,7 @@ export function AccountStatsPanel({ stats }: { stats: CRMAccountStats }) {
   const recentMonths = stats.byMonth.slice(-18);
 
   return (
-    <div className="mt-4 bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 h-full">
       <h2 className="text-sm font-semibold text-[#32373c] mb-4">Histórico de Vendas</h2>
 
       {/* KPI row */}

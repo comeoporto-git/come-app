@@ -7,7 +7,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { AccountDetailClient } from "@/components/crm/AccountDetailClient";
 import { AccountStatsPanel } from "@/components/crm/AccountStatsPanel";
-import { ClientSalesKanban } from "@/components/crm/ClientSalesKanban";
 import { CRMBreadcrumb } from "@/components/crm/CRMBreadcrumb";
 
 export default async function AccountDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -55,20 +54,17 @@ export default async function AccountDetailPage({ params }: { params: Promise<{ 
 
       <CRMBreadcrumb crumbs={[{ label: "CRM", href: "/admin/crm" }, { label: account.name }]} />
       <main className="max-w-5xl mx-auto px-4 py-6">
-        {/* AccountDetailClient handles the 2-col layout:
-            - Client stage: Contactos | Histórico de Vendas, then Atividade below
-            - Other stages: Contactos | Atividade */}
+        {/* Client layout: Contactos | Histórico de Vendas, then Kanban, then Atividade
+            Other layout:  Contactos | Atividade */}
         <AccountDetailClient
           account={account}
           activities={activities}
           emailsPerContact={emailsPerContact}
           stats={isClient ? stats : undefined}
+          sales={isClient ? sales : undefined}
         />
 
-        {/* Serviços Kanban — client accounts only */}
-        {isClient && <ClientSalesKanban sales={sales} />}
-
-        {/* Stats panel for non-client accounts (no sales history to show inline) */}
+        {/* Non-client accounts: show stats panel below if they have booking history */}
         {!isClient && stats.totalBookings > 0 && <AccountStatsPanel stats={stats} />}
       </main>
     </div>
