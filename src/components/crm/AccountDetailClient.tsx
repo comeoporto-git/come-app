@@ -237,14 +237,61 @@ export function AccountDetailClient({
       </div>
 
       {/* Enrichment data */}
-      {account.enrichment_data && (
-        <div className="mt-4 bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-          <h2 className="text-sm font-semibold text-[#32373c] mb-3">Dados de Enriquecimento IA</h2>
-          <pre className="text-xs text-gray-600 bg-gray-50 rounded-xl p-3 overflow-auto max-h-48">
-            {JSON.stringify(account.enrichment_data, null, 2)}
-          </pre>
-        </div>
-      )}
+      {account.enrichment_data && (() => {
+        const d = account.enrichment_data as Record<string, unknown>;
+        const contacts = (d.key_contacts as Array<Record<string, string>> ?? []).filter((c) => c.name?.trim());
+        return (
+          <div className="mt-4 bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+            <div className="flex items-center gap-2 mb-4">
+              <h2 className="text-sm font-semibold text-[#32373c]">Insights IA</h2>
+              <span className="text-xs bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full">✨ Enriquecido</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {!!d.description && (
+                <div className="sm:col-span-2 bg-gray-50 rounded-xl p-3">
+                  <p className="text-xs font-medium text-gray-500 mb-1">Sobre</p>
+                  <p className="text-sm text-gray-700">{String(d.description)}</p>
+                </div>
+              )}
+              {!!d.why_fit && (
+                <div className="sm:col-span-2 bg-purple-50 rounded-xl p-3">
+                  <p className="text-xs font-medium text-purple-500 mb-1">Porquê COME Porto</p>
+                  <p className="text-sm text-purple-800">{String(d.why_fit)}</p>
+                </div>
+              )}
+              {!!d.recent_news && (
+                <div className="sm:col-span-2 bg-blue-50 rounded-xl p-3">
+                  <p className="text-xs font-medium text-blue-500 mb-1">Notícias recentes</p>
+                  <p className="text-sm text-blue-800">{String(d.recent_news)}</p>
+                </div>
+              )}
+            </div>
+            {contacts.length > 0 && (
+              <div className="mt-4">
+                <p className="text-xs font-medium text-gray-500 mb-2">Contactos sugeridos pela IA</p>
+                <div className="space-y-2">
+                  {contacts.map((c, i) => (
+                    <div key={i} className="flex items-center gap-3 bg-gray-50 rounded-xl p-3">
+                      <div className="w-8 h-8 rounded-full bg-[#667470]/10 text-[#667470] flex items-center justify-center text-xs font-bold shrink-0">
+                        {c.name[0]?.toUpperCase()}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-[#32373c]">{c.name} {c.role && <span className="text-xs text-gray-400 font-normal">· {c.role}</span>}</p>
+                        <div className="flex gap-3 flex-wrap mt-0.5">
+                          {c.email && <span className="text-xs text-gray-500">{c.email}</span>}
+                          {c.linkedin_url && (
+                            <a href={c.linkedin_url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-500 hover:underline">LinkedIn</a>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
     </>
   );
 }

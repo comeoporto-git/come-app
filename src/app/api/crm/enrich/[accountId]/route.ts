@@ -99,7 +99,7 @@ Only include fields you're confident about. Leave empty strings for unknown fiel
     // Add any discovered key contacts
     if (Array.isArray(enrichment.key_contacts)) {
       for (const c of enrichment.key_contacts) {
-        if (!c.name) continue;
+        if (!c.name?.trim()) continue;
         const { data: existing } = await supabase
           .from("crm_contacts")
           .select("id")
