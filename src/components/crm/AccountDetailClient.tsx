@@ -120,6 +120,8 @@ export function AccountDetailClient({
   const [showLogActivity, setShowLogActivity] = useState(false);
   const [isEnriching, setIsEnriching] = useState(false);
   const [enrichMsg, setEnrichMsg] = useState<string | null>(null);
+  const [isEnrichingContacts, setIsEnrichingContacts] = useState(false);
+  const [enrichContactsMsg, setEnrichContactsMsg] = useState<string | null>(null);
 
   const contacts = account.contacts ?? [];
 
@@ -135,6 +137,29 @@ export function AccountDetailClient({
       setEnrichMsg("Erro ao enriquecer");
     } finally {
       setIsEnriching(false);
+    }
+  }
+
+  async function handleEnrichContacts() {
+    setIsEnrichingContacts(true);
+    setEnrichContactsMsg(null);
+    try {
+      const res = await fetch(`/api/crm/enrich-contacts/${account.id}`, { method: "POST" });
+      const data = await res.json();
+      if (res.ok) {
+        setEnrichContactsMsg(
+          data.count > 0
+            ? `${data.count} contacto${data.count !== 1 ? "s" : ""} adicionado${data.count !== 1 ? "s" : ""}! A recarregar…`
+            : "Nenhum contacto novo encontrado"
+        );
+        if (data.count > 0) setTimeout(() => window.location.reload(), 1500);
+      } else {
+        setEnrichContactsMsg(data.error ?? "Erro");
+      }
+    } catch {
+      setEnrichContactsMsg("Erro de rede");
+    } finally {
+      setIsEnrichingContacts(false);
     }
   }
 
@@ -191,11 +216,24 @@ export function AccountDetailClient({
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-semibold text-[#32373c]">Contactos</h2>
-              <button
-                onClick={() => setShowAddContact(true)}
-                className="text-xs text-[#667470] hover:text-[#556360] font-medium"
-              >+ Adicionar</button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleEnrichContacts}
+                  disabled={isEnrichingContacts}
+                  className="flex items-center gap-1 text-xs text-purple-600 hover:text-purple-800 font-medium disabled:opacity-50 transition-colors"
+                >
+                  {isEnrichingContacts ? "A pesquisar…" : "✨ Pesquisar"}
+                </button>
+                <span className="text-gray-200">|</span>
+                <button
+                  onClick={() => setShowAddContact(true)}
+                  className="text-xs text-[#667470] hover:text-[#556360] font-medium"
+                >+ Adicionar</button>
+              </div>
             </div>
+            {enrichContactsMsg && (
+              <p className="text-xs text-purple-600 bg-purple-50 rounded-lg px-3 py-2 mb-3">{enrichContactsMsg}</p>
+            )}
             {contacts.length === 0 ? (
               <p className="text-xs text-gray-400 text-center py-4">Sem contactos</p>
             ) : (
