@@ -133,7 +133,9 @@ export function AccountDetailClient({
   const [enrichContactsMsg, setEnrichContactsMsg] = useState<string | null>(null);
   const [isImportingGmail, setIsImportingGmail] = useState(false);
   const [category, setCategory] = useState(account.category ?? "");
+  const [editingDetails, setEditingDetails] = useState(false);
   const [, startCategoryTransition] = useTransition();
+  const [, startDetailsTransition] = useTransition();
 
   const contacts = account.contacts ?? [];
 
@@ -205,6 +207,28 @@ export function AccountDetailClient({
     }
   }
 
+  function handleSaveDetails(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    const get = (k: string) => (fd.get(k) as string)?.trim() || undefined;
+    startDetailsTransition(async () => {
+      await updateCRMAccount(account.id, {
+        website:       get("website"),
+        phone:         get("phone"),
+        email:         get("email"),
+        nif:           get("nif"),
+        nome_fiscal:   get("nome_fiscal"),
+        morada_fiscal: get("morada_fiscal"),
+        industry:      get("industry"),
+        company_size:  get("company_size"),
+        country:       get("country"),
+        linkedin_url:  get("linkedin_url"),
+        notes:         get("notes"),
+      });
+      setEditingDetails(false);
+    });
+  }
+
   function handleCategoryChange(e: React.ChangeEvent<HTMLSelectElement>) {
     const val = e.target.value;
     setCategory(val);
@@ -233,18 +257,66 @@ export function AccountDetailClient({
                 </span>
               )}
             </div>
-            <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-gray-500">
-              {account.industry && <span>{account.industry}</span>}
-              {account.company_size && <span>{account.company_size} colaboradores</span>}
-              {account.country && <span>{account.country}</span>}
-              {account.website && (
-                <a href={account.website} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">{account.website}</a>
-              )}
-              {account.linkedin_url && (
-                <a href={account.linkedin_url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">LinkedIn</a>
-              )}
-            </div>
-            {account.notes && <p className="text-sm text-gray-600 mt-2 whitespace-pre-line">{account.notes}</p>}
+            {!editingDetails ? (
+              <>
+                <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-gray-500">
+                  {account.industry && <span>{account.industry}</span>}
+                  {account.company_size && <span>{account.company_size} colaboradores</span>}
+                  {account.country && <span>{account.country}</span>}
+                  {account.phone && <a href={`tel:${account.phone}`} className="hover:text-[#667470]">{account.phone}</a>}
+                  {account.email && <a href={`mailto:${account.email}`} className="hover:text-[#667470]">{account.email}</a>}
+                  {account.website && (
+                    <a href={account.website} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">{account.website}</a>
+                  )}
+                  {account.linkedin_url && (
+                    <a href={account.linkedin_url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">LinkedIn</a>
+                  )}
+                </div>
+                {(account.nif || account.nome_fiscal || account.morada_fiscal) && (
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1.5 text-xs text-gray-400">
+                    {account.nif && <span>NIF: <span className="text-gray-600 font-medium">{account.nif}</span></span>}
+                    {account.nome_fiscal && <span>{account.nome_fiscal}</span>}
+                    {account.morada_fiscal && <span>{account.morada_fiscal}</span>}
+                  </div>
+                )}
+                {account.notes && <p className="text-sm text-gray-600 mt-2 whitespace-pre-line">{account.notes}</p>}
+                <button onClick={() => setEditingDetails(true)} className="mt-2 text-xs text-gray-400 hover:text-[#667470] transition-colors">Editar detalhes</button>
+              </>
+            ) : (
+              <form onSubmit={handleSaveDetails} className="mt-3 space-y-2 w-full max-w-lg">
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { name: "website",       label: "Website",       defaultValue: account.website },
+                    { name: "phone",         label: "Telefone",      defaultValue: account.phone },
+                    { name: "email",         label: "Email",         defaultValue: account.email },
+                    { name: "industry",      label: "Indústria",     defaultValue: account.industry },
+                    { name: "company_size",  label: "Dimensão",      defaultValue: account.company_size },
+                    { name: "country",       label: "País",          defaultValue: account.country },
+                    { name: "linkedin_url",  label: "LinkedIn",      defaultValue: account.linkedin_url },
+                    { name: "nif",           label: "NIF",           defaultValue: account.nif },
+                    { name: "nome_fiscal",   label: "Nome Fiscal",   defaultValue: account.nome_fiscal },
+                    { name: "morada_fiscal", label: "Morada Fiscal", defaultValue: account.morada_fiscal },
+                  ].map(({ name, label, defaultValue }) => (
+                    <div key={name}>
+                      <label className="block text-[10px] text-gray-400 mb-0.5">{label}</label>
+                      <input
+                        name={name}
+                        defaultValue={defaultValue ?? ""}
+                        className="w-full border border-gray-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-[#667470]/30"
+                      />
+                    </div>
+                  ))}
+                </div>
+                <div>
+                  <label className="block text-[10px] text-gray-400 mb-0.5">Notas</label>
+                  <textarea name="notes" defaultValue={account.notes ?? ""} rows={2} className="w-full border border-gray-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-[#667470]/30 resize-none" />
+                </div>
+                <div className="flex gap-2">
+                  <button type="submit" className="px-3 py-1.5 bg-[#667470] text-white rounded-lg text-xs font-medium hover:bg-[#556360] transition-colors">Guardar</button>
+                  <button type="button" onClick={() => setEditingDetails(false)} className="px-3 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-500 hover:bg-gray-50 transition-colors">Cancelar</button>
+                </div>
+              </form>
+            )}
           </div>
           <div className="flex items-center gap-2 flex-wrap shrink-0">
             <select

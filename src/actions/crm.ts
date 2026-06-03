@@ -56,6 +56,10 @@ export async function updateCRMAccount(
     industry: string;
     linkedin_url: string;
     notes: string;
+    phone: string;
+    nif: string;
+    nome_fiscal: string;
+    morada_fiscal: string;
     last_contacted_at: string;
     enriched_at: string;
     enrichment_data: Record<string, unknown>;

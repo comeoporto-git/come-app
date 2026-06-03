@@ -1031,6 +1031,10 @@ export type CRMAccount = {
   website: string | null;
   stage: string;
   category: string | null;
+  phone: string | null;
+  nif: string | null;
+  nome_fiscal: string | null;
+  morada_fiscal: string | null;
   revenue?: number;
   company_size: string | null;
   country: string | null;
