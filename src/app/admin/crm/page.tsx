@@ -1,16 +1,20 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { getCRMAccounts } from "@/lib/notion";
+import { getCRMAccounts, getCRMTopClients } from "@/lib/notion";
 import Image from "next/image";
 import Link from "next/link";
 import { PipelineBoard } from "@/components/crm/PipelineBoard";
+import { TopClientsLeaderboard } from "@/components/crm/TopClientsLeaderboard";
 import { CRMBreadcrumb } from "@/components/crm/CRMBreadcrumb";
 
 export default async function CRMPage() {
   const session = await auth();
   if (!session || session.user.role !== "Admin") redirect("/");
 
-  const accounts = await getCRMAccounts();
+  const [accounts, topClients] = await Promise.all([
+    getCRMAccounts(),
+    getCRMTopClients(15),
+  ]);
 
   return (
     <div className="min-h-screen bg-[#667470] text-[#32373c]">
@@ -36,8 +40,9 @@ export default async function CRMPage() {
       </header>
 
       <CRMBreadcrumb crumbs={[{ label: "CRM" }]} />
-      <main className="max-w-7xl mx-auto px-4 py-6">
+      <main className="max-w-7xl mx-auto px-4 py-6 space-y-6">
         <PipelineBoard accounts={accounts} />
+        <TopClientsLeaderboard clients={topClients} />
       </main>
     </div>
   );

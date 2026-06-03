@@ -1176,6 +1176,146 @@ export async function getWeeklyActions(weekOf: string): Promise<CRMWeeklyAction[
   }));
 }
 
+// ── CRM Analytics ────────────────────────────────────────────────────────────
+
+export type CRMAccountStats = {
+  totalBookings: number;
+  totalPax: number;
+  avgGroupSize: number;
+  totalRevenue: number;
+  firstBooking: string | null;
+  lastBooking: string | null;
+  topServices: Array<{ name: string; count: number }>;
+  byMonth: Array<{ month: string; bookings: number; pax: number; revenue: number }>;
+};
+
+export type CRMTopClient = {
+  id: string;
+  name: string;
+  category: string | null;
+  bookings: number;
+  totalPax: number;
+  revenue: number;
+};
+
+export async function getCRMAccountStats(accountId: string): Promise<CRMAccountStats> {
+  const [bookingRows, revenueRows, serviceRows, monthRows] = await Promise.all([
+    // Totals
+    supabase.from("sales").select("number_of_guests, date").eq("client_id", accountId)
+      .not("status", "in", '("Cancelled","Canceled")').not("date", "is", null),
+    // Revenue (positive transactions linked to this client's sales)
+    supabase.rpc("get_client_revenue", { p_client_id: accountId }).maybeSingle(),
+    // Top services
+    supabase.from("sales").select("services(name)").eq("client_id", accountId)
+      .not("status", "in", '("Cancelled","Canceled")').not("service_id", "is", null),
+    // Monthly breakdown via raw query is tricky via Supabase client — fetch all sales and group in JS
+    supabase.from("sales").select("date, number_of_guests, id").eq("client_id", accountId)
+      .not("status", "in", '("Cancelled","Canceled")').not("date", "is", null).order("date"),
+  ]);
+
+  const sales = bookingRows.data ?? [];
+  const totalBookings = sales.length;
+  const totalPax = sales.reduce((sum, s) => sum + (s.number_of_guests ?? 0), 0);
+  const avgGroupSize = totalBookings > 0 ? Math.round(totalPax / totalBookings) : 0;
+  const dates = sales.map((s) => s.date as string).filter(Boolean).sort();
+  const firstBooking = dates[0] ?? null;
+  const lastBooking = dates[dates.length - 1] ?? null;
+
+  // Revenue: query transactions directly
+  const { data: txData } = await supabase
+    .from("transactions")
+    .select("valor, sale_id")
+    .gt("valor", 0)
+    .not("sale_id", "is", null);
+
+  // Get sale IDs for this client
+  const saleIds = new Set((monthRows.data ?? []).map((s) => s.id as string));
+  const totalRevenue = (txData ?? [])
+    .filter((t) => saleIds.has(t.sale_id))
+    .reduce((sum, t) => sum + (t.valor ?? 0), 0);
+
+  // Per-month revenue
+  const monthRevenueMap: Record<string, number> = {};
+  for (const tx of (txData ?? [])) {
+    if (!saleIds.has(tx.sale_id)) continue;
+    // Find the sale date for this transaction
+    const sale = (monthRows.data ?? []).find((s) => s.id === tx.sale_id);
+    if (!sale?.date) continue;
+    const month = (sale.date as string).slice(0, 7);
+    monthRevenueMap[month] = (monthRevenueMap[month] ?? 0) + (tx.valor ?? 0);
+  }
+
+  // Group by month
+  const monthMap: Record<string, { bookings: number; pax: number }> = {};
+  for (const s of monthRows.data ?? []) {
+    const month = (s.date as string).slice(0, 7);
+    if (!monthMap[month]) monthMap[month] = { bookings: 0, pax: 0 };
+    monthMap[month].bookings++;
+    monthMap[month].pax += s.number_of_guests ?? 0;
+  }
+  const byMonth = Object.entries(monthMap)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([month, v]) => ({ month, ...v, revenue: monthRevenueMap[month] ?? 0 }));
+
+  // Top services
+  const serviceCount: Record<string, number> = {};
+  for (const s of (serviceRows.data ?? [])) {
+    const svc = s.services as unknown;
+    const name = Array.isArray(svc)
+      ? (svc[0] as { name: string } | undefined)?.name
+      : (svc as { name: string } | null)?.name;
+    if (name) serviceCount[name] = (serviceCount[name] ?? 0) + 1;
+  }
+  const topServices = Object.entries(serviceCount)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 4)
+    .map(([name, count]) => ({ name, count }));
+
+  void revenueRows; // unused RPC fallback
+
+  return { totalBookings, totalPax, avgGroupSize, totalRevenue, firstBooking, lastBooking, topServices, byMonth };
+}
+
+export async function getCRMTopClients(limit = 10): Promise<CRMTopClient[]> {
+  // Get all client-stage accounts with their sales counts
+  const { data: accounts } = await supabase
+    .from("sales_pipeline")
+    .select("id, name, category")
+    .order("name");
+
+  if (!accounts?.length) return [];
+
+  // Fetch sales summary for all client accounts in bulk
+  const { data: salesData } = await supabase
+    .from("sales")
+    .select("client_id, number_of_guests, id")
+    .not("status", "in", '("Cancelled","Canceled")')
+    .not("client_id", "is", null);
+
+  const { data: txData } = await supabase
+    .from("transactions")
+    .select("valor, sale_id")
+    .gt("valor", 0)
+    .not("sale_id", "is", null);
+
+  const saleRevenueMap: Record<string, number> = {};
+  for (const tx of txData ?? []) {
+    saleRevenueMap[tx.sale_id] = (saleRevenueMap[tx.sale_id] ?? 0) + (tx.valor ?? 0);
+  }
+
+  const result: CRMTopClient[] = accounts.map((acc) => {
+    const accSales = (salesData ?? []).filter((s) => s.client_id === acc.id);
+    const bookings = accSales.length;
+    const totalPax = accSales.reduce((sum, s) => sum + (s.number_of_guests ?? 0), 0);
+    const revenue = accSales.reduce((sum, s) => sum + (saleRevenueMap[s.id] ?? 0), 0);
+    return { id: acc.id, name: acc.name, category: acc.category, bookings, totalPax, revenue };
+  }).filter((a) => a.bookings > 0)
+    .sort((a, b) => b.bookings - a.bookings)
+    .slice(0, limit);
+
+  return result;
+}
+
 export async function getLatestWeeklyActionsWeek(): Promise<string | null> {
   const { data } = await supabase
     .from("crm_weekly_actions")

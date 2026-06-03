@@ -35,15 +35,22 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ ac
     return NextResponse.json({ error: "Gmail integration not configured" }, { status: 400 });
   }
 
-  // Get all sales for this client
-  const { data: sales } = await supabase
+  // Get all sales for this client that have a real (non-empty) Gmail thread linked
+  const { data: allSales } = await supabase
     .from("sales")
     .select("id, thread_ids")
     .eq("client_id", accountId)
     .not("thread_ids", "is", null);
 
-  if (!sales?.length) {
-    return NextResponse.json({ message: "Sem vendas com threads de email associadas", count: 0 });
+  const sales = (allSales ?? []).filter(
+    (s) => s.thread_ids && String(s.thread_ids).trim() !== ""
+  );
+
+  if (!sales.length) {
+    return NextResponse.json({
+      message: "no_threads",
+      count: 0,
+    });
   }
 
   // Existing contacts to avoid duplicates

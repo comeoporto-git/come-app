@@ -182,10 +182,17 @@ export function AccountDetailClient({
       const res = await fetch(`/api/crm/import-gmail-contacts/${account.id}`, { method: "POST" });
       const data = await res.json();
       if (res.ok) {
+        if (data.message === "no_threads") {
+          // No linked Gmail threads — fall back to AI automatically
+          setEnrichContactsMsg("Sem emails ligados a este cliente. A pesquisar com IA…");
+          setIsImportingGmail(false);
+          await handleEnrichContacts();
+          return;
+        }
         setEnrichContactsMsg(
           data.count > 0
             ? `${data.count} contacto${data.count !== 1 ? "s" : ""} importado${data.count !== 1 ? "s" : ""} do Gmail! A recarregar…`
-            : data.message ?? "Nenhum contacto novo encontrado"
+            : "Nenhum contacto novo encontrado nos emails"
         );
         if (data.count > 0) setTimeout(() => window.location.reload(), 1500);
       } else {
