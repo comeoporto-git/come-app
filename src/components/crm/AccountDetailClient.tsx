@@ -8,7 +8,7 @@ import { AddContactModal } from "./AddContactModal";
 import { LogActivityModal } from "./LogActivityModal";
 import { StageSelect, StageBadge } from "./StageSelect";
 import { SaleEmails } from "@/components/SaleEmails";
-import { deleteCRMActivity, deleteCRMContact, updateCRMAccount } from "@/actions/crm";
+import { deleteCRMActivity, deleteCRMContact, updateCRMAccount, clearAccountEnrichment } from "@/actions/crm";
 
 const CATEGORIES = ["DMC", "Events", "Hotel", "Corporate", "Other"];
 const CATEGORY_COLORS: Record<string, string> = {
@@ -352,9 +352,18 @@ export function AccountDetailClient({
         const contacts = (d.key_contacts as Array<Record<string, string>> ?? []).filter((c) => c.name?.trim());
         return (
           <div className="mt-4 bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-            <div className="flex items-center gap-2 mb-4">
-              <h2 className="text-sm font-semibold text-[#32373c]">Insights IA</h2>
-              <span className="text-xs bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full">✨ Enriquecido</span>
+            <div className="flex items-center justify-between gap-2 mb-4">
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-semibold text-[#32373c]">Insights IA</h2>
+                <span className="text-xs bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full">✨ Enriquecido</span>
+              </div>
+              <button
+                onClick={() => startCategoryTransition(async () => {
+                  await clearAccountEnrichment(account.id);
+                  window.location.reload();
+                })}
+                className="text-xs text-gray-400 hover:text-red-500 transition-colors"
+              >Remover</button>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {!!d.description && (

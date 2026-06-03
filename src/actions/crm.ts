@@ -68,6 +68,16 @@ export async function updateCRMAccount(
   return {};
 }
 
+export async function clearAccountEnrichment(id: string): Promise<{ error?: string }> {
+  const { error } = await supabase
+    .from("sales_pipeline")
+    .update({ enrichment_data: null, enriched_at: null })
+    .eq("id", id);
+  if (error) return { error: error.message };
+  revalidatePath(`/admin/crm/accounts/${id}`);
+  return {};
+}
+
 export async function deleteCRMAccount(id: string): Promise<{ error?: string }> {
   const { error } = await supabase.from("sales_pipeline").delete().eq("id", id);
   if (error) return { error: error.message };
