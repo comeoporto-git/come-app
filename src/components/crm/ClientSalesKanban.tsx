@@ -1,12 +1,15 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
 import type { ClientSale } from "@/lib/notion";
 
 const COLUMNS: { status: string[]; label: string; color: string }[] = [
-  { status: ["Pending"],              label: "Pendente",   color: "bg-yellow-50 border-yellow-200" },
-  { status: ["Confirmed"],            label: "Confirmado", color: "bg-blue-50 border-blue-200" },
-  { status: ["Invoiced"],             label: "Faturado",   color: "bg-purple-50 border-purple-200" },
-  { status: ["Paid"],                 label: "Pago",       color: "bg-green-50 border-green-200" },
-  { status: ["Cancelled", "Canceled"],label: "Cancelado",  color: "bg-red-50 border-red-200" },
+  { status: ["Pending"],               label: "Pendente",   color: "bg-yellow-50 border-yellow-200" },
+  { status: ["Confirmed"],             label: "Confirmado", color: "bg-blue-50 border-blue-200" },
+  { status: ["Invoiced"],              label: "Faturado",   color: "bg-purple-50 border-purple-200" },
+  { status: ["Paid"],                  label: "Pago",       color: "bg-green-50 border-green-200" },
+  { status: ["Cancelled", "Canceled"], label: "Cancelado",  color: "bg-red-50 border-red-200" },
 ];
 
 const STATUS_DOT: Record<string, string> = {
@@ -17,6 +20,8 @@ const STATUS_DOT: Record<string, string> = {
   Cancelled: "bg-red-400",
   Canceled:  "bg-red-400",
 };
+
+const LIMIT = 3;
 
 function formatDate(d: string | null) {
   if (!d) return "—";
@@ -43,6 +48,42 @@ function SaleCard({ sale }: { sale: ClientSale }) {
   );
 }
 
+function KanbanColumn({ status, label, color, sales }: {
+  status: string[]; label: string; color: string; sales: ClientSale[];
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const visible = expanded ? sales : sales.slice(0, LIMIT);
+  const hidden = sales.length - LIMIT;
+
+  return (
+    <div>
+      <div className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg border mb-2 ${color}`}>
+        <span className="text-xs font-medium text-gray-600">{label}</span>
+        <span className="text-xs text-gray-400">{sales.length}</span>
+      </div>
+      <div className="space-y-2">
+        {visible.map((s) => <SaleCard key={s.id} sale={s} />)}
+      </div>
+      {!expanded && hidden > 0 && (
+        <button
+          onClick={() => setExpanded(true)}
+          className="mt-2 w-full text-xs text-gray-400 hover:text-[#667470] py-1.5 border border-dashed border-gray-200 rounded-xl hover:border-[#667470]/40 transition-colors"
+        >
+          + {hidden} mais
+        </button>
+      )}
+      {expanded && sales.length > LIMIT && (
+        <button
+          onClick={() => setExpanded(false)}
+          className="mt-2 w-full text-xs text-gray-400 hover:text-[#667470] py-1.5 transition-colors"
+        >
+          ↑ Mostrar menos
+        </button>
+      )}
+    </div>
+  );
+}
+
 export function ClientSalesKanban({ sales }: { sales: ClientSale[] }) {
   if (!sales.length) return null;
 
@@ -57,15 +98,7 @@ export function ClientSalesKanban({ sales }: { sales: ClientSale[] }) {
           const col = sales.filter((s) => status.includes(s.status));
           if (!col.length) return null;
           return (
-            <div key={label}>
-              <div className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg border mb-2 ${color}`}>
-                <span className="text-xs font-medium text-gray-600">{label}</span>
-                <span className="text-xs text-gray-400">{col.length}</span>
-              </div>
-              <div className="space-y-2">
-                {col.map((s) => <SaleCard key={s.id} sale={s} />)}
-              </div>
-            </div>
+            <KanbanColumn key={label} status={status} label={label} color={color} sales={col} />
           );
         })}
       </div>
