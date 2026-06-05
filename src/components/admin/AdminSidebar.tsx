@@ -29,6 +29,7 @@ const nav: { group: string | null; items: NavItem[] }[] = [
     group: "CRM & Vendas",
     items: [
       { label: "Pipeline", href: "/admin/crm", exact: true },
+      { label: "Clientes", href: "/admin/crm/clients" },
       { label: "Contactos", href: "/admin/crm/contacts" },
       { label: "Semana", href: "/admin/crm/weekly" },
       { label: "Prospecção", href: "/admin/crm/prospecting" },
