@@ -5,6 +5,8 @@ import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { signOut } from "next-auth/react";
+import { AddExpenseModal } from "@/components/AddExpenseModal";
+import type { Fornecedor } from "@/lib/notion";
 
 type NavItem = {
   label: string;
@@ -49,8 +51,15 @@ const nav: { group: string | null; items: NavItem[] }[] = [
     ],
   },
   {
+    group: "Fornecedores",
+    items: [
+      { label: "Lista", href: "/admin/fornecedores" },
+    ],
+  },
+  {
     group: "Equipa",
     items: [
+      { label: "Toda a Equipa", href: "/admin/equipa" },
       { label: "Utilizadores", href: "/admin/users" },
       { label: "Permissões", href: "/admin/permissoes" },
     ],

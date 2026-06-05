@@ -997,6 +997,29 @@ export const getFornecedores = unstable_cache(
   { revalidate: 300, tags: ["fornecedores"] },
 );
 
+export async function getTransactionsByFornecedor(fornecedorId: string): Promise<Transaction[]> {
+  const { data } = await supabase
+    .from("transactions")
+    .select(TX_SELECT)
+    .eq("fornecedor_id", fornecedorId)
+    .order("data", { ascending: false });
+  return (data ?? []).map(mapTransactionRow);
+}
+
+export async function getFornecedorStats(): Promise<Map<string, { count: number; total: number }>> {
+  const { data } = await supabase
+    .from("transactions")
+    .select("fornecedor_id, valor")
+    .not("fornecedor_id", "is", null);
+  const map = new Map<string, { count: number; total: number }>();
+  for (const row of data ?? []) {
+    const id = row.fornecedor_id as string;
+    const prev = map.get(id) ?? { count: 0, total: 0 };
+    map.set(id, { count: prev.count + 1, total: prev.total + (row.valor ?? 0) });
+  }
+  return map;
+}
+
 export async function createFornecedor(name: string): Promise<Fornecedor> {
   const { data, error } = await supabase.from("fornecedores")
     .insert({ name: name.trim() })
