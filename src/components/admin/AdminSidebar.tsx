@@ -33,6 +33,7 @@ const nav: { group: string | null; items: NavItem[] }[] = [
       { label: "Contactos", href: "/admin/crm/contacts" },
       { label: "Semana", href: "/admin/crm/weekly" },
       { label: "Prospecção", href: "/admin/crm/prospecting" },
+      { label: "Google Contacts", href: "/admin/crm/google-contacts" },
     ],
   },
   {
