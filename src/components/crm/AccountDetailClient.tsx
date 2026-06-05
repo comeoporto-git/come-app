@@ -8,7 +8,7 @@ import { AddContactModal } from "./AddContactModal";
 import { LogActivityModal } from "./LogActivityModal";
 import { StageSelect, StageBadge } from "./StageSelect";
 import { SaleEmails } from "@/components/SaleEmails";
-import { deleteCRMActivity, deleteCRMContact, updateCRMAccount, clearAccountEnrichment } from "@/actions/crm";
+import { deleteCRMActivity, deleteCRMContact, updateCRMContact, updateCRMAccount, clearAccountEnrichment } from "@/actions/crm";
 import { AccountStatsPanel } from "./AccountStatsPanel";
 import { ClientSalesKanban } from "./ClientSalesKanban";
 import type { CRMAccountStats, ClientSale } from "@/lib/notion";
@@ -79,11 +79,68 @@ function ActivityItem({ activity, accountId }: { activity: CRMActivity; accountI
 function ContactCard({ contact, accountId }: { contact: CRMContact; accountId: string }) {
   const [isPending, startTransition] = useTransition();
   const [deleted, setDeleted] = useState(false);
+  const [editing, setEditing] = useState(false);
 
   if (deleted) return null;
 
+  function handleSave(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    const get = (k: string) => (fd.get(k) as string)?.trim() || undefined;
+    startTransition(async () => {
+      await updateCRMContact(contact.id, accountId, {
+        name: get("name") ?? contact.name,
+        email: get("email"),
+        phone: get("phone"),
+        role: get("role"),
+        linkedin_url: get("linkedin_url"),
+        is_primary: fd.get("is_primary") === "on",
+      });
+      setEditing(false);
+    });
+  }
+
+  if (editing) {
+    return (
+      <form onSubmit={handleSave} className="bg-gray-50 rounded-xl p-3 space-y-2">
+        {[
+          { name: "name",         label: "Nome",     defaultValue: contact.name,         required: true },
+          { name: "role",         label: "Cargo",    defaultValue: contact.role ?? "" },
+          { name: "email",        label: "Email",    defaultValue: contact.email ?? "" },
+          { name: "phone",        label: "Telefone", defaultValue: contact.phone ?? "" },
+          { name: "linkedin_url", label: "LinkedIn", defaultValue: contact.linkedin_url ?? "" },
+        ].map(({ name, label, defaultValue, required }) => (
+          <div key={name}>
+            <label className="block text-[10px] text-gray-400 mb-0.5">{label}</label>
+            <input
+              name={name}
+              defaultValue={defaultValue}
+              required={required}
+              className="w-full border border-gray-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-[#667470]/30"
+            />
+          </div>
+        ))}
+        <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+          <input type="checkbox" name="is_primary" defaultChecked={contact.is_primary} className="rounded" />
+          Contacto principal
+        </label>
+        <div className="flex gap-2">
+          <button type="submit" disabled={isPending} className="px-3 py-1.5 bg-[#667470] text-white rounded-lg text-xs font-medium hover:bg-[#556360] transition-colors disabled:opacity-50">
+            Guardar
+          </button>
+          <button type="button" onClick={() => setEditing(false)} className="px-3 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-500 hover:bg-gray-50 transition-colors">
+            Cancelar
+          </button>
+        </div>
+      </form>
+    );
+  }
+
   return (
-    <div className="bg-gray-50 rounded-xl p-3 relative group">
+    <div
+      className="bg-gray-50 rounded-xl p-3 relative group cursor-pointer hover:bg-gray-100 transition-colors"
+      onClick={() => setEditing(true)}
+    >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="text-sm font-semibold text-[#32373c] truncate">
@@ -93,24 +150,24 @@ function ContactCard({ contact, accountId }: { contact: CRMContact; accountId: s
           {contact.role && <p className="text-xs text-gray-500 mt-0.5">{contact.role}</p>}
         </div>
         <button
-          onClick={() => startTransition(async () => { await deleteCRMContact(contact.id, accountId); setDeleted(true); })}
+          onClick={(e) => { e.stopPropagation(); startTransition(async () => { await deleteCRMContact(contact.id, accountId); setDeleted(true); }); }}
           disabled={isPending}
           className="text-gray-300 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 text-xs shrink-0"
         >×</button>
       </div>
       <div className="mt-2 space-y-1">
         {contact.email && (
-          <a href={`mailto:${contact.email}`} className="flex items-center gap-1.5 text-xs text-gray-600 hover:text-[#667470]">
+          <a href={`mailto:${contact.email}`} onClick={(e) => e.stopPropagation()} className="flex items-center gap-1.5 text-xs text-gray-600 hover:text-[#667470]">
             <span>✉️</span> <span className="truncate">{contact.email}</span>
           </a>
         )}
         {contact.phone && (
-          <a href={`tel:${contact.phone}`} className="flex items-center gap-1.5 text-xs text-gray-600 hover:text-[#667470]">
+          <a href={`tel:${contact.phone}`} onClick={(e) => e.stopPropagation()} className="flex items-center gap-1.5 text-xs text-gray-600 hover:text-[#667470]">
             <span>📞</span> {contact.phone}
           </a>
         )}
         {contact.linkedin_url && (
-          <a href={contact.linkedin_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-xs text-blue-500 hover:underline">
+          <a href={contact.linkedin_url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="flex items-center gap-1.5 text-xs text-blue-500 hover:underline">
             <span>💼</span> LinkedIn
           </a>
         )}

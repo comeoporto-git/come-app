@@ -13,6 +13,10 @@ const nextConfig: NextConfig = {
         hostname: "comeoporto.com",
         pathname: "/wp-content/uploads/**",
       },
+      {
+        protocol: "https",
+        hostname: "lh3.googleusercontent.com",
+      },
     ],
   },
   async redirects() {
