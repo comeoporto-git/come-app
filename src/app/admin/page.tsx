@@ -19,7 +19,6 @@ import {
   getTransactionsNeedingInvoice,
 } from "@/lib/notion";
 import { getRecentInboxEmails } from "@/lib/integration";
-import { AddStandaloneExpenseButton } from "@/components/AddStandaloneExpenseButton";
 import { getFornecedores } from "@/lib/notion";
 
 function getMondayOfThisWeek(): string {
@@ -352,15 +351,6 @@ export default async function AdminDashboard({
                     <p className="text-sm text-emerald-600 px-3 py-2">✓ CRM em dia</p>
                   )}
                 </div>
-              </div>
-
-              {/* Despesas avulsas */}
-              <div className="pt-2 border-t border-gray-50 flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-[#32373c]">Despesas sem Serviço</p>
-                  <p className="text-xs text-gray-400">Custos não associados a um serviço</p>
-                </div>
-                <AddStandaloneExpenseButton fornecedores={fornecedores} />
               </div>
             </div>
           </div>

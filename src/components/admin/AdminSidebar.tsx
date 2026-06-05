@@ -70,11 +70,13 @@ type Props = {
   userName: string;
   userEmail: string;
   userImage: string | null;
+  fornecedores?: Fornecedor[];
 };
 
-export function AdminSidebar({ userName, userEmail, userImage }: Props) {
+export function AdminSidebar({ userName, userEmail, userImage, fornecedores = [] }: Props) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [expenseOpen, setExpenseOpen] = useState(false);
 
   function isActive(item: NavItem) {
     if (item.exact) return pathname === item.href;
@@ -129,6 +131,16 @@ export function AdminSidebar({ userName, userEmail, userImage }: Props) {
         ))}
       </nav>
 
+      {/* Quick action */}
+      <div className="px-3 pb-3">
+        <button
+          onClick={() => setExpenseOpen(true)}
+          className="w-full bg-white text-[#32373c] text-[13px] font-semibold py-2 rounded-xl hover:bg-white/90 active:scale-95 transition-all"
+        >
+          + Despesa
+        </button>
+      </div>
+
       {/* User */}
       <div className="border-t border-white/10 px-4 py-3 space-y-2">
         <div className="flex items-center gap-2.5 min-w-0">
@@ -166,6 +178,15 @@ export function AdminSidebar({ userName, userEmail, userImage }: Props) {
 
   return (
     <>
+      {expenseOpen && (
+        <AddExpenseModal
+          tourId={null}
+          fornecedores={fornecedores}
+          userRole="Admin"
+          onClose={() => setExpenseOpen(false)}
+        />
+      )}
+
       {/* Desktop sidebar — fixed */}
       <aside className="hidden md:flex fixed inset-y-0 left-0 w-[220px] flex-col z-30 shadow-xl">
         {sidebarContent}
