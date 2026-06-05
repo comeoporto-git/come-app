@@ -111,20 +111,27 @@ function SectionCard({ title, sub, children }: {
   );
 }
 
-/** VBars — vertical bar chart. Pass `colors` for per-bar color overrides. */
-function VBars({ entries, max, color, colors, formatValue, barHeight = 88 }: {
+/** VBars — vertical bar chart. Pass `colors` for per-bar color overrides.
+ *  Pass `baseValues`+`baseColors` to render a solid darker layer within each bar
+ *  (used to split past vs future services in the yearly chart). */
+function VBars({ entries, max, color, colors, formatValue, barHeight = 88, baseValues, baseColors }: {
   entries: [string, number][];
   max: number;
   color: string;
-  colors?: string[];       // per-bar colour override
+  colors?: string[];
   formatValue?: (v: number) => string;
   barHeight?: number;
+  baseValues?: number[];
+  baseColors?: string[];
 }) {
   return (
     <div className="flex items-end gap-2" style={{ height: `${barHeight + 32}px` }}>
       {entries.map(([label, value], i) => {
-        const pct      = (value / max) * 100;
-        const barColor = colors?.[i] ?? color;
+        const pct       = (value / max) * 100;
+        const barColor  = colors?.[i] ?? color;
+        const baseVal   = baseValues?.[i] ?? value;
+        const baseColor = baseColors?.[i] ?? barColor;
+        const basePct   = max > 0 ? (baseVal / max) * 100 : 0;
         return (
           <div key={label} className="flex-1 flex flex-col items-center gap-1 h-full justify-end">
             {value > 0 && (
@@ -137,6 +144,12 @@ function VBars({ entries, max, color, colors, formatValue, barHeight = 88 }: {
                 className={`absolute bottom-0 w-full ${barColor} rounded-t-lg`}
                 style={{ height: `${pct}%`, minHeight: value > 0 ? "4px" : "0" }}
               />
+              {baseValues && (
+                <div
+                  className={`absolute bottom-0 w-full ${baseColor} rounded-t-lg`}
+                  style={{ height: `${basePct}%`, minHeight: baseVal > 0 ? "4px" : "0" }}
+                />
+              )}
             </div>
             <span className="text-xs text-gray-400 capitalize leading-none">{label}</span>
           </div>
@@ -212,10 +225,7 @@ export function AnalyticsDashboard({
   const hasYearlyRevenue  = yearlyData.some((d) => d.revenue > 0);
   const yearlyHasFuture   = yearlyData.some((d) => d.isFuture || d.hasFuturePartial);
 
-  // Colours for yearly charts — future years get lighter bars
-  const yearlyServiceColors = yearlyData.map((d) =>
-    d.isFuture ? "bg-[#667470]/40" : "bg-[#667470]"
-  );
+  // Revenue chart colours — future years lighter
   const yearlyRevenueColors = yearlyData.map((d) =>
     d.isFuture ? "bg-emerald-400/40" : "bg-emerald-400"
   );
@@ -505,8 +515,10 @@ export function AnalyticsDashboard({
                 <VBars
                   entries={yearlyData.map((d) => [String(d.year), d.services])}
                   max={maxYearlyServices}
-                  color="bg-[#667470]"
-                  colors={yearlyServiceColors}
+                  color="bg-[#667470]/40"
+                  colors={yearlyData.map(() => "bg-[#667470]/40")}
+                  baseValues={yearlyData.map((d) => d.services - d.futureSvcs)}
+                  baseColors={yearlyData.map(() => "bg-[#667470]")}
                 />
                 {yearlyHasFuture && (
                   <ChartLegend items={[
