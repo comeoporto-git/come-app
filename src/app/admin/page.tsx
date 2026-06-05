@@ -1,9 +1,7 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { signOut } from "@/lib/auth";
 import { getUnmatchedBankTransactions, getFlaggedTransactions, getGuideExpenses, getServicesWithMissingInfo, getPendingServices, getFornecedores } from "@/lib/notion";
 import { AddStandaloneExpenseButton } from "@/components/AddStandaloneExpenseButton";
-import Image from "next/image";
 import Link from "next/link";
 
 export default async function AdminPage({
@@ -30,28 +28,6 @@ export default async function AdminPage({
 
   return (
     <div className="min-h-screen bg-[#667470] text-[#32373c]">
-      <header className="bg-[#7b8b87] sticky top-0 z-10">
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-          <Link href="/">
-            <Image
-            src="https://comeoporto.com/wp-content/uploads/2023/08/cropped-COME-Porto-Food-Tours-Logo-Black-.png"
-            alt="COME"
-            width={72}
-            height={28}
-            className="object-contain invert"
-           
-          />
-          </Link>
-          <div className="flex items-center gap-4">
-            <span className="text-xs text-white/50 font-medium uppercase tracking-widest">Admin</span>
-            <Link href="/profile" className="text-xs text-white/40 hover:text-white transition-colors">Perfil</Link>
-            <form action={async () => { "use server"; await signOut({ redirectTo: "/login" }); }}>
-              <button className="text-xs text-white/40 hover:text-white transition-colors">Sair</button>
-            </form>
-          </div>
-        </div>
-      </header>
-
       <main className="max-w-5xl mx-auto px-4 py-8 space-y-4">
         {/* Status banners */}
         {params.bank_connected && (

@@ -1,6 +1,5 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { signOut } from "@/lib/auth";
 import {
   getUnmatchedBankTransactions,
   getMatchedTransactionMap,
@@ -8,8 +7,6 @@ import {
 } from "@/lib/notion";
 import { getStoredTransactions } from "@/lib/enablebanking";
 import { BankLedger } from "@/components/BankLedger";
-import Image from "next/image";
-import Link from "next/link";
 
 export default async function ReconciliationPage() {
   const session = await auth();
@@ -57,23 +54,6 @@ export default async function ReconciliationPage() {
 
   return (
     <div className="min-h-screen bg-[#667470] text-[#32373c]">
-      <header className="bg-[#7b8b87] sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-3">
-          <Link href="/admin/contabilidade" className="text-white/40 hover:text-white transition-colors text-lg leading-none">←</Link>
-          <Link href="/">
-            <Image
-              src="https://comeoporto.com/wp-content/uploads/2023/08/cropped-COME-Porto-Food-Tours-Logo-Black-.png"
-              alt="COME" width={72} height={28} className="object-contain invert"
-            />
-          </Link>
-          <div className="flex-1" />
-          <span className="text-xs text-white/50 font-medium uppercase tracking-widest">Reconciliação</span>
-          <form action={async () => { "use server"; await signOut({ redirectTo: "/login" }); }}>
-            <button className="text-xs text-white/40 hover:text-white transition-colors">Sair</button>
-          </form>
-        </div>
-      </header>
-
       <main className="max-w-4xl mx-auto px-4 py-6 space-y-6">
 
         {/* Financial totals — 2 cols on mobile, Saldo full-width below; 3 cols on md+ */}
