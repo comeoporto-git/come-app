@@ -219,16 +219,24 @@ function StackedVBars({ data, max, barHeight = 88, formatValue }: {
                 </div>
               </div>
               <div
-                className={`absolute bottom-0 w-full rounded-t-lg overflow-hidden flex flex-col-reverse${isFuture ? " opacity-40" : ""}`}
+                className={`absolute bottom-0 w-full rounded-t-lg overflow-hidden${isFuture ? " opacity-40" : ""}`}
                 style={{ height: `${totalPct}%`, minHeight: total > 0 ? "4px" : "0" }}
               >
-                {entries.map(([status, value]) => (
-                  <div
-                    key={status}
-                    className={`w-full shrink-0 ${STATUS_COLORS[status] ?? "bg-gray-400"}`}
-                    style={{ height: `${total > 0 ? (value / total) * 100 : 0}%` }}
-                  />
-                ))}
+                {(() => {
+                  let cumPct = 0;
+                  return entries.map(([status, value]) => {
+                    const segPct = total > 0 ? (value / total) * 100 : 0;
+                    const bottom = cumPct;
+                    cumPct += segPct;
+                    return (
+                      <div
+                        key={status}
+                        className={`absolute w-full ${STATUS_COLORS[status] ?? "bg-gray-400"}`}
+                        style={{ bottom: `${bottom}%`, height: `${segPct}%` }}
+                      />
+                    );
+                  });
+                })()}
               </div>
             </div>
             <span className="text-xs text-gray-400 capitalize leading-none">{label}</span>
