@@ -15,6 +15,7 @@ import {
 import type { Transaction, Fornecedor } from "@/lib/notion";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
+import { notifyInvoiceAdded } from "@/lib/notifications";
 
 async function requireAuth() {
   const session = await auth();
@@ -141,6 +142,14 @@ export async function logExpenseAction(
     } else {
       revalidatePath("/admin");
     }
+    notifyInvoiceAdded({
+      guideName: session.user.name ?? session.user.email ?? "Guia",
+      supplier: data.supplier,
+      totalCost: data.totalCost,
+      tourId: data.tourId,
+      tourName: data.tourName,
+      invoiceId: data.invoiceId || undefined,
+    }).catch(() => {});
     return { id };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -161,6 +170,7 @@ export async function finishPendingExpenseAction(
   invoiceImageUrl?: string,
   originalStatus?: string,
   paymentMethod?: string,
+  supplier?: string,
 ): Promise<{ error?: string }> {
   try {
     const session = await requireAuth();
@@ -189,6 +199,15 @@ export async function finishPendingExpenseAction(
       ...(invoiceImageUrl ? { invoiceImageUrl } : {}),
     });
     revalidatePath(`/guide/tours/${tourId}`);
+    if (supplier) {
+      notifyInvoiceAdded({
+        guideName: session.user.name ?? session.user.email ?? "Guia",
+        supplier,
+        totalCost,
+        tourId,
+        invoiceId: invoiceId || undefined,
+      }).catch(() => {});
+    }
     return {};
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

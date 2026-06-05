@@ -244,6 +244,7 @@ export function AddExpenseModal({
           invoiceImageUrl,
           pendingTransaction.status,
           pendingTransaction.paymentMethod,
+          pendingTransaction.supplier,
         );
         if (result?.error) throw new Error(result.error);
       } else {
