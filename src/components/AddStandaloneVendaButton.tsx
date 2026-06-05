@@ -9,7 +9,7 @@ export function AddStandaloneVendaButton({ className }: { className?: string }) 
   return (
     <>
       <button onClick={() => setOpen(true)} className={className}>
-        + Venda
+        + Serviço
       </button>
       {open && <StandaloneVendaModal onClose={() => setOpen(false)} />}
     </>
