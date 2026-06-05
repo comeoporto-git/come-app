@@ -131,15 +131,23 @@ function VBars({ entries, max, color, colors, formatValue, barHeight = 88, baseV
         const barColor  = colors?.[i] ?? color;
         const baseVal   = baseValues?.[i] ?? value;
         const baseColor = baseColors?.[i] ?? barColor;
-        const basePct   = max > 0 ? (baseVal / max) * 100 : 0;
+        const basePct      = max > 0 ? (baseVal / max) * 100 : 0;
+        const tooltipLabel = baseValues
+          ? `${fmt(value)} total · ${fmt(baseVal)} realizado${baseVal !== 1 ? "s" : ""}`
+          : formatValue ? formatValue(value) : fmt(value);
         return (
-          <div key={label} className="flex-1 flex flex-col items-center gap-1 h-full justify-end">
+          <div key={label} className="group/vbar flex-1 flex flex-col items-center gap-1 h-full justify-end">
             {value > 0 && (
               <span className="text-xs font-semibold text-gray-500 leading-none">
                 {formatValue ? formatValue(value) : fmt(value)}
               </span>
             )}
             <div className="w-full relative" style={{ height: `${barHeight}px` }}>
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-full -mt-1 opacity-0 group-hover/vbar:opacity-100 transition-opacity z-30 pointer-events-none">
+                <div className="bg-[#32373c] text-white text-[11px] font-semibold rounded px-2 py-0.5 whitespace-nowrap shadow">
+                  {tooltipLabel}
+                </div>
+              </div>
               <div
                 className={`absolute bottom-0 w-full ${barColor} rounded-t-lg`}
                 style={{ height: `${pct}%`, minHeight: value > 0 ? "4px" : "0" }}
@@ -172,6 +180,55 @@ function ChartLegend({ items }: { items: { color: string; label: string }[] }) {
   );
 }
 
+/** StackedVBars — vertical bar chart with status-coloured stacked segments. */
+function StackedVBars({ data, max, barHeight = 88 }: {
+  data: { label: string; revenueByStatus: Record<string, number>; total: number; isFuture: boolean }[];
+  max: number;
+  barHeight?: number;
+}) {
+  return (
+    <div className="flex items-end gap-2" style={{ height: `${barHeight + 32}px` }}>
+      {data.map(({ label, revenueByStatus, total, isFuture }) => {
+        const totalPct = max > 0 ? (total / max) * 100 : 0;
+        const segments = Object.entries(revenueByStatus).sort((a, b) => b[1] - a[1]);
+        return (
+          <div key={label} className="group/svbar flex-1 flex flex-col items-center gap-1 h-full justify-end">
+            {total > 0 && (
+              <span className="text-xs font-semibold text-gray-500 leading-none">{fmtEur(total)}</span>
+            )}
+            <div className="w-full relative" style={{ height: `${barHeight}px` }}>
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-full -mt-1 opacity-0 group-hover/svbar:opacity-100 transition-opacity z-30 pointer-events-none">
+                <div className="bg-[#32373c] text-white text-[11px] font-semibold rounded px-2 py-1.5 whitespace-nowrap shadow space-y-1">
+                  <div className="border-b border-white/20 pb-1 mb-0.5">{fmtEur(total)}</div>
+                  {segments.map(([status, value]) => (
+                    <div key={status} className="flex items-center gap-1.5">
+                      <span className={`inline-block w-2 h-2 rounded-sm shrink-0 ${STATUS_COLORS[status] ?? "bg-gray-400"}`} />
+                      <span>{status}: {fmtEur(value)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div
+                className={`absolute bottom-0 w-full rounded-t-lg overflow-hidden flex flex-col-reverse${isFuture ? " opacity-40" : ""}`}
+                style={{ height: `${totalPct}%`, minHeight: total > 0 ? "4px" : "0" }}
+              >
+                {segments.map(([status, value]) => (
+                  <div
+                    key={status}
+                    className={`w-full shrink-0 ${STATUS_COLORS[status] ?? "bg-gray-400"}`}
+                    style={{ height: `${total > 0 ? (value / total) * 100 : 0}%` }}
+                  />
+                ))}
+              </div>
+            </div>
+            <span className="text-xs text-gray-400 capitalize leading-none">{label}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function EmptyState({ message = "Sem dados para este período" }: { message?: string }) {
   return <p className="text-sm text-gray-400 text-center py-6">{message}</p>;
 }
@@ -194,19 +251,24 @@ export function AnalyticsDashboard({
 
   // ── By year (always full history) ──────────────────────────────────────────
   const yearlyData = useMemo(() => {
-    const map: Record<number, { services: number; futureSvcs: number; revenue: number }> = {};
+    const map: Record<number, { services: number; futureSvcs: number; revenue: number; revenueByStatus: Record<string, number> }> = {};
     for (const t of allTours) {
       if (!t.date || isCancelled(t)) continue;
       const y = new Date(t.date).getFullYear();
-      if (!map[y]) map[y] = { services: 0, futureSvcs: 0, revenue: 0 };
+      if (!map[y]) map[y] = { services: 0, futureSvcs: 0, revenue: 0, revenueByStatus: {} };
       map[y].services++;
       if (isTourFuture(t)) map[y].futureSvcs++;
     }
+    const tourStatusById = new Map(
+      allTours.filter((t) => t.id).map((t) => [t.id!, t.status === "Canceled" ? "Cancelled" : (t.status || "Sem estado")])
+    );
     for (const t of allTransactions) {
       if (!t.date || !t.supplier.startsWith("IN -")) continue;
       const y = new Date(t.date).getFullYear();
-      if (!map[y]) map[y] = { services: 0, futureSvcs: 0, revenue: 0 };
+      if (!map[y]) map[y] = { services: 0, futureSvcs: 0, revenue: 0, revenueByStatus: {} };
       map[y].revenue += t.totalCost;
+      const status = t.tourId ? (tourStatusById.get(t.tourId) ?? "Sem estado") : "Sem estado";
+      map[y].revenueByStatus[status] = (map[y].revenueByStatus[status] ?? 0) + t.totalCost;
     }
     return Object.entries(map)
       .map(([year, d]) => ({
@@ -224,11 +286,6 @@ export function AnalyticsDashboard({
   const maxYearlyRevenue  = Math.max(...yearlyData.map((d) => d.revenue), 1);
   const hasYearlyRevenue  = yearlyData.some((d) => d.revenue > 0);
   const yearlyHasFuture   = yearlyData.some((d) => d.isFuture || d.hasFuturePartial);
-
-  // Revenue chart colours — future years lighter
-  const yearlyRevenueColors = yearlyData.map((d) =>
-    d.isFuture ? "bg-emerald-400/40" : "bg-emerald-400"
-  );
 
   // ── Period-filtered analytics ─────────────────────────────────────────────
   const a = useMemo(() => {
@@ -532,19 +589,24 @@ export function AnalyticsDashboard({
                   <div className="border-t border-gray-50" />
                   <div>
                     <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wide mb-3">Receita</p>
-                    <VBars
-                      entries={yearlyData.map((d) => [String(d.year), d.revenue])}
+                    <StackedVBars
+                      data={yearlyData.map((d) => ({
+                        label: String(d.year),
+                        revenueByStatus: d.revenueByStatus,
+                        total: d.revenue,
+                        isFuture: d.isFuture,
+                      }))}
                       max={maxYearlyRevenue}
-                      color="bg-emerald-400"
-                      colors={yearlyRevenueColors}
-                      formatValue={fmtEur}
                     />
-                    {yearlyHasFuture && (
-                      <ChartLegend items={[
-                        { color: "bg-emerald-400",    label: "Passado" },
-                        { color: "bg-emerald-400/40", label: "Futuro (estimado)" },
-                      ]} />
-                    )}
+                    {(() => {
+                      const statuses = [...new Set(yearlyData.flatMap((d) => Object.keys(d.revenueByStatus)))];
+                      return statuses.length > 0 ? (
+                        <ChartLegend items={[
+                          ...statuses.map((s) => ({ color: STATUS_COLORS[s] ?? "bg-gray-400", label: s })),
+                          ...(yearlyHasFuture ? [{ color: "opacity-40 bg-gray-400", label: "Futuro (estimado)" }] : []),
+                        ]} />
+                      ) : null;
+                    })()}
                   </div>
                 </>
               )}
