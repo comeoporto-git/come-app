@@ -37,6 +37,8 @@ const STATUS_COLORS: Record<string, string> = {
   Pending:    "bg-yellow-400",
   Paid:       "bg-blue-400",
   Cancelled:  "bg-red-400",
+  Invoiced:   "bg-violet-400",
+  Finalised:  "bg-emerald-400",
 };
 
 // ── Categories ────────────────────────────────────────────────────────────────
@@ -84,13 +86,19 @@ function HBar({ label, value, max, color = "bg-[#667470]", labelWidth = "w-36", 
   label: string; value: number; max: number; color?: string; labelWidth?: string;
   formatValue?: (v: number) => string;
 }) {
-  const pct = max > 0 ? Math.max(2, (value / max) * 100) : 0;
+  const pct     = max > 0 ? Math.max(2, (value / max) * 100) : 0;
+  const realPct = max > 0 ? Math.round((value / max) * 100) : 0;
   const displayed = formatValue ? formatValue(value) : fmt(value);
   return (
-    <div className="flex items-center gap-3">
+    <div className="group/hbar relative flex items-center gap-3 rounded-lg hover:bg-gray-50 -mx-1 px-1 transition-colors cursor-default">
+      <div className="absolute left-1/2 bottom-full mb-1 -translate-x-1/2 opacity-0 group-hover/hbar:opacity-100 transition-opacity z-20 pointer-events-none">
+        <div className="bg-[#32373c] text-white text-[11px] font-semibold rounded px-2 py-0.5 whitespace-nowrap shadow">
+          {displayed} · {realPct}%
+        </div>
+      </div>
       <span className={`text-xs text-gray-500 shrink-0 ${labelWidth} truncate text-right`}>{label}</span>
       <div className="flex-1 bg-gray-100 rounded-full h-2">
-        <div className={`${color} h-2 rounded-full`} style={{ width: `${pct}%` }} />
+        <div className={`${color} h-2 rounded-full transition-opacity group-hover/hbar:opacity-80`} style={{ width: `${pct}%` }} />
       </div>
       <span className="text-xs font-semibold text-gray-700 w-16 text-right shrink-0">{displayed}</span>
     </div>
@@ -181,29 +189,31 @@ function ChartLegend({ items }: { items: { color: string; label: string }[] }) {
 }
 
 /** StackedVBars — vertical bar chart with status-coloured stacked segments. */
-function StackedVBars({ data, max, barHeight = 88 }: {
-  data: { label: string; revenueByStatus: Record<string, number>; total: number; isFuture: boolean }[];
+function StackedVBars({ data, max, barHeight = 88, formatValue }: {
+  data: { label: string; segments: Record<string, number>; total: number; isFuture: boolean }[];
   max: number;
   barHeight?: number;
+  formatValue?: (v: number) => string;
 }) {
+  const fmtVal = (v: number) => formatValue ? formatValue(v) : fmt(v);
   return (
     <div className="flex items-end gap-2" style={{ height: `${barHeight + 32}px` }}>
-      {data.map(({ label, revenueByStatus, total, isFuture }) => {
+      {data.map(({ label, segments: seg, total, isFuture }) => {
         const totalPct = max > 0 ? (total / max) * 100 : 0;
-        const segments = Object.entries(revenueByStatus).sort((a, b) => b[1] - a[1]);
+        const entries  = Object.entries(seg).sort((a, b) => b[1] - a[1]);
         return (
           <div key={label} className="group/svbar flex-1 flex flex-col items-center gap-1 h-full justify-end">
             {total > 0 && (
-              <span className="text-xs font-semibold text-gray-500 leading-none">{fmtEur(total)}</span>
+              <span className="text-xs font-semibold text-gray-500 leading-none">{fmtVal(total)}</span>
             )}
             <div className="w-full relative" style={{ height: `${barHeight}px` }}>
               <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-full -mt-1 opacity-0 group-hover/svbar:opacity-100 transition-opacity z-30 pointer-events-none">
                 <div className="bg-[#32373c] text-white text-[11px] font-semibold rounded px-2 py-1.5 whitespace-nowrap shadow space-y-1">
-                  <div className="border-b border-white/20 pb-1 mb-0.5">{fmtEur(total)}</div>
-                  {segments.map(([status, value]) => (
+                  <div className="border-b border-white/20 pb-1 mb-0.5">{fmtVal(total)}</div>
+                  {entries.map(([status, value]) => (
                     <div key={status} className="flex items-center gap-1.5">
                       <span className={`inline-block w-2 h-2 rounded-sm shrink-0 ${STATUS_COLORS[status] ?? "bg-gray-400"}`} />
-                      <span>{status}: {fmtEur(value)}</span>
+                      <span>{status}: {fmtVal(value)}</span>
                     </div>
                   ))}
                 </div>
@@ -212,7 +222,7 @@ function StackedVBars({ data, max, barHeight = 88 }: {
                 className={`absolute bottom-0 w-full rounded-t-lg overflow-hidden flex flex-col-reverse${isFuture ? " opacity-40" : ""}`}
                 style={{ height: `${totalPct}%`, minHeight: total > 0 ? "4px" : "0" }}
               >
-                {segments.map(([status, value]) => (
+                {entries.map(([status, value]) => (
                   <div
                     key={status}
                     className={`w-full shrink-0 ${STATUS_COLORS[status] ?? "bg-gray-400"}`}
@@ -251,13 +261,19 @@ export function AnalyticsDashboard({
 
   // ── By year (always full history) ──────────────────────────────────────────
   const yearlyData = useMemo(() => {
-    const map: Record<number, { services: number; futureSvcs: number; revenue: number; revenueByStatus: Record<string, number> }> = {};
+    const map: Record<number, {
+      services: number; futureSvcs: number;
+      servicesByStatus: Record<string, number>;
+      revenue: number; revenueByStatus: Record<string, number>;
+    }> = {};
     for (const t of allTours) {
       if (!t.date || isCancelled(t)) continue;
       const y = new Date(t.date).getFullYear();
-      if (!map[y]) map[y] = { services: 0, futureSvcs: 0, revenue: 0, revenueByStatus: {} };
+      if (!map[y]) map[y] = { services: 0, futureSvcs: 0, servicesByStatus: {}, revenue: 0, revenueByStatus: {} };
       map[y].services++;
       if (isTourFuture(t)) map[y].futureSvcs++;
+      const s = t.status === "Canceled" ? "Cancelled" : (t.status || "Sem estado");
+      map[y].servicesByStatus[s] = (map[y].servicesByStatus[s] ?? 0) + 1;
     }
     const tourStatusById = new Map(
       allTours.filter((t) => t.id).map((t) => [t.id!, t.status === "Canceled" ? "Cancelled" : (t.status || "Sem estado")])
@@ -265,7 +281,7 @@ export function AnalyticsDashboard({
     for (const t of allTransactions) {
       if (!t.date || !t.supplier.startsWith("IN -")) continue;
       const y = new Date(t.date).getFullYear();
-      if (!map[y]) map[y] = { services: 0, futureSvcs: 0, revenue: 0, revenueByStatus: {} };
+      if (!map[y]) map[y] = { services: 0, futureSvcs: 0, servicesByStatus: {}, revenue: 0, revenueByStatus: {} };
       map[y].revenue += t.totalCost;
       const status = t.tourId ? (tourStatusById.get(t.tourId) ?? "Sem estado") : "Sem estado";
       map[y].revenueByStatus[status] = (map[y].revenueByStatus[status] ?? 0) + t.totalCost;
@@ -569,20 +585,21 @@ export function AnalyticsDashboard({
             <div className="space-y-8">
               <div>
                 <p className="text-xs font-semibold text-[#667470] uppercase tracking-wide mb-3">Serviços realizados</p>
-                <VBars
-                  entries={yearlyData.map((d) => [String(d.year), d.services])}
+                <StackedVBars
+                  data={yearlyData.map((d) => ({
+                    label: String(d.year),
+                    segments: d.servicesByStatus,
+                    total: d.services,
+                    isFuture: d.isFuture,
+                  }))}
                   max={maxYearlyServices}
-                  color="bg-[#667470]/40"
-                  colors={yearlyData.map(() => "bg-[#667470]/40")}
-                  baseValues={yearlyData.map((d) => d.services - d.futureSvcs)}
-                  baseColors={yearlyData.map(() => "bg-[#667470]")}
                 />
-                {yearlyHasFuture && (
-                  <ChartLegend items={[
-                    { color: "bg-[#667470]",    label: "Passado" },
-                    { color: "bg-[#667470]/40", label: "Futuro (estimado)" },
-                  ]} />
-                )}
+                {(() => {
+                  const statuses = [...new Set(yearlyData.flatMap((d) => Object.keys(d.servicesByStatus)))];
+                  return statuses.length > 0 ? (
+                    <ChartLegend items={statuses.map((s) => ({ color: STATUS_COLORS[s] ?? "bg-gray-400", label: s }))} />
+                  ) : null;
+                })()}
               </div>
               {hasYearlyRevenue && (
                 <>
@@ -592,11 +609,12 @@ export function AnalyticsDashboard({
                     <StackedVBars
                       data={yearlyData.map((d) => ({
                         label: String(d.year),
-                        revenueByStatus: d.revenueByStatus,
+                        segments: d.revenueByStatus,
                         total: d.revenue,
                         isFuture: d.isFuture,
                       }))}
                       max={maxYearlyRevenue}
+                      formatValue={fmtEur}
                     />
                     {(() => {
                       const statuses = [...new Set(yearlyData.flatMap((d) => Object.keys(d.revenueByStatus)))];
@@ -661,12 +679,19 @@ export function AnalyticsDashboard({
             <SectionCard title="Por Dia da Semana" sub="Volume de serviços">
               <div className="flex items-end gap-1.5" style={{ height: "110px" }}>
                 {a.byDay.map((count, i) => {
-                  const pct      = (count / a.maxDay) * 100;
+                  const pct       = (count / a.maxDay) * 100;
                   const isWeekend = i === 0 || i === 6;
                   return (
-                    <div key={i} className="flex-1 flex flex-col items-center gap-1 h-full justify-end">
+                    <div key={i} className="group/daybar flex-1 flex flex-col items-center gap-1 h-full justify-end">
                       {count > 0 && <span className="text-[10px] font-semibold text-gray-500">{count}</span>}
                       <div className="w-full relative" style={{ height: "72px" }}>
+                        {count > 0 && (
+                          <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-full -mt-1 opacity-0 group-hover/daybar:opacity-100 transition-opacity z-30 pointer-events-none">
+                            <div className="bg-[#32373c] text-white text-[11px] font-semibold rounded px-2 py-0.5 whitespace-nowrap shadow">
+                              {a.DAYS_PT[i]}: {count}
+                            </div>
+                          </div>
+                        )}
                         <div
                           className={`absolute bottom-0 w-full rounded-t-md ${isWeekend ? "bg-[#667470]" : "bg-[#667470]/60"}`}
                           style={{ height: `${pct}%`, minHeight: count > 0 ? "4px" : "0" }}
