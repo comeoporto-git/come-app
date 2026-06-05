@@ -123,16 +123,30 @@ export async function markAiScanFailedAction(
   revalidatePath("/super-guide/invoices");
 }
 
+export async function markNoInvoiceNeededAction(
+  transactionId: string,
+): Promise<void> {
+  const session = await requireAuth();
+  if (session.user.role !== "Super Guide" && session.user.role !== "Admin") {
+    throw new Error("Forbidden");
+  }
+  await updateTransaction(transactionId, { precisaDeFatura: "Não" });
+  revalidatePath("/admin/invoices");
+  revalidatePath("/super-guide/invoices");
+}
+
 export async function logExpenseAction(
   data: Omit<Transaction, "id" | "accountantVerified">
 ): Promise<{ id?: string; error?: string }> {
   try {
     const session = await requireAuth();
+    const role = session.user.role;
     if (
-      session.user.role !== "Guide" &&
-      session.user.role !== "Admin" &&
-      session.user.role !== "Super Guide" &&
-      session.user.role !== "Chef"
+      role !== "Guide" &&
+      role !== "Admin" &&
+      role !== "Super Guide" &&
+      role !== "Chef" &&
+      role !== "Driver"
     ) {
       return { error: "Forbidden" };
     }
@@ -142,14 +156,16 @@ export async function logExpenseAction(
     } else {
       revalidatePath("/admin");
     }
-    notifyInvoiceAdded({
-      guideName: session.user.name ?? session.user.email ?? "Guia",
-      supplier: data.supplier,
-      totalCost: data.totalCost,
-      tourId: data.tourId,
-      tourName: data.tourName,
-      invoiceId: data.invoiceId || undefined,
-    }).catch(() => {});
+    if (role === "Guide" || role === "Chef" || role === "Driver") {
+      notifyInvoiceAdded({
+        guideName: session.user.name ?? session.user.email ?? "Guia",
+        supplier: data.supplier,
+        totalCost: data.totalCost,
+        tourId: data.tourId,
+        tourName: data.tourName,
+        invoiceId: data.invoiceId || undefined,
+      }).catch(() => {});
+    }
     return { id };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -174,11 +190,13 @@ export async function finishPendingExpenseAction(
 ): Promise<{ error?: string }> {
   try {
     const session = await requireAuth();
+    const role = session.user.role;
     if (
-      session.user.role !== "Guide" &&
-      session.user.role !== "Admin" &&
-      session.user.role !== "Super Guide" &&
-      session.user.role !== "Chef"
+      role !== "Guide" &&
+      role !== "Admin" &&
+      role !== "Super Guide" &&
+      role !== "Chef" &&
+      role !== "Driver"
     ) {
       return { error: "Forbidden" };
     }
@@ -199,7 +217,7 @@ export async function finishPendingExpenseAction(
       ...(invoiceImageUrl ? { invoiceImageUrl } : {}),
     });
     revalidatePath(`/guide/tours/${tourId}`);
-    if (supplier) {
+    if (supplier && (role === "Guide" || role === "Chef" || role === "Driver")) {
       notifyInvoiceAdded({
         guideName: session.user.name ?? session.user.email ?? "Guia",
         supplier,

@@ -3,7 +3,7 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { analyzeInvoice, type InvoiceData } from "@/actions/invoice";
-import { markInvoiceCollectedAction, createFornecedorAction, markAiScanFailedAction } from "@/actions/transactions";
+import { markInvoiceCollectedAction, createFornecedorAction, markAiScanFailedAction, markNoInvoiceNeededAction } from "@/actions/transactions";
 import type { Transaction, Fornecedor } from "@/lib/notion";
 
 type Step = "capture" | "scanning" | "review";
@@ -39,6 +39,7 @@ export function InvoiceCollectionModal({
   const [error, setError] = useState("");
   const [aiScanFailed, setAiScanFailed] = useState(isAiScanFailed);
   const [saving, setSaving] = useState(false);
+  const [markingNoInvoice, setMarkingNoInvoice] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
 
   const [fornecedores, setFornecedores] = useState<Fornecedor[]>(initialFornecedores);
@@ -304,6 +305,22 @@ export function InvoiceCollectionModal({
                   <span className="text-sm font-semibold text-gray-700">Carregar Ficheiro</span>
                 </button>
               </div>
+              <button
+                onClick={async () => {
+                  setMarkingNoInvoice(true);
+                  try {
+                    await markNoInvoiceNeededAction(transaction.id);
+                    router.refresh();
+                    onClose();
+                  } finally {
+                    setMarkingNoInvoice(false);
+                  }
+                }}
+                disabled={markingNoInvoice}
+                className="w-full border border-gray-200 text-gray-500 font-medium py-3 rounded-2xl text-sm disabled:opacity-50 hover:bg-gray-50 active:scale-[0.98] transition-colors"
+              >
+                {markingNoInvoice ? "A guardar…" : "Não precisa de fatura"}
+              </button>
               <button onClick={onClose} className="w-full text-sm text-gray-400 hover:text-gray-600 text-center">
                 Cancelar
               </button>
