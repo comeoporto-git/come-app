@@ -109,7 +109,11 @@ export default async function SuperGuideGestaoServicosPage() {
                         {t.saleId}
                       </Link>
                       {t.serviceName && <span className="text-xs text-gray-400">{t.serviceName}</span>}
-                      {t.clientName && <span className="text-xs font-medium text-[#32373c]">{t.clientName}</span>}
+                      {t.clientName && t.client && (
+                        <Link href={`/admin/crm/accounts/${t.client}`} className="text-xs font-medium text-[#32373c] hover:underline">
+                          {t.clientName}
+                        </Link>
+                      )}
                     </div>
                     <p className="text-xs text-gray-400 mt-0.5">{formatDate(t.date)}</p>
                     <div className="flex flex-wrap gap-1 mt-1.5">
@@ -150,7 +154,11 @@ export default async function SuperGuideGestaoServicosPage() {
                           {t.saleId}
                         </Link>
                         {t.serviceName && <span className="text-xs text-gray-400">{t.serviceName}</span>}
-                        {t.clientName && <span className="text-xs font-medium text-[#32373c]">{t.clientName}</span>}
+                        {t.clientName && t.client && (
+                        <Link href={`/admin/crm/accounts/${t.client}`} className="text-xs font-medium text-[#32373c] hover:underline">
+                          {t.clientName}
+                        </Link>
+                      )}
                       </div>
                       <p className="text-xs text-gray-400 mt-0.5">{formatDate(t.date)}</p>
                       <div className="flex flex-wrap gap-1 mt-1.5">
