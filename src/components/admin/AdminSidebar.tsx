@@ -6,6 +6,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { signOut } from "next-auth/react";
 import { AddExpenseModal } from "@/components/AddExpenseModal";
+import { AddStandaloneVendaButton } from "@/components/AddStandaloneVendaButton";
 import type { Fornecedor } from "@/lib/notion";
 
 type NavItem = {
@@ -131,14 +132,17 @@ export function AdminSidebar({ userName, userEmail, userImage, fornecedores = []
         ))}
       </nav>
 
-      {/* Quick action */}
-      <div className="px-3 pb-3">
+      {/* Quick actions */}
+      <div className="px-3 pb-3 flex gap-2">
         <button
           onClick={() => setExpenseOpen(true)}
-          className="w-full bg-white text-[#32373c] text-[13px] font-semibold py-2 rounded-xl hover:bg-white/90 active:scale-95 transition-all"
+          className="flex-1 bg-white text-[#32373c] text-[13px] font-semibold py-2 rounded-xl hover:bg-white/90 active:scale-95 transition-all"
         >
           + Despesa
         </button>
+        <AddStandaloneVendaButton
+          className="flex-1 bg-white text-[#32373c] text-[13px] font-semibold py-2 rounded-xl hover:bg-white/90 active:scale-95 transition-all"
+        />
       </div>
 
       {/* User */}

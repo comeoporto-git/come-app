@@ -354,6 +354,46 @@ export async function createEarningAction(
   }
 }
 
+export async function createStandaloneEarningAction(data: {
+  reference: string;
+  date: string;
+  invoiceId: string;
+  taxFree: number;
+  iva6: number;
+  iva13: number;
+  iva23: number;
+  totalCost: number;
+  invoiceImageUrl?: string;
+}): Promise<{ error?: string }> {
+  const session = await requireAuth();
+  if (session.user.role !== "Admin") return { error: "Forbidden" };
+  try {
+    await createTransaction({
+      supplier:        "IN - " + (data.reference || ""),
+      fornecedorId:    null,
+      date:            data.date,
+      invoiceId:       data.invoiceId,
+      taxFree:         data.taxFree,
+      iva6:            data.iva6,
+      iva13:           data.iva13,
+      iva23:           data.iva23,
+      totalCost:       data.totalCost,
+      whoPaid:         "Company",
+      paymentMethod:   "COME",
+      status:          "Pending Payment",
+      tourId:          null,
+      bankReference:   "",
+      invoiceImageUrl: data.invoiceImageUrl,
+      precisaDeFatura: "",
+    });
+    revalidatePath("/admin");
+    revalidatePath("/admin/transacoes");
+    return {};
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
 export async function editEarningAction(
   transactionId: string,
   tourId: string,
