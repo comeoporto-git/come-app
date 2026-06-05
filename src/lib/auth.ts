@@ -15,6 +15,7 @@ declare module "next-auth" {
       image?: string | null;
       role: TeamMember["role"];
       notionId: string;
+      googleAccessToken?: string;
     };
   }
 }
@@ -50,7 +51,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       // Block anyone not in the Notion Team DB
       return member !== null;
     },
-    async jwt({ token, user }) {
+    async jwt({ token, user, account }) {
+      // Capture Google access token whenever a Google sign-in occurs
+      if (account?.provider === "google" && account.access_token) {
+        token.googleAccessToken = account.access_token;
+      }
+
       const REFRESH_INTERVAL = 30 * 60 * 1000; // 30 minutes
       const now = Date.now();
       const shouldRefresh =
@@ -76,6 +82,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         session.user.role = token.role as TeamMember["role"];
         session.user.notionId = token.notionId as string;
         session.user.id = token.sub ?? "";
+        session.user.googleAccessToken = token.googleAccessToken as string | undefined;
       }
       return session;
     },

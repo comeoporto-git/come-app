@@ -23,7 +23,7 @@ export default async function GoogleContactsPage({
   const query = params.q?.toLowerCase().trim() ?? "";
 
   const [result, crmContacts] = await Promise.all([
-    getGoogleContacts(session.user.id),
+    getGoogleContacts(session.user.googleAccessToken, session.user.id),
     getAllCRMContacts(),
   ]);
 
