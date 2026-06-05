@@ -4,6 +4,7 @@ import Resend from "next-auth/providers/resend";
 import PgAdapter from "@auth/pg-adapter";
 import { Pool } from "pg";
 import { getTeamMemberByEmail } from "@/lib/notion";
+import { getDb } from "@/lib/db";
 import type { TeamMember } from "@/lib/notion";
 
 declare module "next-auth" {
@@ -52,9 +53,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return member !== null;
     },
     async jwt({ token, user, account }) {
-      // Capture Google access token whenever a Google sign-in occurs
+      // On every Google OAuth sign-in, capture the fresh token in the JWT
+      // AND force-update the accounts table so the DB fallback stays in sync.
       if (account?.provider === "google" && account.access_token) {
         token.googleAccessToken = account.access_token;
+        try {
+          const sql = getDb();
+          await sql`
+            UPDATE accounts
+            SET access_token  = ${account.access_token},
+                refresh_token = COALESCE(${account.refresh_token ?? null}, refresh_token),
+                expires_at    = ${account.expires_at ?? null}
+            WHERE provider = 'google'
+              AND "providerAccountId" = ${account.providerAccountId}
+          `;
+        } catch { /* never fail auth over a token cache update */ }
       }
 
       const REFRESH_INTERVAL = 30 * 60 * 1000; // 30 minutes

@@ -12,8 +12,9 @@ export type GoogleContact = {
 
 export type GoogleContactsResult =
   | { status: "ok"; contacts: GoogleContact[] }
-  | { status: "no_token" }   // no Google token available at all
-  | { status: "no_scope" }   // token exists but contacts scope not granted
+  | { status: "no_token" }       // no Google token — need to sign in
+  | { status: "no_scope" }       // token exists but contacts scope not granted
+  | { status: "api_disabled" }   // People API not enabled in Google Cloud project
   | { status: "error"; message?: string };
 
 type AccountRow = {
@@ -103,7 +104,15 @@ async function callPeopleApi(token: string): Promise<GoogleContactsResult> {
   });
 
   if (res.status === 401) return { status: "no_token" };
-  if (res.status === 403) return { status: "no_scope" };
+  if (res.status === 403) {
+    // Parse the error body to distinguish "scope missing" from "API not enabled"
+    const body = await res.json().catch(() => ({})) as { error?: { message?: string } };
+    const msg = body?.error?.message ?? "";
+    if (msg.includes("has not been used") || msg.includes("disabled") || msg.includes("SERVICE_DISABLED")) {
+      return { status: "api_disabled" };
+    }
+    return { status: "no_scope" };
+  }
   if (!res.ok) return { status: "error", message: `HTTP ${res.status}` };
 
   const data = await res.json() as { connections?: unknown[] };

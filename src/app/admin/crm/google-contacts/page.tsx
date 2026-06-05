@@ -8,7 +8,9 @@ import Image from "next/image";
 
 async function authorizeContacts() {
   "use server";
-  await signIn("google", { redirectTo: "/admin/crm/google-contacts" });
+  // prompt:consent forces Google to show the scope screen and return a
+  // fresh token that includes contacts.readonly even for returning users.
+  await signIn("google", { redirectTo: "/admin/crm/google-contacts" }, { prompt: "consent" });
 }
 
 export default async function GoogleContactsPage({
@@ -33,6 +35,37 @@ export default async function GoogleContactsPage({
       .filter((c) => c.email)
       .map((c) => [c.email!.toLowerCase(), c])
   );
+
+  // ── State: People API not enabled ────────────────────────────────────────
+  if (result.status === "api_disabled") {
+    return (
+      <div className="min-h-screen bg-[#667470] text-[#32373c]">
+        <CRMBreadcrumb crumbs={[{ label: "CRM", href: "/admin/crm" }, { label: "Google Contacts" }]} />
+        <main className="max-w-2xl mx-auto px-4 py-12 flex flex-col items-center text-center gap-5">
+          <div className="w-16 h-16 rounded-2xl bg-white flex items-center justify-center shadow-sm text-3xl">⚙️</div>
+          <div>
+            <h1 className="text-xl font-bold text-white">People API não está ativa</h1>
+            <p className="text-white/70 text-sm mt-2 max-w-sm">
+              A Google People API precisa de ser ativada no Google Cloud Console para este projeto.
+            </p>
+          </div>
+          <div className="bg-white rounded-2xl p-5 text-left text-sm text-[#32373c] space-y-2 w-full max-w-sm">
+            <p className="font-semibold">Como ativar:</p>
+            <ol className="list-decimal list-inside space-y-1 text-gray-600">
+              <li>Vai a <a href="https://console.cloud.google.com/apis/library/people.googleapis.com?project=come-app-493117" target="_blank" className="text-blue-600 underline">Google Cloud Console → People API</a></li>
+              <li>Clica em <strong>Enable</strong></li>
+              <li>Volta aqui e clica em Re-autorizar</li>
+            </ol>
+          </div>
+          <form action={authorizeContacts}>
+            <button type="submit" className="text-sm font-medium bg-white text-[#32373c] px-5 py-2.5 rounded-xl shadow-sm border border-gray-200 hover:bg-gray-50 transition-colors">
+              Re-autorizar após ativar API
+            </button>
+          </form>
+        </main>
+      </div>
+    );
+  }
 
   // ── State: not authorized yet ─────────────────────────────────────────────
   if (result.status === "no_token" || result.status === "no_scope") {
