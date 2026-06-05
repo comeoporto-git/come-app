@@ -1363,3 +1363,93 @@ export async function getLatestWeeklyActionsWeek(): Promise<string | null> {
     .single();
   return data?.week_of ?? null;
 }
+
+// ── Dashboard helpers ─────────────────────────────────────────────────────────
+
+export type DashboardMonthlyStats = {
+  serviceCount: number;
+  totalPax: number;
+  revenue: number;
+  lastMonthRevenue: number;
+  lastMonthServiceCount: number;
+};
+
+export async function getDashboardMonthlyStats(): Promise<DashboardMonthlyStats> {
+  const now = new Date();
+  const yr = now.getFullYear();
+  const mo = now.getMonth() + 1;
+  const thisMonthStart = `${yr}-${String(mo).padStart(2, "0")}-01`;
+  const prevMo = mo === 1 ? 12 : mo - 1;
+  const prevYr = mo === 1 ? yr - 1 : yr;
+  const lastMonthStart = `${prevYr}-${String(prevMo).padStart(2, "0")}-01`;
+
+  const [salesThis, salesLast, txThis, txLast] = await Promise.all([
+    supabase.from("sales").select("number_of_guests")
+      .gte("date", thisMonthStart)
+      .not("status", "in", '("Cancelled","Canceled")'),
+    supabase.from("sales").select("id")
+      .gte("date", lastMonthStart).lt("date", thisMonthStart)
+      .not("status", "in", '("Cancelled","Canceled")'),
+    supabase.from("transactions").select("valor")
+      .gte("data", thisMonthStart).like("notion_id", "IN -%").gt("valor", 0),
+    supabase.from("transactions").select("valor")
+      .gte("data", lastMonthStart).lt("data", thisMonthStart).like("notion_id", "IN -%").gt("valor", 0),
+  ]);
+
+  return {
+    serviceCount: salesThis.data?.length ?? 0,
+    totalPax: (salesThis.data ?? []).reduce((s, r) => s + (r.number_of_guests ?? 0), 0),
+    revenue: (txThis.data ?? []).reduce((s, r) => s + (r.valor ?? 0), 0),
+    lastMonthRevenue: (txLast.data ?? []).reduce((s, r) => s + (r.valor ?? 0), 0),
+    lastMonthServiceCount: salesLast.data?.length ?? 0,
+  };
+}
+
+export type StaleProspect = {
+  id: string;
+  name: string;
+  stage: string;
+  last_contacted_at: string | null;
+  category: string | null;
+};
+
+export async function getStaleProspects(daysThreshold = 30): Promise<StaleProspect[]> {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - daysThreshold);
+  const { data } = await supabase
+    .from("sales_pipeline")
+    .select("id, name, stage, last_contacted_at, category")
+    .not("stage", "in", '("Client","Lost")')
+    .or(`last_contacted_at.is.null,last_contacted_at.lt.${cutoff.toISOString()}`)
+    .order("last_contacted_at", { ascending: true, nullsFirst: true })
+    .limit(8);
+  return (data ?? []) as StaleProspect[];
+}
+
+export type CRMMonthlyActivity = {
+  emailCount: number;
+  callCount: number;
+  totalActivities: number;
+  newContacts: number;
+  newProspects: number;
+};
+
+export async function getCRMMonthlyActivity(): Promise<CRMMonthlyActivity> {
+  const now = new Date();
+  const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+
+  const [activities, contacts, prospects] = await Promise.all([
+    supabase.from("sales_activities").select("type").gte("created_at", monthStart),
+    supabase.from("crm_contacts").select("id", { count: "exact", head: true }).gte("created_at", monthStart),
+    supabase.from("sales_pipeline").select("id", { count: "exact", head: true }).gte("created_at", monthStart),
+  ]);
+
+  const acts = activities.data ?? [];
+  return {
+    emailCount: acts.filter((a) => a.type === "email").length,
+    callCount: acts.filter((a) => a.type === "call").length,
+    totalActivities: acts.length,
+    newContacts: contacts.count ?? 0,
+    newProspects: prospects.count ?? 0,
+  };
+}
