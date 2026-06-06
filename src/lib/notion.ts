@@ -52,6 +52,7 @@ export type Tour = {
   threadIds: string[];
   startTime: string | null;
   endTime: string | null;
+  expectedRevenue?: number;
 };
 
 export type TourWithMissingStaff = Tour & { missingRoles: string[] };
@@ -600,11 +601,23 @@ export async function getAnalyticsTours(): Promise<Tour[]> {
     const PAGE = 1000;
     while (true) {
       const { data } = await supabase.from("sales")
-        .select(SALE_SELECT)
+        .select(SALE_SELECT_WITH_PRICES)
         .order("date", { ascending: false })
         .range(from, from + PAGE - 1);
       if (!data?.length) break;
-      all.push(...data.map(mapSaleRow));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      all.push(...data.map((row: any) => {
+        const tour = mapSaleRow(row);
+        const svc  = row.services ?? {};
+        const p1   = (svc.pax_2_3 ?? 0) * 2;
+        const p23  = svc.pax_2_3  ?? 0;
+        const p46  = svc.pax_4_6  ?? 0;
+        const p7   = svc.pax_7_plus ?? 0;
+        const pricePerPax = tour.numGuests >= 7 ? p7
+                          : tour.numGuests >= 4 ? p46
+                          : tour.numGuests >= 2 ? p23 : p1;
+        return { ...tour, expectedRevenue: pricePerPax * tour.numGuests };
+      }));
       if (data.length < PAGE) break;
       from += PAGE;
     }
@@ -707,9 +720,10 @@ export async function getTransactionsNeedingInvoice(): Promise<Transaction[]> {
   return (data ?? [])
     .map(mapTransactionRow)
     .filter((t) =>
-      t.precisaDeFatura === "Sim" ||
-      ((t.status === "Pending Payment" || t.status === "Pending Receipt") &&
-        !t.invoiceId && !t.invoiceImageUrl)
+      t.precisaDeFatura !== "Não" &&
+      (t.precisaDeFatura === "Sim" ||
+        ((t.status === "Pending Payment" || t.status === "Pending Receipt") &&
+          !t.invoiceId && !t.invoiceImageUrl))
     );
 }
 

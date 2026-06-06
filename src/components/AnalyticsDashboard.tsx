@@ -273,15 +273,19 @@ export function AnalyticsDashboard({
       services: number; futureSvcs: number;
       servicesByStatus: Record<string, number>;
       revenue: number; revenueByStatus: Record<string, number>;
+      billingByStatus: Record<string, number>;
     }> = {};
     for (const t of allTours) {
       if (!t.date || isCancelled(t)) continue;
       const y = new Date(t.date).getFullYear();
-      if (!map[y]) map[y] = { services: 0, futureSvcs: 0, servicesByStatus: {}, revenue: 0, revenueByStatus: {} };
+      if (!map[y]) map[y] = { services: 0, futureSvcs: 0, servicesByStatus: {}, revenue: 0, revenueByStatus: {}, billingByStatus: {} };
       map[y].services++;
       if (isTourFuture(t)) map[y].futureSvcs++;
       const s = t.status === "Canceled" ? "Cancelled" : (t.status || "Sem estado");
       map[y].servicesByStatus[s] = (map[y].servicesByStatus[s] ?? 0) + 1;
+      if (t.expectedRevenue) {
+        map[y].billingByStatus[s] = (map[y].billingByStatus[s] ?? 0) + t.expectedRevenue;
+      }
     }
     const tourStatusById = new Map(
       allTours.filter((t) => t.id).map((t) => [t.id!, t.status === "Canceled" ? "Cancelled" : (t.status || "Sem estado")])
@@ -289,7 +293,7 @@ export function AnalyticsDashboard({
     for (const t of allTransactions) {
       if (!t.date || !t.supplier.startsWith("IN -")) continue;
       const y = new Date(t.date).getFullYear();
-      if (!map[y]) map[y] = { services: 0, futureSvcs: 0, servicesByStatus: {}, revenue: 0, revenueByStatus: {} };
+      if (!map[y]) map[y] = { services: 0, futureSvcs: 0, servicesByStatus: {}, revenue: 0, revenueByStatus: {}, billingByStatus: {} };
       map[y].revenue += t.totalCost;
       const status = t.tourId ? (tourStatusById.get(t.tourId) ?? "Sem estado") : "Sem estado";
       map[y].revenueByStatus[status] = (map[y].revenueByStatus[status] ?? 0) + t.totalCost;
@@ -310,6 +314,9 @@ export function AnalyticsDashboard({
   const maxYearlyRevenue  = Math.max(...yearlyData.map((d) => d.revenue), 1);
   const hasYearlyRevenue  = yearlyData.some((d) => d.revenue > 0);
   const yearlyHasFuture   = yearlyData.some((d) => d.isFuture || d.hasFuturePartial);
+  const yearlyBillingTotals = yearlyData.map((d) => Object.values(d.billingByStatus).reduce((a, b) => a + b, 0));
+  const maxYearlyBilling    = Math.max(...yearlyBillingTotals, 1);
+  const hasYearlyBilling    = yearlyBillingTotals.some((v) => v > 0);
 
   // ── Period-filtered analytics ─────────────────────────────────────────────
   const a = useMemo(() => {
@@ -609,28 +616,26 @@ export function AnalyticsDashboard({
                   ) : null;
                 })()}
               </div>
-              {hasYearlyRevenue && (
+              {hasYearlyBilling && (
                 <>
                   <div className="border-t border-gray-50" />
                   <div>
-                    <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wide mb-3">Receita</p>
+                    <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wide mb-3">Faturação por Status</p>
+                    <p className="text-[11px] text-gray-400 mb-3 -mt-2">Faturação esperada (preço × pax) · exclui cancelados</p>
                     <StackedVBars
-                      data={yearlyData.map((d) => ({
+                      data={yearlyData.map((d, i) => ({
                         label: String(d.year),
-                        segments: d.revenueByStatus,
-                        total: d.revenue,
+                        segments: d.billingByStatus,
+                        total: yearlyBillingTotals[i],
                         isFuture: d.isFuture,
                       }))}
-                      max={maxYearlyRevenue}
+                      max={maxYearlyBilling}
                       formatValue={fmtEur}
                     />
                     {(() => {
-                      const statuses = [...new Set(yearlyData.flatMap((d) => Object.keys(d.revenueByStatus)))];
+                      const statuses = [...new Set(yearlyData.flatMap((d) => Object.keys(d.billingByStatus)))];
                       return statuses.length > 0 ? (
-                        <ChartLegend items={[
-                          ...statuses.map((s) => ({ color: STATUS_COLORS[s] ?? "bg-gray-400", label: s })),
-                          ...(yearlyHasFuture ? [{ color: "opacity-40 bg-gray-400", label: "Futuro (estimado)" }] : []),
-                        ]} />
+                        <ChartLegend items={statuses.map((s) => ({ color: STATUS_COLORS[s] ?? "bg-gray-400", label: s }))} />
                       ) : null;
                     })()}
                   </div>
