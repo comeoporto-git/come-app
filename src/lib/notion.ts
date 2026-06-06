@@ -1405,16 +1405,19 @@ export async function getDashboardMonthlyStats(): Promise<DashboardMonthlyStats>
   const prevMo = mo === 1 ? 12 : mo - 1;
   const prevYr = mo === 1 ? yr - 1 : yr;
   const lastMonthStart = `${prevYr}-${String(prevMo).padStart(2, "0")}-01`;
+  const nextMo = mo === 12 ? 1 : mo + 1;
+  const nextYr = mo === 12 ? yr + 1 : yr;
+  const nextMonthStart = `${nextYr}-${String(nextMo).padStart(2, "0")}-01`;
 
   const [salesThis, salesLast, txThis, txLast] = await Promise.all([
     supabase.from("sales").select("number_of_guests")
-      .gte("date", thisMonthStart)
+      .gte("date", thisMonthStart).lt("date", nextMonthStart)
       .not("status", "in", '("Cancelled","Canceled")'),
     supabase.from("sales").select("id")
       .gte("date", lastMonthStart).lt("date", thisMonthStart)
       .not("status", "in", '("Cancelled","Canceled")'),
     supabase.from("transactions").select("valor")
-      .gte("data", thisMonthStart).like("notion_id", "IN -%").gt("valor", 0),
+      .gte("data", thisMonthStart).lt("data", nextMonthStart).like("notion_id", "IN -%").gt("valor", 0),
     supabase.from("transactions").select("valor")
       .gte("data", lastMonthStart).lt("data", thisMonthStart).like("notion_id", "IN -%").gt("valor", 0),
   ]);
