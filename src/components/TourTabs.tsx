@@ -35,8 +35,6 @@ function formatDate(iso: string | null): string {
     weekday: "short",
     day: "numeric",
     month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
     timeZone: "Europe/Lisbon",
   });
 }
@@ -97,6 +95,9 @@ function TourCard({
             </p>
             <p className="text-xs text-gray-500 flex items-center gap-1">
               {formatDate(tour.date)}
+              {tour.startTime && (
+                <span>{tour.startTime}{tour.endTime ? ` - ${tour.endTime}` : ""}</span>
+              )}
               {hasDuplicate && (
                 <span className="inline-flex items-center gap-0.5 text-amber-600 font-semibold bg-amber-50 px-1.5 py-0 rounded-full text-[10px] leading-5">
                   ⚠ same day

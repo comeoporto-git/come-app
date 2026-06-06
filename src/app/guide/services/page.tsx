@@ -25,8 +25,6 @@ function formatDate(iso: string | null): string {
     weekday: "short",
     day: "numeric",
     month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
     timeZone: "Europe/Lisbon",
   });
 }
@@ -119,7 +117,10 @@ export default async function GuideDashboard() {
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0 space-y-1">
                           <p className="font-semibold text-sm text-white">{tour.saleId}</p>
-                          <p className="text-xs text-white/60">{formatDate(tour.date)}</p>
+                          <p className="text-xs text-white/60">
+                            {formatDate(tour.date)}
+                            {tour.startTime && <span> {tour.startTime}{tour.endTime ? ` - ${tour.endTime}` : ""}</span>}
+                          </p>
                           {tour.serviceName && (
                             <p className="text-xs text-white/60">{tour.serviceName}</p>
                           )}
