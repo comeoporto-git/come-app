@@ -720,9 +720,10 @@ export async function getTransactionsNeedingInvoice(): Promise<Transaction[]> {
   return (data ?? [])
     .map(mapTransactionRow)
     .filter((t) =>
-      t.precisaDeFatura === "Sim" ||
-      ((t.status === "Pending Payment" || t.status === "Pending Receipt") &&
-        !t.invoiceId && !t.invoiceImageUrl)
+      t.precisaDeFatura !== "Não" &&
+      (t.precisaDeFatura === "Sim" ||
+        ((t.status === "Pending Payment" || t.status === "Pending Receipt") &&
+          !t.invoiceId && !t.invoiceImageUrl))
     );
 }
 
