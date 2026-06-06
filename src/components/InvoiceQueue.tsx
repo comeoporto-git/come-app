@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import type { Transaction, Fornecedor } from "@/lib/notion";
 import { InvoiceCollectionModal } from "@/components/InvoiceCollectionModal";
+import { retryAiScanAction } from "@/actions/transactions";
 
 type Tab = "pending" | "done" | "failed";
 
@@ -29,6 +30,22 @@ export function InvoiceQueue({
 }) {
   const [tab, setTab] = useState<Tab>("pending");
   const [selected, setSelected] = useState<Transaction | null>(null);
+  const [retrying, setRetrying] = useState<string | null>(null);
+  const [retryMsg, setRetryMsg] = useState<Record<string, string>>({});
+  const [, startTransition] = useTransition();
+
+  function handleRetry(t: Transaction) {
+    setRetrying(t.id);
+    setRetryMsg((prev: Record<string, string>) => ({ ...prev, [t.id]: "" }));
+    startTransition(async () => {
+      const res = await retryAiScanAction(t.id);
+      setRetrying(null);
+      setRetryMsg((prev: Record<string, string>) => ({
+        ...prev,
+        [t.id]: res.success ? "✓ Scan OK! A mover para Por Tratar…" : (res.error ?? "Erro desconhecido"),
+      }));
+    });
+  }
 
   const list = tab === "pending" ? needingInvoice : tab === "done" ? treated : aiScanFailed;
   const isClickable = tab !== "done";
@@ -107,7 +124,7 @@ export function InvoiceQueue({
       ) : (
         <ul className="flex flex-col gap-3">
           {list.map((t) => (
-            <li key={t.id}>
+            <li key={t.id} className="flex flex-col gap-1">
               <button
                 onClick={() => isClickable && setSelected(t)}
                 className={`w-full text-left rounded-2xl p-4 border shadow-sm transition-all ${
@@ -149,6 +166,32 @@ export function InvoiceQueue({
                   </div>
                 </div>
               </button>
+              {tab === "failed" && (
+                <div className="flex flex-col gap-1">
+                  <button
+                    onClick={() => handleRetry(t)}
+                    disabled={retrying === t.id}
+                    className="w-full py-2 rounded-xl text-sm font-semibold bg-white/20 text-white hover:bg-white/30 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {retrying === t.id ? (
+                      <>
+                        <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                        </svg>
+                        A fazer scan…
+                      </>
+                    ) : (
+                      <>✨ Re-scan com AI</>
+                    )}
+                  </button>
+                  {retryMsg[t.id] && (
+                    <p className={`text-xs text-center px-2 ${retryMsg[t.id].startsWith("✓") ? "text-green-300" : "text-red-300"}`}>
+                      {retryMsg[t.id]}
+                    </p>
+                  )}
+                </div>
+              )}
             </li>
           ))}
         </ul>

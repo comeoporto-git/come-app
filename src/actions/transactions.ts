@@ -11,11 +11,14 @@ import {
   createFornecedor,
   markTransferenciaFeita,
   setComprovativoUrl,
+  getFornecedores,
+  supabase,
 } from "@/lib/notion";
 import type { Transaction, Fornecedor } from "@/lib/notion";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { notifyInvoiceAdded } from "@/lib/notifications";
+import { analyzeInvoice } from "@/actions/invoice";
 
 async function requireAuth() {
   const session = await auth();
@@ -476,4 +479,54 @@ export async function deleteEarningAction(
   }
   await archiveTransaction(transactionId);
   revalidatePath(`/guide/tours/${tourId}`);
+}
+
+export async function retryAiScanAction(
+  transactionId: string,
+): Promise<{ success: boolean; error?: string }> {
+  await requireAuth();
+
+  const { data: row } = await supabase
+    .from("transactions")
+    .select("fatura_url")
+    .eq("id", transactionId)
+    .maybeSingle();
+
+  const imageUrl = row?.fatura_url as string | null;
+  if (!imageUrl) return { success: false, error: "Sem imagem guardada para re-scan." };
+
+  let base64: string;
+  let mediaType: "image/jpeg" | "image/png" | "image/webp" | "image/gif" | "application/pdf";
+  try {
+    const res = await fetch(imageUrl);
+    const ct = res.headers.get("content-type") ?? "";
+    if (ct.includes("pdf")) mediaType = "application/pdf";
+    else if (ct.includes("png")) mediaType = "image/png";
+    else if (ct.includes("webp")) mediaType = "image/webp";
+    else mediaType = "image/jpeg";
+    const buf = await res.arrayBuffer();
+    base64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
+  } catch {
+    return { success: false, error: "Erro ao carregar a imagem." };
+  }
+
+  try {
+    const fornecedores = await getFornecedores();
+    const result = await analyzeInvoice(base64, mediaType, fornecedores.map((f: Fornecedor) => f.name));
+    await updateTransaction(transactionId, {
+      supplier: result.supplier || undefined,
+      invoiceId: result.invoiceId || "",
+      taxFree: result.taxFree,
+      iva6: result.iva6,
+      iva13: result.iva13,
+      iva23: result.iva23,
+      totalCost: result.totalCost,
+      precisaDeFatura: "Sim",
+    });
+    revalidatePath("/admin/invoices");
+    revalidatePath("/super-guide/invoices");
+    return { success: true };
+  } catch {
+    return { success: false, error: "O scan de AI falhou novamente." };
+  }
 }
