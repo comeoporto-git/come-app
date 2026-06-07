@@ -11,7 +11,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const fornecedores = await getFornecedores();
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen overflow-x-hidden">
       <AdminSidebar
         userName={session.user.name ?? ""}
         userEmail={session.user.email ?? ""}
