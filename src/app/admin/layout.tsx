@@ -18,7 +18,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         userImage={session.user.image ?? null}
         fornecedores={fornecedores}
       />
-      <div className="flex-1 md:ml-[220px] pt-12 md:pt-0 min-h-screen bg-[#667470] text-[#32373c]">
+      <div className="flex-1 min-w-0 md:ml-[220px] pt-12 md:pt-0 min-h-screen bg-[#667470] text-[#32373c]">
         {children}
       </div>
     </div>
