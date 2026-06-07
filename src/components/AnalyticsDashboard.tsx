@@ -59,11 +59,11 @@ function KpiCard({ label, value, sub, accent = false, subAccent = false }: {
   label: string; value: string; sub?: string; accent?: boolean; subAccent?: boolean;
 }) {
   return (
-    <div className={`rounded-2xl border p-4 flex flex-col gap-1 ${
+    <div className={`rounded-2xl border p-3 sm:p-4 flex flex-col gap-1 ${
       accent ? "bg-[#32373c] border-[#32373c] text-white" : "bg-white border-gray-100 shadow-sm"
     }`}>
-      <p className={`text-xs font-medium uppercase tracking-wide ${accent ? "text-white/50" : "text-gray-400"}`}>{label}</p>
-      <p className={`text-3xl font-bold ${accent ? "text-white" : "text-[#32373c]"}`}>{value}</p>
+      <p className={`text-[11px] font-medium uppercase tracking-wide leading-tight ${accent ? "text-white/50" : "text-gray-400"}`}>{label}</p>
+      <p className={`text-2xl sm:text-3xl font-bold ${accent ? "text-white" : "text-[#32373c]"}`}>{value}</p>
       {sub && (
         <p className={`text-xs ${
           subAccent ? "text-amber-300 font-semibold" : accent ? "text-white/40" : "text-gray-400"
@@ -82,7 +82,7 @@ function MiniStat({ label, value }: { label: string; value: string | number }) {
   );
 }
 
-function HBar({ label, value, max, color = "bg-[#667470]", labelWidth = "w-36", formatValue }: {
+function HBar({ label, value, max, color = "bg-[#667470]", labelWidth = "w-20 sm:w-36", formatValue }: {
   label: string; value: number; max: number; color?: string; labelWidth?: string;
   formatValue?: (v: number) => string;
 }) {
@@ -90,7 +90,7 @@ function HBar({ label, value, max, color = "bg-[#667470]", labelWidth = "w-36", 
   const realPct = max > 0 ? Math.round((value / max) * 100) : 0;
   const displayed = formatValue ? formatValue(value) : fmt(value);
   return (
-    <div className="group/hbar relative flex items-center gap-3 rounded-lg hover:bg-gray-50 -mx-1 px-1 transition-colors cursor-default">
+    <div className="group/hbar relative flex items-center gap-2 sm:gap-3 rounded-lg hover:bg-gray-50 -mx-1 px-1 transition-colors cursor-default">
       <div className="absolute left-1/2 bottom-full mb-1 -translate-x-1/2 opacity-0 group-hover/hbar:opacity-100 transition-opacity z-20 pointer-events-none">
         <div className="bg-[#32373c] text-white text-[11px] font-semibold rounded px-2 py-0.5 whitespace-nowrap shadow">
           {displayed} · {realPct}%
@@ -100,7 +100,7 @@ function HBar({ label, value, max, color = "bg-[#667470]", labelWidth = "w-36", 
       <div className="flex-1 bg-gray-100 rounded-full h-2">
         <div className={`${color} h-2 rounded-full transition-opacity group-hover/hbar:opacity-80`} style={{ width: `${pct}%` }} />
       </div>
-      <span className="text-xs font-semibold text-gray-700 w-16 text-right shrink-0">{displayed}</span>
+      <span className="text-xs font-semibold text-gray-700 w-10 sm:w-16 text-right shrink-0">{displayed}</span>
     </div>
   );
 }
@@ -500,7 +500,7 @@ export function AnalyticsDashboard({
   const periodLabel = period === 0 ? "todo o histórico" : `últimos ${period} dias`;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 overflow-x-hidden">
 
       {/* ── Period picker + range label ── */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
@@ -566,7 +566,7 @@ export function AnalyticsDashboard({
                     value={count}
                     max={a.maxStatus}
                     color={STATUS_COLORS[status] ?? "bg-gray-400"}
-                    labelWidth="w-24"
+                    labelWidth="w-16 sm:w-24"
                   />
                 ))}
               </div>
@@ -583,7 +583,7 @@ export function AnalyticsDashboard({
                     value={rev}
                     max={a.maxRevenueByStatus}
                     color={STATUS_COLORS[status] ?? "bg-gray-400"}
-                    labelWidth="w-24"
+                    labelWidth="w-16 sm:w-24"
                     formatValue={(v) => fmtEur(v)}
                   />
                 ))}
@@ -667,7 +667,7 @@ export function AnalyticsDashboard({
             {a.topCategories.length === 0 ? <EmptyState /> : (
               <div className="space-y-3">
                 {a.topCategories.map(([cat, count]) => (
-                  <HBar key={cat} label={cat} value={count} max={a.maxCategory} color="bg-violet-400" labelWidth="w-32" />
+                  <HBar key={cat} label={cat} value={count} max={a.maxCategory} color="bg-violet-400" labelWidth="w-20 sm:w-32" />
                 ))}
               </div>
             )}
@@ -678,7 +678,7 @@ export function AnalyticsDashboard({
               {a.topServices.length === 0 ? <EmptyState /> : (
                 <div className="space-y-3">
                   {a.topServices.map(([name, count]) => (
-                    <HBar key={name} label={name} value={count} max={a.maxService} labelWidth="w-28" />
+                    <HBar key={name} label={name} value={count} max={a.maxService} labelWidth="w-20 sm:w-28" />
                   ))}
                 </div>
               )}
@@ -774,7 +774,7 @@ export function AnalyticsDashboard({
                   <div className="space-y-2.5">
                     <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Top clientes · por nº de serviços</p>
                     {a.topClients.map(([name, count]) => (
-                      <HBar key={name} label={name} value={count} max={a.maxClientCount} color="bg-blue-400" labelWidth="w-32" />
+                      <HBar key={name} label={name} value={count} max={a.maxClientCount} color="bg-blue-400" labelWidth="w-20 sm:w-32" />
                     ))}
                   </div>
                 )}
@@ -783,7 +783,7 @@ export function AnalyticsDashboard({
                   <div className="space-y-2.5">
                     <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wide">Faturação por cliente</p>
                     {a.topClientsByRevenue.map(([name, revenue]) => (
-                      <HBar key={name} label={name} value={revenue} max={a.maxClientRevenue} color="bg-emerald-400" labelWidth="w-32" formatValue={fmtEur} />
+                      <HBar key={name} label={name} value={revenue} max={a.maxClientRevenue} color="bg-emerald-400" labelWidth="w-20 sm:w-32" formatValue={fmtEur} />
                     ))}
                   </div>
                 )}
@@ -812,7 +812,7 @@ export function AnalyticsDashboard({
                 <div className="space-y-2.5">
                   <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Por método de pagamento</p>
                   {a.topMethods.map(([method, total]) => (
-                    <HBar key={method} label={method} value={total} max={a.maxMethod} color="bg-orange-400" labelWidth="w-28" formatValue={fmtEur} />
+                    <HBar key={method} label={method} value={total} max={a.maxMethod} color="bg-orange-400" labelWidth="w-20 sm:w-28" formatValue={fmtEur} />
                   ))}
                 </div>
               )}

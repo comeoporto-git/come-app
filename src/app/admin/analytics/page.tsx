@@ -43,7 +43,7 @@ export default async function AnalyticsPage() {
   const clientNameMap = await resolvePageTitles(topClientIds);
 
   return (
-    <div className="min-h-screen bg-[#667470] text-[#32373c]">
+    <div className="min-h-screen bg-[#667470] text-[#32373c] overflow-x-hidden">
       <main className="max-w-6xl mx-auto px-4 py-6">
         <AnalyticsDashboard
           tours={tours}
