@@ -59,7 +59,7 @@ function KpiCard({ label, value, sub, accent = false, subAccent = false }: {
   label: string; value: string; sub?: string; accent?: boolean; subAccent?: boolean;
 }) {
   return (
-    <div className={`rounded-2xl border p-3 sm:p-4 flex flex-col gap-1 ${
+    <div className={`rounded-2xl border p-3 sm:p-4 flex flex-col gap-1 min-w-0 overflow-hidden ${
       accent ? "bg-[#32373c] border-[#32373c] text-white" : "bg-white border-gray-100 shadow-sm"
     }`}>
       <p className={`text-[11px] font-medium uppercase tracking-wide leading-tight ${accent ? "text-white/50" : "text-gray-400"}`}>{label}</p>
@@ -527,7 +527,7 @@ export function AnalyticsDashboard({
       </div>
 
       {/* ── KPIs — always visible ── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid gap-3 [grid-template-columns:repeat(2,minmax(0,1fr))] md:[grid-template-columns:repeat(4,minmax(0,1fr))]">
         <KpiCard
           label="Serviços"
           value={fmt(a.pastCompleted.length)}
