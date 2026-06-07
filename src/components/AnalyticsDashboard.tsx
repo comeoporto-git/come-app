@@ -505,7 +505,7 @@ export function AnalyticsDashboard({
   const periodLabel = period === 0 ? "todo o histórico" : `últimos ${period} dias`;
 
   return (
-    <div className="space-y-5 overflow-x-hidden">
+    <div className="space-y-5">
 
       {/* ── Period picker + range label ── */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
