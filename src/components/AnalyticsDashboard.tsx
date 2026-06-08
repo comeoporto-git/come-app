@@ -110,11 +110,11 @@ function SectionCard({ title, sub, children }: {
 }) {
   return (
     <section className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-      <div className="px-5 py-4 border-b border-gray-50">
+      <div className="px-4 sm:px-5 py-4 border-b border-gray-50">
         <h2 className="text-sm font-semibold text-[#32373c]">{title}</h2>
         {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
       </div>
-      <div className="px-5 py-4">{children}</div>
+      <div className="px-4 sm:px-5 py-4">{children}</div>
     </section>
   );
 }
@@ -532,7 +532,7 @@ export function AnalyticsDashboard({
       </div>
 
       {/* ── KPIs — always visible ── */}
-      <div className="grid gap-3 [grid-template-columns:repeat(2,minmax(0,1fr))] md:[grid-template-columns:repeat(4,minmax(0,1fr))]">
+      <div className="kpi-grid">
         <KpiCard
           label="Serviços"
           value={fmt(a.pastCompleted.length)}
