@@ -16,7 +16,7 @@ export function AnalyticsPeriodPicker({
   onChange: (days: number) => void;
 }) {
   return (
-    <div className="flex gap-1 bg-black/10 p-1 rounded-xl overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <div className="w-full flex gap-1 bg-black/10 p-1 rounded-xl overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       {PERIODS.map(({ value, label }) => (
         <button
           key={value}
