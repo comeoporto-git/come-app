@@ -90,7 +90,7 @@ function HBar({ label, value, max, color = "bg-[#667470]", labelWidth = "w-20 sm
   const realPct = max > 0 ? Math.round((value / max) * 100) : 0;
   const displayed = formatValue ? formatValue(value) : fmt(value);
   return (
-    <div className="group/hbar relative flex items-center gap-2 sm:gap-3 rounded-lg hover:bg-gray-50 -mx-1 px-1 transition-colors cursor-default">
+    <div className="group/hbar relative flex items-center gap-2 sm:gap-3 rounded-lg hover:bg-gray-50 transition-colors cursor-default">
       <div className="absolute left-1/2 bottom-full mb-1 -translate-x-1/2 opacity-0 group-hover/hbar:opacity-100 transition-opacity z-20 pointer-events-none">
         <div className="bg-[#32373c] text-white text-[11px] font-semibold rounded px-2 py-0.5 whitespace-nowrap shadow">
           {displayed} · {realPct}%
@@ -109,7 +109,7 @@ function SectionCard({ title, sub, children }: {
   title: string; sub?: string; children: React.ReactNode;
 }) {
   return (
-    <section className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+    <section className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden [transform:translateZ(0)]">
       <div className="px-4 sm:px-5 py-4 border-b border-gray-50">
         <h2 className="text-sm font-semibold text-[#32373c]">{title}</h2>
         {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
@@ -133,7 +133,7 @@ function VBars({ entries, max, color, colors, formatValue, barHeight = 88, baseV
   baseColors?: string[];
 }) {
   return (
-    <div className="flex items-end gap-2" style={{ height: `${barHeight + 32}px` }}>
+    <div className="overflow-x-hidden flex items-end gap-2" style={{ height: `${barHeight + 32}px` }}>
       {entries.map(([label, value], i) => {
         const pct       = (value / max) * 100;
         const barColor  = colors?.[i] ?? color;
@@ -144,9 +144,9 @@ function VBars({ entries, max, color, colors, formatValue, barHeight = 88, baseV
           ? `${fmt(value)} total · ${fmt(baseVal)} realizado${baseVal !== 1 ? "s" : ""}`
           : formatValue ? formatValue(value) : fmt(value);
         return (
-          <div key={label} className="group/vbar flex-1 flex flex-col items-center gap-1 h-full justify-end">
+          <div key={label} className="group/vbar flex-1 min-w-0 flex flex-col items-center gap-1 h-full justify-end">
             {value > 0 && (
-              <span className="text-xs font-semibold text-gray-500 leading-none">
+              <span className="block w-full text-center text-[10px] font-semibold text-gray-500 leading-none overflow-hidden">
                 {formatValue ? formatValue(value) : fmt(value)}
               </span>
             )}
@@ -197,14 +197,14 @@ function StackedVBars({ data, max, barHeight = 88, formatValue }: {
 }) {
   const fmtVal = (v: number) => formatValue ? formatValue(v) : fmt(v);
   return (
-    <div className="flex items-end gap-2" style={{ height: `${barHeight + 32}px` }}>
+    <div className="overflow-x-hidden flex items-end gap-2" style={{ height: `${barHeight + 32}px` }}>
       {data.map(({ label, segments: seg, total, isFuture }) => {
         const totalPct = max > 0 ? (total / max) * 100 : 0;
         const entries  = Object.entries(seg).sort((a, b) => b[1] - a[1]);
         return (
-          <div key={label} className="group/svbar flex-1 flex flex-col items-center gap-1 h-full justify-end">
+          <div key={label} className="group/svbar flex-1 min-w-0 flex flex-col items-center gap-1 h-full justify-end">
             {total > 0 && (
-              <span className="text-xs font-semibold text-gray-500 leading-none">{fmtVal(total)}</span>
+              <span className="block w-full text-center text-[10px] font-semibold text-gray-500 leading-none overflow-hidden">{fmtVal(total)}</span>
             )}
             <div className="w-full relative" style={{ height: `${barHeight}px` }}>
               <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-full -mt-1 opacity-0 group-hover/svbar:opacity-100 transition-opacity z-30 pointer-events-none">
