@@ -28,7 +28,6 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
   overflow-x: hidden;
-  max-width: 100vw;
 }
 
 /* Shared input style */
@@ -49,4 +48,16 @@ body {
 .input:focus {
   box-shadow: 0 0 0 2px #66747033;
   border-color: #667470;
+}
+
+/* KPI grid — plain CSS to guarantee minmax(0,1fr) regardless of Tailwind processing */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+@media (min-width: 768px) {
+  .kpi-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
