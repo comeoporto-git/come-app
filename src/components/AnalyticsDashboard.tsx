@@ -500,16 +500,16 @@ export function AnalyticsDashboard({
   const periodLabel = period === 0 ? "todo o histórico" : `últimos ${period} dias`;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 w-full overflow-x-hidden">
 
       {/* ── Period picker + range label ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+      <div className="w-full flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <AnalyticsPeriodPicker current={period} onChange={setPeriod} />
         <p className="text-xs text-white/40 font-medium">{a.rangeLbl}</p>
       </div>
 
       {/* ── Category buttons ── */}
-      <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="w-full flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {CATEGORIES.map(({ id, label, icon }) => (
           <button
             key={id}

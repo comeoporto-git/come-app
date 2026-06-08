@@ -60,7 +60,7 @@ export default async function SuperGuideAnalyticsPage() {
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 py-6">
+      <main className="w-full max-w-6xl mx-auto px-4 py-6 overflow-x-hidden">
         <AnalyticsDashboard
           tours={tours}
           transactions={transactions}

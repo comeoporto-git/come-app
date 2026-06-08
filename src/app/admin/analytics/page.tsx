@@ -44,7 +44,7 @@ export default async function AnalyticsPage() {
 
   return (
     <div className="min-h-screen bg-[#667470] text-[#32373c] overflow-x-hidden">
-      <main className="max-w-6xl mx-auto px-4 py-6">
+      <main className="w-full max-w-6xl mx-auto px-4 py-6 overflow-x-hidden">
         <AnalyticsDashboard
           tours={tours}
           transactions={transactions}
