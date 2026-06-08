@@ -585,6 +585,27 @@ export async function getFinalisedSales(): Promise<FinalisedSale[]> {
   });
 }
 
+export async function getInvoicedSales(): Promise<FinalisedSale[]> {
+  const { data } = await supabase.from("sales")
+    .select(SALE_SELECT_WITH_PRICES)
+    .eq("status", "Invoiced")
+    .order("date", { ascending: false });
+
+  return (data ?? []).map((row) => {
+    const tour = mapSaleRow(row);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const svc  = (row as any).services ?? {};
+    const p1   = (svc.pax_2_3 ?? 0) * 2;
+    const p23  = svc.pax_2_3  ?? 0;
+    const p46  = svc.pax_4_6  ?? 0;
+    const p7   = svc.pax_7_plus ?? 0;
+    const pricePerPax = tour.numGuests >= 7 ? p7
+                      : tour.numGuests >= 4 ? p46
+                      : tour.numGuests >= 2 ? p23 : p1;
+    return { ...tour, price1: p1, price23: p23, price46: p46, price7: p7, pricePerPax };
+  });
+}
+
 export async function getFinalisedSalesCount(): Promise<number> {
   try {
     const { count } = await supabase.from("sales")
