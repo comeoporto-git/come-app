@@ -384,7 +384,7 @@ export function AnalyticsDashboard({
       if (!s) continue;
       revenueByStatus[s] = (revenueByStatus[s] ?? 0) + tx.totalCost;
     }
-    const topRevenueByStatus = Object.entries(revenueByStatus).filter(([s]) => s === "Paid").sort((a, b) => b[1] - a[1]);
+    const topRevenueByStatus = Object.entries(revenueByStatus).sort((a, b) => b[1] - a[1]);
     const maxRevenueByStatus = Math.max(...topRevenueByStatus.map(([, v]) => v), 1);
 
     // By service name
