@@ -32,7 +32,7 @@ export async function updateTeamMemberRoleAction(
   }
   try {
     await updateTeamMemberRole(memberId, role);
-    revalidateTag("team-members");
+    revalidateTag("team-members", "max");
     revalidatePath("/admin");
     return {};
   } catch (err) {
