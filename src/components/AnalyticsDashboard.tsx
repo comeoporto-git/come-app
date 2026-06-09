@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { AnalyticsPeriodPicker } from "@/components/AnalyticsPeriodPicker";
+import { AnalyticsDateRangePicker, type DateRange } from "@/components/AnalyticsDateRangePicker";
 import type { Tour, Transaction } from "@/lib/notion";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -264,7 +264,10 @@ export function AnalyticsDashboard({
   teamMap: Record<string, string>;
   clientNameMap: Record<string, string>;
 }) {
-  const [period,   setPeriod]   = useState(180);
+  const [dateRange, setDateRange] = useState<DateRange>({
+    start: new Date(Date.now() - 180 * 86_400_000),
+    end: null,
+  });
   const [category, setCategory] = useState<Category>("resumo");
 
   // ── By year (always full history) ──────────────────────────────────────────
@@ -318,11 +321,23 @@ export function AnalyticsDashboard({
   const maxYearlyBilling    = Math.max(...yearlyBillingTotals, 1);
   const hasYearlyBilling    = yearlyBillingTotals.some((v) => v > 0);
 
-  // ── Period-filtered analytics ─────────────────────────────────────────────
+  // ── Date-range-filtered analytics ────────────────────────────────────────
   const a = useMemo(() => {
-    const cutoff = period === 0 ? new Date(0) : new Date(Date.now() - period * 86_400_000);
-    const tours  = allTours.filter((t) => t.date && new Date(t.date) >= cutoff);
-    const txns   = allTransactions.filter((t) => t.date && new Date(t.date) >= cutoff);
+    const { start, end } = dateRange;
+    const tours = allTours.filter((t) => {
+      if (!t.date) return false;
+      const d = new Date(t.date);
+      if (start && d < start) return false;
+      if (end   && d > end)   return false;
+      return true;
+    });
+    const txns = allTransactions.filter((t) => {
+      if (!t.date) return false;
+      const d = new Date(t.date);
+      if (start && d < start) return false;
+      if (end   && d > end)   return false;
+      return true;
+    });
 
     const completed       = tours.filter((t) => !isCancelled(t));
     const cancelled       = tours.filter((t) => isCancelled(t));
@@ -335,11 +350,15 @@ export function AnalyticsDashboard({
     const avgGroup    = completed.length > 0 ? totalGuests / completed.length : 0;
     const cancelRate  = tours.length > 0 ? (cancelled.length / tours.length) * 100 : 0;
 
-    // Monthly trend — past N months + any future months that have bookings
-    const numMonths = period === 0 ? 12 : period <= 30 ? 1 : period <= 90 ? 3 : period <= 180 ? 6 : 12;
+    // Monthly trend — span of selected range
+    const effectiveEnd = end ?? new Date();
+    const diffDays = start
+      ? (effectiveEnd.getTime() - start.getTime()) / 86_400_000
+      : Infinity;
+    const numMonths = diffDays > 180 ? 12 : diffDays > 60 ? 6 : diffDays > 20 ? 3 : 1;
     const monthlyMap: Record<string, number> = {};
     for (let i = numMonths - 1; i >= 0; i--) {
-      const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - i);
+      const d = new Date(effectiveEnd); d.setDate(1); d.setMonth(d.getMonth() - i);
       monthlyMap[monthKey(d)] = 0;
     }
     // Add any future months that aren't already in the window
@@ -473,11 +492,12 @@ export function AnalyticsDashboard({
     const maxMethod  = Math.max(...topMethods.map(([, v]) => v), 1);
 
     // Range label
-    const now      = new Date();
-    const fromDate = new Date(Date.now() - period * 86_400_000);
-    const rangeLbl = period === 0
+    const fmtDate = (d: Date) => d.toLocaleDateString("pt-PT", { day: "numeric", month: "short", year: "numeric" });
+    const rangeLbl = !start
       ? `Todo o histórico · ${allTours.length} serviços carregados`
-      : `${fromDate.toLocaleDateString("pt-PT", { day: "numeric", month: "short", year: "numeric" })} – ${now.toLocaleDateString("pt-PT", { day: "numeric", month: "short", year: "numeric" })}`;
+      : end
+      ? `${fmtDate(start)} – ${fmtDate(end)}`
+      : `${fmtDate(start)} – hoje`;
 
     return {
       completed, cancelled, pastCompleted, futureCompleted, hasFuture,
@@ -495,16 +515,21 @@ export function AnalyticsDashboard({
       totalExpenses, totalEarnings, expPerTour, topMethods, maxMethod,
       rangeLbl,
     };
-  }, [allTours, allTransactions, teamMap, clientNameMap, period]);
+  }, [allTours, allTransactions, teamMap, clientNameMap, dateRange]);
 
-  const periodLabel = period === 0 ? "todo o histórico" : `últimos ${period} dias`;
+  const periodLabel = (() => {
+    const { start, end } = dateRange;
+    if (!start) return "todo o histórico";
+    const fmtDate = (d: Date) => d.toLocaleDateString("pt-PT", { day: "numeric", month: "short", year: "numeric" });
+    return end ? `${fmtDate(start)} – ${fmtDate(end)}` : `desde ${fmtDate(start)}`;
+  })();
 
   return (
     <div className="space-y-5 w-full overflow-x-hidden">
 
       {/* ── Period picker + range label ── */}
       <div className="w-full flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-        <AnalyticsPeriodPicker current={period} onChange={setPeriod} />
+        <AnalyticsDateRangePicker value={dateRange} onChange={setDateRange} />
         <p className="text-xs text-white/40 font-medium">{a.rangeLbl}</p>
       </div>
 
@@ -646,7 +671,7 @@ export function AnalyticsDashboard({
         <div className="space-y-6">
           <SectionCard
             title="Tendência Mensal"
-            sub={period === 0 ? "Últimos 12 meses" : "Serviços por mês"}
+            sub={!dateRange.start ? "Últimos 12 meses" : "Serviços por mês"}
           >
             <VBars
               entries={a.monthlyEntries.map(([k, v]) => [monthLabel(k), v])}
