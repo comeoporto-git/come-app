@@ -10,15 +10,19 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   const fornecedores = await getFornecedores();
 
+  const isAccountant = session.user.role === "Accountant";
+
   return (
     <div className="flex min-h-screen overflow-x-hidden">
-      <AdminSidebar
-        userName={session.user.name ?? ""}
-        userEmail={session.user.email ?? ""}
-        userImage={session.user.image ?? null}
-        fornecedores={fornecedores}
-      />
-      <div className="flex-1 min-w-0 md:ml-[220px] pt-12 md:pt-0 min-h-screen bg-[#667470] text-[#32373c]">
+      {!isAccountant && (
+        <AdminSidebar
+          userName={session.user.name ?? ""}
+          userEmail={session.user.email ?? ""}
+          userImage={session.user.image ?? null}
+          fornecedores={fornecedores}
+        />
+      )}
+      <div className={`flex-1 min-w-0 ${!isAccountant ? "md:ml-[220px] pt-12 md:pt-0" : ""} min-h-screen bg-[#667470] text-[#32373c]`}>
         {children}
       </div>
     </div>
