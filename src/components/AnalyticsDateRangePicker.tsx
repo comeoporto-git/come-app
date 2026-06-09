@@ -25,37 +25,51 @@ function addMonths(d: Date, n: number) {
   const r = new Date(d); r.setDate(1); r.setMonth(r.getMonth() + n); return r;
 }
 
-const PRESET_GROUPS: { heading: string; items: { label: string; range: DateRange }[] }[] = [
-  {
-    heading: "Passado",
-    items: (() => {
-      const ago = (days: number) => {
-        const d = new Date(); d.setDate(d.getDate() - days); d.setHours(0,0,0,0); return d;
-      };
-      return [
-        { label: "30 dias",  range: { start: ago(30),  end: null } },
-        { label: "3 meses",  range: { start: ago(90),  end: null } },
-        { label: "6 meses",  range: { start: ago(180), end: null } },
-        { label: "12 meses", range: { start: ago(365), end: null } },
-        { label: "Tudo",     range: { start: null,     end: null } },
-      ];
-    })(),
-  },
-  {
-    heading: "Futuro",
-    items: (() => {
-      const t = new Date(); t.setHours(0,0,0,0);
-      const ahead = (days: number) => {
-        const d = new Date(); d.setDate(d.getDate() + days); d.setHours(23,59,59,999); return d;
-      };
-      return [
-        { label: "Próx. mês",     range: { start: t, end: ahead(30)  } },
-        { label: "Próx. 3 meses", range: { start: t, end: ahead(90)  } },
-        { label: "Próx. 6 meses", range: { start: t, end: ahead(180) } },
-      ];
-    })(),
-  },
-];
+const PRESET_GROUPS: { heading: string; items: { label: string; range: DateRange }[] }[] = (() => {
+  const ago = (days: number) => {
+    const d = new Date(); d.setDate(d.getDate() - days); d.setHours(0, 0, 0, 0); return d;
+  };
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const ahead = (days: number) => {
+    const d = new Date(); d.setDate(d.getDate() + days); d.setHours(23, 59, 59, 999); return d;
+  };
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const endOfMonth   = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+  const startOfYear  = new Date(now.getFullYear(), 0, 1);
+  const endOfYear    = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
+
+  return [
+    {
+      heading: "Passado",
+      items: [
+        { label: "7 dias",  range: { start: ago(7),   end: null } },
+        { label: "30 dias", range: { start: ago(30),  end: null } },
+        { label: "3 meses", range: { start: ago(90),  end: null } },
+        { label: "6 meses", range: { start: ago(180), end: null } },
+        { label: "1 ano",   range: { start: ago(365), end: null } },
+        { label: "Tudo",    range: { start: null,      end: null } },
+      ],
+    },
+    {
+      heading: "Este período",
+      items: [
+        { label: "Este mês", range: { start: startOfMonth, end: endOfMonth } },
+        { label: "Este ano", range: { start: startOfYear,  end: endOfYear  } },
+      ],
+    },
+    {
+      heading: "Futuro",
+      items: [
+        { label: "Próx. 7 dias",  range: { start: today, end: ahead(7)   } },
+        { label: "Próx. 30 dias", range: { start: today, end: ahead(30)  } },
+        { label: "Próx. 3 meses", range: { start: today, end: ahead(90)  } },
+        { label: "Próx. 6 meses", range: { start: today, end: ahead(180) } },
+        { label: "Próx. 1 ano",   range: { start: today, end: ahead(365) } },
+      ],
+    },
+  ];
+})();
 
 function isPresetActive(range: DateRange, value: DateRange): boolean {
   if ((range.start === null) !== (value.start === null)) return false;
