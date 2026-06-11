@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 export default async function ConfiguracoesPage() {
   const { data, error } = await supabase
     .from("business_rules")
-    .select("key, value, description, updated_at")
+    .select("name, value, notes")
     .order("key");
 
   const rules = data ?? [];

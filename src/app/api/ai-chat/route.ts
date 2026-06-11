@@ -72,8 +72,8 @@ async function getBusinessSnapshot() {
       .order("name"),
     supabase
       .from("business_rules")
-      .select("key, value, description")
-      .order("key"),
+      .select("name, value, notes")
+      .order("name"),
   ]);
 
   // type is stored as "Earning" or "Expense" (capital); valor is positive for earnings, negative for expenses
@@ -110,14 +110,14 @@ async function getBusinessSnapshot() {
 
   // Convert rules array to a plain object for easy AI consumption
   const rules: Record<string, string> = {};
-  for (const r of rulesRows ?? []) rules[r.key] = r.value;
+  for (const r of rulesRows ?? []) rules[r.name] = r.value;
 
   return {
     today: todayStr,
     upcomingWindowEnd: in90Days,
     company: "COME Porto — Premium food tours and corporate events company based in Porto, Portugal",
-    businessRules: rulesRows?.map((r) => ({ key: r.key, value: r.value, description: r.description })) ?? [],
-    _rules: rules, // flat map for fast AI lookup
+    businessRules: rulesRows?.map((r) => ({ name: r.name, value: r.value, notes: r.notes })) ?? [],
+    _rules: rules,
     team: (team ?? []).map((m) => ({ name: m.name, role: m.role })),
     services: (services ?? []).map((sv) => ({
       name: sv.name,
@@ -198,7 +198,7 @@ export async function POST(req: NextRequest) {
   // Build rules block dynamically from DB
   const rulesBlock = snapshot.businessRules.length > 0
     ? snapshot.businessRules
-        .map((r) => `- **${r.key}** = ${r.value}${r.description ? ` — ${r.description}` : ""}`)
+        .map((r) => `- **${r.name}** = ${r.value}${r.notes ? ` — ${r.notes}` : ""}`)
         .join("\n")
     : "- No rules configured in DB yet.";
 
