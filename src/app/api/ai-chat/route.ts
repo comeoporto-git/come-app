@@ -11,6 +11,8 @@ async function getBusinessSnapshot() {
   const thisMonthEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split("T")[0];
   const thisYearStart  = `${now.getFullYear()}-01-01`;
   const thisYearEnd    = `${now.getFullYear()}-12-31`;
+  const lastYearStart  = `${now.getFullYear() - 1}-01-01`;
+  const lastYearEnd    = `${now.getFullYear() - 1}-12-31`;
   const todayStr       = now.toISOString().split("T")[0];
   const in90Days       = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
 
@@ -25,8 +27,10 @@ async function getBusinessSnapshot() {
     { data: upcomingSales },
     { data: thisMonthSales },
     { data: thisYearSales },
+    { data: lastYearSales },
     { data: thisMonthTx },
     { data: thisYearTx },
+    { data: lastYearTx },
     { data: pipeline },
     { data: team },
     { data: services },
@@ -47,25 +51,40 @@ async function getBusinessSnapshot() {
       .gte("date", thisMonthStart)
       .lte("date", thisMonthEnd)
       .neq("status", "Cancelado"),
-    // YTD sales for totals
+    // Full current year sales
     supabase
       .from("sales")
       .select(SALE_SELECT)
       .gte("date", thisYearStart)
       .lte("date", thisYearEnd)
-      .neq("status", "Cancelado"),
+      .neq("status", "Cancelado")
+      .order("date", { ascending: true }),
+    // Full last year sales
+    supabase
+      .from("sales")
+      .select(SALE_SELECT)
+      .gte("date", lastYearStart)
+      .lte("date", lastYearEnd)
+      .neq("status", "Cancelado")
+      .order("date", { ascending: true }),
     // Full month transactions (earnings already recorded)
     supabase
       .from("transactions")
       .select("id, supplier, valor, date, who_paid, status, accountant_verified, type")
       .gte("date", thisMonthStart)
       .lte("date", thisMonthEnd),
-    // YTD transactions
+    // Current year transactions
     supabase
       .from("transactions")
       .select("id, supplier, valor, date, who_paid, status, accountant_verified, type")
       .gte("date", thisYearStart)
       .lte("date", thisYearEnd),
+    // Last year transactions
+    supabase
+      .from("transactions")
+      .select("id, supplier, valor, date, who_paid, status, accountant_verified, type")
+      .gte("date", lastYearStart)
+      .lte("date", lastYearEnd),
     supabase
       .from("sales_pipeline")
       .select("id, name, stage, industry, country, company_size, last_contacted_at, notes")
@@ -158,6 +177,7 @@ async function getBusinessSnapshot() {
         .map((t) => ({ supplier: t.supplier, amount: Math.abs(t.valor ?? 0), date: t.date, who_paid: t.who_paid })),
     },
     thisYear: {
+      year: now.getFullYear(),
       salesCount: (thisYearSales ?? []).length,
       totalGuests: (thisYearSales ?? []).reduce((s, t) => s + (t.number_of_guests ?? 0), 0),
       projectedRevenue: (thisYearSales ?? [])
@@ -172,6 +192,22 @@ async function getBusinessSnapshot() {
         .filter((t) => t.type === "Expense")
         .reduce((s, t) => s + Math.abs(t.valor ?? 0), 0)
         .toFixed(2),
+      // Full list so AI can filter by guide, month, service, etc.
+      sales: (thisYearSales ?? []).map(mapSale),
+    },
+    lastYear: {
+      year: now.getFullYear() - 1,
+      salesCount: (lastYearSales ?? []).length,
+      totalGuests: (lastYearSales ?? []).reduce((s, t) => s + (t.number_of_guests ?? 0), 0),
+      recordedEarnings: (lastYearTx ?? [])
+        .filter((t) => t.type === "Earning")
+        .reduce((s, t) => s + Math.abs(t.valor ?? 0), 0)
+        .toFixed(2),
+      recordedExpenses: (lastYearTx ?? [])
+        .filter((t) => t.type === "Expense")
+        .reduce((s, t) => s + Math.abs(t.valor ?? 0), 0)
+        .toFixed(2),
+      sales: (lastYearSales ?? []).map(mapSale),
     },
     crm: {
       totalAccounts: (pipeline ?? []).length,
@@ -222,7 +258,7 @@ export async function POST(req: NextRequest) {
 
   const systemPrompt = `You are the business assistant for COME Porto, a premium food tours and corporate events company based in Porto, Portugal.
 
-You have access to real-time business data including ALL upcoming bookings for the next 90 days (in snapshot.upcoming.bookings). Use this data to answer questions precisely.
+You have access to complete business data: all sales from last year (snapshot.lastYear.sales), all sales from this year (snapshot.thisYear.sales), all upcoming bookings for the next 90 days (snapshot.upcoming.bookings), and financial transactions. Use this data to answer any historical or future question precisely — never say you don't have access to historical data.
 
 ## Business rules (from database — these are authoritative)
 ${rulesBlock}
@@ -253,7 +289,7 @@ When asked about availability for a date + service:
 - When the data doesn't cover something (e.g., external calendars, real-time guide availability), say so clearly.
 - Respond in the same language the user writes in (Portuguese if they write Portuguese, English if English).
 
-Current business data (today: ${snapshot.today}, upcoming window until: ${snapshot.upcomingWindowEnd}):
+Current business data (today: ${snapshot.today}, data covers: ${snapshot.lastYear.year} full year + ${snapshot.thisYear.year} full year + upcoming window until ${snapshot.upcomingWindowEnd}):
 ${JSON.stringify(snapshot, null, 2)}`;
 
   const encoder = new TextEncoder();
