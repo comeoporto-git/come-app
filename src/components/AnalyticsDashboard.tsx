@@ -474,7 +474,7 @@ export function AnalyticsDashboard({
     for (const t of allTours) { if (t.id && t.client) tourClientMap[t.id] = t.client; }
     const revenueByClient: Record<string, number> = {};
     for (const tx of txns) {
-      if (!tx.supplier.startsWith("IN -") || !tx.tourId) continue;
+      if (!(tx.supplier.startsWith("IN -") || tx.txType === "Earning") || !tx.tourId) continue;
       const cid = tourClientMap[tx.tourId];
       if (!cid) continue;
       revenueByClient[cid] = (revenueByClient[cid] ?? 0) + tx.totalCost;
@@ -485,8 +485,15 @@ export function AnalyticsDashboard({
     const maxClientRevenue = Math.max(...topClientsByRevenue.map(([, v]) => v), 1);
 
     // Expenses & revenue (past transactions only — future txns not expected)
-    const expenses      = txns.filter((t) => !t.supplier.startsWith("IN -"));
-    const earnings      = txns.filter((t) => t.supplier.startsWith("IN -"));
+    const cancelledTourIds = new Set(
+      allTours.filter(isCancelled).map((t) => t.id).filter((id): id is string => !!id)
+    );
+    const isEarning = (t: typeof txns[0]) => t.supplier.startsWith("IN -") || t.txType === "Earning";
+    // Earnings from cancelled tours are excluded from revenue (costs still count)
+    const isBillableEarning = (t: typeof txns[0]) =>
+      isEarning(t) && (!t.tourId || !cancelledTourIds.has(t.tourId));
+    const expenses      = txns.filter((t) => !isEarning(t));
+    const earnings      = txns.filter(isBillableEarning);
     const totalExpenses = expenses.reduce((s, t) => s + t.totalCost, 0);
     const totalEarnings = earnings.reduce((s, t) => s + t.totalCost, 0);
     const expPerTour    = pastCompleted.length > 0 ? totalExpenses / pastCompleted.length : 0;
@@ -510,9 +517,9 @@ export function AnalyticsDashboard({
     for (const t of txns) {
       if (!t.date) continue;
       const k = monthKey(new Date(t.date));
-      if (t.supplier.startsWith("IN -")) {
+      if (isBillableEarning(t)) {
         finRevMap[k] = (finRevMap[k] ?? 0) + t.totalCost;
-      } else {
+      } else if (!isEarning(t)) {
         finCostMap[k] = (finCostMap[k] ?? 0) + Math.abs(t.totalCost);
       }
     }

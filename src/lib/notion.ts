@@ -90,6 +90,7 @@ export type Transaction = {
   paidByName?: string;
   payeeIban?: string;
   contaPagamento?: string;
+  txType?: "Earning" | "Expense";
 };
 
 export type Fornecedor = {
@@ -172,6 +173,7 @@ function mapTransactionRow(row: any): Transaction {
     transferenciaFeita: row.transferencia_feita ?? false,
     comprovantivoUrl:   row.comprovativo_url    ?? undefined,
     contaPagamento:     row.conta_pagamento     ?? undefined,
+    txType:             (row.type as "Earning" | "Expense" | undefined) ?? undefined,
   };
 }
 
@@ -185,7 +187,7 @@ const SALE_SELECT = `
   driver:team!sales_driver_id_fkey(name)
 `.trim();
 
-const TX_SELECT = `*, sales!transactions_sale_id_fkey(notion_id)`;
+const TX_SELECT = `*, type, sales!transactions_sale_id_fkey(notion_id)`;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
