@@ -10,30 +10,42 @@ async function getBusinessSnapshot() {
   const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0];
   const thisYearStart = `${now.getFullYear()}-01-01`;
   const todayStr = now.toISOString().split("T")[0];
+  const in90Days = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+
+  const SALE_SELECT = `id, date, status, number_of_guests, expenses_closed, start_time, end_time,
+    services(name, type, equipa),
+    clients(name),
+    guide:guide_id(name),
+    chef:chef_id(name)`;
 
   const [
-    { data: recentSales },
+    { data: upcomingSales },
     { data: thisMonthSales },
     { data: thisYearSales },
     { data: thisMonthTx },
     { data: thisYearTx },
     { data: pipeline },
     { data: team },
-    { data: clients },
+    { data: services },
   ] = await Promise.all([
+    // All bookings from today + 90 days (for availability queries)
     supabase
       .from("sales")
-      .select("id, date, status, number_of_guests, expenses_closed, services(name, type), clients(name)")
-      .order("date", { ascending: false })
-      .limit(20),
+      .select(SALE_SELECT)
+      .gte("date", todayStr)
+      .lte("date", in90Days)
+      .neq("status", "Cancelado")
+      .order("date", { ascending: true }),
+    // This month (past + today) for financial/ops stats
     supabase
       .from("sales")
-      .select("id, date, status, number_of_guests, services(name, type), clients(name)")
+      .select(SALE_SELECT)
       .gte("date", thisMonthStart)
       .lte("date", todayStr),
+    // YTD count
     supabase
       .from("sales")
-      .select("id, date, status, number_of_guests, services(name, type), clients(name)")
+      .select("id, date, number_of_guests")
       .gte("date", thisYearStart)
       .lte("date", todayStr),
     supabase
@@ -54,8 +66,8 @@ async function getBusinessSnapshot() {
       .from("team")
       .select("id, name, role, email"),
     supabase
-      .from("clients")
-      .select("id, name")
+      .from("services")
+      .select("id, name, type, equipa")
       .order("name"),
   ]);
 
@@ -74,23 +86,41 @@ async function getBusinessSnapshot() {
     pipelineByStage[s] = (pipelineByStage[s] ?? 0) + 1;
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function mapSale(s: any) {
+    return {
+      service: s.services?.name ?? "",
+      serviceType: s.services?.type ?? "",
+      requiredRoles: s.services?.equipa ?? [],
+      client: s.clients?.name ?? "",
+      date: s.date,
+      guests: s.number_of_guests,
+      status: s.status,
+      startTime: s.start_time ?? null,
+      endTime: s.end_time ?? null,
+      guide: s.guide?.name ?? null,
+      chef: s.chef?.name ?? null,
+    };
+  }
+
   return {
     today: todayStr,
+    upcomingWindowEnd: in90Days,
     company: "COME Porto — Premium food tours and corporate events company based in Porto, Portugal",
     team: (team ?? []).map((m) => ({ name: m.name, role: m.role })),
-    clients: (clients ?? []).map((c) => c.name),
+    services: (services ?? []).map((sv) => ({
+      name: sv.name,
+      type: sv.type,
+      requiredRoles: sv.equipa ?? [],
+    })),
+    upcoming: {
+      salesCount: (upcomingSales ?? []).length,
+      bookings: (upcomingSales ?? []).map(mapSale),
+    },
     thisMonth: {
       salesCount: (thisMonthSales ?? []).length,
       totalGuests: (thisMonthSales ?? []).reduce((s, t) => s + (t.number_of_guests ?? 0), 0),
-      sales: (thisMonthSales ?? []).map((s) => ({
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        service: (s.services as any)?.name ?? "",
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        client: (s.clients as any)?.name ?? "",
-        date: s.date,
-        guests: s.number_of_guests,
-        status: s.status,
-      })),
+      sales: (thisMonthSales ?? []).map(mapSale),
       expenses: monthExpenses.toFixed(2),
       earnings: monthEarnings.toFixed(2),
       transactions: (thisMonthTx ?? []).map((t) => ({
@@ -105,16 +135,6 @@ async function getBusinessSnapshot() {
       salesCount: (thisYearSales ?? []).length,
       totalGuests: (thisYearSales ?? []).reduce((s, t) => s + (t.number_of_guests ?? 0), 0),
     },
-    recentSales: (recentSales ?? []).slice(0, 10).map((s) => ({
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      service: (s.services as any)?.name ?? "",
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      client: (s.clients as any)?.name ?? "",
-      date: s.date,
-      guests: s.number_of_guests,
-      status: s.status,
-      expensesClosed: s.expenses_closed === "Closed",
-    })),
     crm: {
       totalAccounts: (pipeline ?? []).length,
       byStage: pipelineByStage,
@@ -151,11 +171,24 @@ export async function POST(req: NextRequest) {
     snapshot = { today: new Date().toISOString().split("T")[0] } as never;
   }
 
-  const systemPrompt = `You are the business assistant for COME Porto, a premium food tours and corporate events company based in Porto, Portugal. You have access to real-time business data shown below.
+  const systemPrompt = `You are the business assistant for COME Porto, a premium food tours and corporate events company based in Porto, Portugal.
 
-Answer questions about the company's operations, sales, finances, CRM pipeline, and team. Be concise and precise. Use numbers when available. Respond in the same language the user writes in (Portuguese if they write in Portuguese, English if in English).
+You have access to real-time business data including ALL upcoming bookings for the next 90 days (in snapshot.upcoming.bookings). Use this data to answer questions precisely.
 
-Current business data (today: ${snapshot.today}):
+## Availability rules
+- A date is "available" for a given tour/service if there is no existing active booking (status != Cancelado) for the SAME service on that date, OR if the team has enough staff to run concurrent tours.
+- COME Porto CAN run multiple tours on the same day as long as there are enough guides/chefs.
+- To check availability for a specific date + service: look in snapshot.upcoming.bookings for entries where date matches AND service name matches the requested tour.
+- If no booking exists for that service on that date → likely available (but guide/chef assignment still needs to be confirmed).
+- If a booking already exists for that service on that date → flag it and check if a second run is feasible given team size.
+- The team list (snapshot.team) shows all available staff and their roles.
+
+## General rules
+- Be concise and precise. Use the actual data, never guess.
+- When the data doesn't cover something (e.g., external calendars, Calendly, real-time guide availability), say so clearly.
+- Respond in the same language the user writes in (Portuguese if they write Portuguese, English if English).
+
+Current business data (today: ${snapshot.today}, upcoming window until: ${snapshot.upcomingWindowEnd}):
 ${JSON.stringify(snapshot, null, 2)}`;
 
   const encoder = new TextEncoder();
