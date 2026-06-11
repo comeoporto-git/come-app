@@ -22,7 +22,6 @@ const STATUS_COLORS: Record<string, string> = {
   Confirmed: "bg-green-100 text-green-700",
   Pending:   "bg-yellow-100 text-yellow-700",
   Cancelled: "bg-red-100 text-red-700",
-  Canceled:  "bg-red-100 text-red-700",
 };
 
 export default async function AdminToursPage() {
@@ -56,7 +55,7 @@ export default async function AdminToursPage() {
                 return (
                   <Link key={tour.id} href={`/guide/tours/${tour.id}`}>
                     <li className={`rounded-2xl p-5 shadow-sm border transition-all active:scale-[0.98] cursor-pointer ${
-                      (tour.status === "Canceled" || tour.status === "Cancelled")
+                      tour.status === "Cancelled"
                         ? "bg-gray-100 border-gray-200 opacity-60 text-[#32373c]"
                         : "bg-[#32373c] border-[#32373c] text-white"
                     }`}>

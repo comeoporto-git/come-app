@@ -81,7 +81,7 @@ export default async function SuperGuideServicosPage() {
                 return (
                   <Link key={tour.id} href={`/guide/tours/${tour.id}`}>
                     <li className={`rounded-2xl p-5 shadow-sm border transition-all active:scale-[0.98] cursor-pointer ${
-                      (tour.status === "Canceled" || tour.status === "Cancelled")
+                      tour.status === "Cancelled"
                         ? "bg-gray-100 border-gray-200 opacity-60 text-[#32373c]"
                         : "bg-[#32373c] border-[#32373c] text-white"
                     }`}>

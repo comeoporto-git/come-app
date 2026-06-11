@@ -391,7 +391,7 @@ export async function getServicesWithMissingInfo(): Promise<Tour[]> {
   return (data ?? [])
     .map(mapSaleRow)
     .filter((t) =>
-      t.status !== "Cancelled" && t.status !== "Canceled" &&
+      t.status !== "Cancelled" &&
       (!t.numGuests || !t.names || !t.phoneNumber || !t.clientName || !t.notes)
     );
 }
@@ -417,7 +417,7 @@ export async function getServicesWithMissingStaff(): Promise<TourWithMissingStaf
       .order("date");
     return (data ?? [])
       .map(mapSaleRow)
-      .filter((t) => t.status !== "Cancelled" && t.status !== "Canceled")
+      .filter((t) => t.status !== "Cancelled")
       .filter((t) => t.serviceEquipa.length > 0)
       .map((t) => ({ ...t, missingRoles: getMissingStaffRoles(t) }))
       .filter((t) => t.missingRoles.length > 0);
@@ -1300,15 +1300,15 @@ export async function getCRMAccountStats(accountId: string): Promise<CRMAccountS
   const [bookingRows, revenueRows, serviceRows, monthRows] = await Promise.all([
     // Totals
     supabase.from("sales").select("number_of_guests, date").eq("client_id", accountId)
-      .not("status", "in", '("Cancelled","Canceled")').not("date", "is", null),
+      .neq("status", "Cancelled").not("date", "is", null),
     // Revenue (positive transactions linked to this client's sales)
     supabase.rpc("get_client_revenue", { p_client_id: accountId }).maybeSingle(),
     // Top services
     supabase.from("sales").select("services(name)").eq("client_id", accountId)
-      .not("status", "in", '("Cancelled","Canceled")').not("service_id", "is", null),
+      .neq("status", "Cancelled").not("service_id", "is", null),
     // Monthly breakdown via raw query is tricky via Supabase client — fetch all sales and group in JS
     supabase.from("sales").select("date, number_of_guests, id").eq("client_id", accountId)
-      .not("status", "in", '("Cancelled","Canceled")').not("date", "is", null).order("date"),
+      .neq("status", "Cancelled").not("date", "is", null).order("date"),
   ]);
 
   const sales = bookingRows.data ?? [];
@@ -1387,7 +1387,7 @@ export async function getCRMTopClients(limit = 10): Promise<CRMTopClient[]> {
   const { data: salesData } = await supabase
     .from("sales")
     .select("client_id, number_of_guests, id")
-    .not("status", "in", '("Cancelled","Canceled")')
+    .neq("status", "Cancelled")
     .not("client_id", "is", null);
 
   const { data: txData } = await supabase
@@ -1449,10 +1449,10 @@ export async function getDashboardMonthlyStats(): Promise<DashboardMonthlyStats>
   const [salesThis, salesLast, txThis, txLast] = await Promise.all([
     supabase.from("sales").select("number_of_guests")
       .gte("date", thisMonthStart).lt("date", nextMonthStart)
-      .not("status", "in", '("Cancelled","Canceled")'),
+      .neq("status", "Cancelled"),
     supabase.from("sales").select("id")
       .gte("date", lastMonthStart).lt("date", thisMonthStart)
-      .not("status", "in", '("Cancelled","Canceled")'),
+      .neq("status", "Cancelled"),
     supabase.from("transactions").select("valor")
       .gte("data", thisMonthStart).lt("data", nextMonthStart).like("notion_id", "IN -%").gt("valor", 0),
     supabase.from("transactions").select("valor")

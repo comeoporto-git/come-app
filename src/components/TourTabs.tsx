@@ -76,7 +76,7 @@ function TourCard({
   hasDuplicate?: boolean;
 }) {
   const ts = typeStyle(tour.serviceType);
-  const isCanceled = tour.status === "Canceled" || tour.status === "Cancelled";
+  const isCanceled = tour.status === "Cancelled";
   return (
     <Link href={`/guide/tours/${tour.id}`}>
       <li

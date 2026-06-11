@@ -17,7 +17,7 @@ function fmtEur(n: number) {
   return n.toLocaleString("pt-PT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
 }
 function isCancelled(t: Tour) {
-  return t.status === "Cancelled" || t.status === "Canceled";
+  return t.status === "Cancelled";
 }
 function isTourFuture(t: Tour) {
   return !!t.date && new Date(t.date) >= TODAY;
@@ -291,14 +291,14 @@ export function AnalyticsDashboard({
       if (!map[y]) map[y] = { services: 0, futureSvcs: 0, servicesByStatus: {}, revenue: 0, revenueByStatus: {}, billingByStatus: {} };
       map[y].services++;
       if (isTourFuture(t)) map[y].futureSvcs++;
-      const s = t.status === "Canceled" ? "Cancelled" : (t.status || "Sem estado");
+      const s = t.status || "Sem estado";
       map[y].servicesByStatus[s] = (map[y].servicesByStatus[s] ?? 0) + 1;
       if (t.expectedRevenue) {
         map[y].billingByStatus[s] = (map[y].billingByStatus[s] ?? 0) + t.expectedRevenue;
       }
     }
     const tourStatusById = new Map(
-      allTours.filter((t) => t.id).map((t) => [t.id!, t.status === "Canceled" ? "Cancelled" : (t.status || "Sem estado")])
+      allTours.filter((t) => t.id).map((t) => [t.id!, t.status || "Sem estado"])
     );
     for (const t of allTransactions) {
       if (!t.date || !t.supplier.startsWith("IN -")) continue;
@@ -392,7 +392,7 @@ export function AnalyticsDashboard({
     const byStatus: Record<string, number> = {};
     for (const t of tours) {
       const s = t.status || "Sem estado";
-      const key = s === "Canceled" ? "Cancelled" : s;
+      const key = s;
       byStatus[key] = (byStatus[key] ?? 0) + 1;
     }
     const topStatuses = Object.entries(byStatus).sort((a, b) => b[1] - a[1]);
@@ -402,7 +402,7 @@ export function AnalyticsDashboard({
     const revenueByStatus: Record<string, number> = {};
     for (const t of tours) {
       if (!t.expectedRevenue) continue;
-      const s = t.status === "Canceled" ? "Cancelled" : (t.status || "Sem estado");
+      const s = t.status || "Sem estado";
       revenueByStatus[s] = (revenueByStatus[s] ?? 0) + t.expectedRevenue;
     }
     const topRevenueByStatus = Object.entries(revenueByStatus).sort((a, b) => b[1] - a[1]);

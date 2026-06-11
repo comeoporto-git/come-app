@@ -42,7 +42,7 @@ async function getBusinessSnapshot() {
       .select(SALE_SELECT)
       .gte("date", todayStr)
       .lte("date", in90Days)
-      .not("status", "in", '("Cancelado","Cancelled","Canceled")')
+      .neq("status", "Cancelled")
       .order("date", { ascending: true }),
     // Full current month sales (past + future) for revenue projection
     supabase
@@ -50,14 +50,14 @@ async function getBusinessSnapshot() {
       .select(SALE_SELECT)
       .gte("date", thisMonthStart)
       .lte("date", thisMonthEnd)
-      .not("status", "in", '("Cancelado","Cancelled","Canceled")'),
+      .neq("status", "Cancelled"),
     // Full current year sales
     supabase
       .from("sales")
       .select(SALE_SELECT)
       .gte("date", thisYearStart)
       .lte("date", thisYearEnd)
-      .not("status", "in", '("Cancelado","Cancelled","Canceled")')
+      .neq("status", "Cancelled")
       .order("date", { ascending: true }),
     // Full last year sales
     supabase
@@ -65,7 +65,7 @@ async function getBusinessSnapshot() {
       .select(SALE_SELECT)
       .gte("date", lastYearStart)
       .lte("date", lastYearEnd)
-      .not("status", "in", '("Cancelado","Cancelled","Canceled")')
+      .neq("status", "Cancelled")
       .order("date", { ascending: true }),
     // Full month transactions (earnings already recorded)
     supabase
