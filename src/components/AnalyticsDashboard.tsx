@@ -268,9 +268,12 @@ export function AnalyticsDashboard({
   teamMap: Record<string, string>;
   clientNameMap: Record<string, string>;
 }) {
-  const [dateRange, setDateRange] = useState<DateRange>({
-    start: new Date(Date.now() - 180 * 86_400_000),
-    end: null,
+  const [dateRange, setDateRange] = useState<DateRange>(() => {
+    const now = new Date();
+    return {
+      start: new Date(now.getFullYear(), 0, 1),
+      end:   new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999),
+    };
   });
   const [category, setCategory] = useState<Category>("resumo");
 
