@@ -10,9 +10,14 @@ function formatDate(iso: string | null): string {
   if (!iso) return "—";
   return new Date(iso).toLocaleDateString("pt-PT", {
     weekday: "short", day: "numeric", month: "short",
-    hour: "2-digit", minute: "2-digit",
     timeZone: "Europe/Lisbon",
   });
+}
+
+function formatDateTime(tour: { date: string | null; startTime: string | null; endTime: string | null }): string {
+  const d = formatDate(tour.date);
+  if (!tour.startTime) return d;
+  return `${d} ${tour.startTime}${tour.endTime ? ` - ${tour.endTime}` : ""}`;
 }
 
 function roleColor(role: string): string {
@@ -115,7 +120,7 @@ export default async function SuperGuideGestaoServicosPage() {
                         </Link>
                       )}
                     </div>
-                    <p className="text-xs text-gray-400 mt-0.5">{formatDate(t.date)}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{formatDateTime(t)}</p>
                     <div className="flex flex-wrap gap-1 mt-1.5">
                       {t.missingRoles.map((role) => (
                         <span key={role} className={`text-xs border px-1.5 py-0.5 rounded-md font-medium ${roleColor(role)}`}>
@@ -160,7 +165,7 @@ export default async function SuperGuideGestaoServicosPage() {
                         </Link>
                       )}
                       </div>
-                      <p className="text-xs text-gray-400 mt-0.5">{formatDate(t.date)}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">{formatDateTime(t)}</p>
                       <div className="flex flex-wrap gap-1 mt-1.5">
                         {missing.map((f) => (
                           <span key={f} className="text-xs bg-red-50 text-red-600 border border-red-100 px-1.5 py-0.5 rounded-md font-medium">{f}</span>
@@ -198,7 +203,7 @@ export default async function SuperGuideGestaoServicosPage() {
                       {t.serviceName && <span className="text-xs text-gray-400">{t.serviceName}</span>}
                       <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full font-medium">Pending</span>
                     </div>
-                    <p className="text-xs text-gray-400 mt-0.5">{formatDate(t.date)}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{formatDateTime(t)}</p>
                     {t.numGuests > 0 && <p className="text-xs text-gray-400">{t.numGuests} pax</p>}
                   </li>
                 ))}
