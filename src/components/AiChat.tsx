@@ -397,6 +397,14 @@ export function AiChat() {
         )}
       </button>
 
+      {/* Backdrop */}
+      {open && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm transition-opacity sm:hidden"
+          onClick={() => setOpen(false)}
+        />
+      )}
+
       {/* Panel */}
       {open && (
         <div
