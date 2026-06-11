@@ -7,7 +7,7 @@ export default async function ConfiguracoesPage() {
   const { data, error } = await supabase
     .from("business_rules")
     .select("name, value, notes")
-    .order("key");
+    .order("name");
 
   const rules = data ?? [];
 

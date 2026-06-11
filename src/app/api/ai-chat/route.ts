@@ -14,12 +14,12 @@ async function getBusinessSnapshot() {
   const todayStr       = now.toISOString().split("T")[0];
   const in90Days       = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
 
-  // Include service pricing so we can compute expected revenue per sale
+  // Join earning transactions per sale so revenue comes from actual earnings, not pricing estimates
   const SALE_SELECT = `id, date, status, number_of_guests, expenses_closed, start_time, end_time,
-    services(name, type, equipa, pax_2_3, pax_4_6, pax_7_plus),
+    services(name, type, equipa),
     clients(name),
     guide:guide_id(name),
-    chef:chef_id(name)`;
+    transactions!transactions_sale_id_fkey(id, valor, type)`;
 
   const [
     { data: upcomingSales },
@@ -100,24 +100,21 @@ async function getBusinessSnapshot() {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   function mapSale(s: any) {
-    const svc = s.services ?? {};
-    const guests = s.number_of_guests ?? 0;
-    const p1  = (svc.pax_2_3 ?? 0) * 2;
-    const p23 = svc.pax_2_3   ?? 0;
-    const p46 = svc.pax_4_6   ?? 0;
-    const p7  = svc.pax_7_plus ?? 0;
-    const pricePerPax = guests >= 7 ? p7 : guests >= 4 ? p46 : guests >= 2 ? p23 : p1;
-    const expectedRevenue = pricePerPax * guests;
+    // Revenue = sum of Earning transactions linked to this sale
+    const txs: Array<{ valor: number; type: string }> = s.transactions ?? [];
+    const revenue = txs
+      .filter((t) => t.type === "Earning")
+      .reduce((sum, t) => sum + Math.abs(t.valor ?? 0), 0);
     return {
-      service: svc.name ?? "",
+      service: s.services?.name ?? "",
       client: s.clients?.name ?? "",
       date: s.date,
-      guests,
+      guests: s.number_of_guests ?? 0,
       status: s.status,
       startTime: s.start_time ?? null,
       endTime: s.end_time ?? null,
       guide: s.guide?.name ?? null,
-      expectedRevenue: expectedRevenue > 0 ? expectedRevenue : null,
+      revenue: revenue > 0 ? revenue : null,
     };
   }
 
@@ -144,10 +141,10 @@ async function getBusinessSnapshot() {
     thisMonth: {
       salesCount: (thisMonthSales ?? []).length,
       totalGuests: (thisMonthSales ?? []).reduce((s, t) => s + (t.number_of_guests ?? 0), 0),
-      // Projected revenue = sum of expectedRevenue for all non-cancelled services this month
+      // Revenue from Earning transactions linked to services this month
       projectedRevenue: (thisMonthSales ?? [])
         .map(mapSale)
-        .reduce((s, t) => s + (t.expectedRevenue ?? 0), 0)
+        .reduce((s, t) => s + (t.revenue ?? 0), 0)
         .toFixed(2),
       // Recorded earnings = Earning transactions already entered this month
       recordedEarnings: monthEarnings.toFixed(2),
@@ -165,7 +162,7 @@ async function getBusinessSnapshot() {
       totalGuests: (thisYearSales ?? []).reduce((s, t) => s + (t.number_of_guests ?? 0), 0),
       projectedRevenue: (thisYearSales ?? [])
         .map(mapSale)
-        .reduce((s, t) => s + (t.expectedRevenue ?? 0), 0)
+        .reduce((s, t) => s + (t.revenue ?? 0), 0)
         .toFixed(2),
       recordedEarnings: (thisYearTx ?? [])
         .filter((t) => t.type === "Earning")
@@ -237,10 +234,11 @@ ${rulesBlock}
 - The team list (snapshot.team) shows all available staff and their roles.
 
 ## Revenue / Faturação
-- **thisMonth.projectedRevenue**: total expected revenue for the full month based on confirmed services × service pricing tiers. Use this to answer "quanto vamos faturar este mês / em junho".
-- **thisMonth.recordedEarnings**: earnings already recorded as transactions (may be incomplete mid-month).
-- Each sale in thisMonth.sales has an \`expectedRevenue\` field (€) computed from the service price tier × number of guests.
-- When answering revenue questions, lead with projectedRevenue and clarify that recordedEarnings may differ if not all invoices have been entered yet.
+- **thisMonth.projectedRevenue**: sum of Earning transactions linked to all services this month. Use this to answer "quanto vamos faturar este mês / em junho".
+- **thisMonth.recordedEarnings**: same Earning transactions aggregated at the month level (cross-check).
+- Each sale in thisMonth.sales has a \`revenue\` field (€) = sum of its own Earning transactions.
+- If revenue is null for a sale, no earnings have been registered for it yet.
+- When answering revenue questions, use projectedRevenue as the total and list per-service breakdown from sales[].revenue.
 
 ## General
 - Be concise and precise. Use the actual data, never guess.
