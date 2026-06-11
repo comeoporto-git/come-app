@@ -180,6 +180,8 @@ export function AiChat() {
   // Chat input / streaming
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
+  const [creatingConv, setCreatingConv] = useState(false);
+  const [panelError, setPanelError] = useState<string | null>(null);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -188,9 +190,11 @@ export function AiChat() {
   // Load conversation list when panel opens
   useEffect(() => {
     if (!open) return;
+    setPanelError(null);
     setLoadingList(true);
     listConversations()
       .then(setConversations)
+      .catch((e) => setPanelError(e?.message ?? "Erro ao carregar conversas"))
       .finally(() => setLoadingList(false));
   }, [open]);
 
@@ -217,14 +221,22 @@ export function AiChat() {
 
   // Start a new conversation
   async function startNew() {
-    const id = await createConversation();
-    setActiveId(id);
-    setMessages([]);
-    setConversations((prev) => [
-      { id, title: null, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-      ...prev,
-    ]);
-    setView("chat");
+    setPanelError(null);
+    setCreatingConv(true);
+    try {
+      const id = await createConversation();
+      setActiveId(id);
+      setMessages([]);
+      setConversations((prev) => [
+        { id, title: null, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+        ...prev,
+      ]);
+      setView("chat");
+    } catch (e) {
+      setPanelError((e as Error)?.message ?? "Erro ao criar conversa");
+    } finally {
+      setCreatingConv(false);
+    }
   }
 
   // Delete a conversation
@@ -415,9 +427,10 @@ export function AiChat() {
             {view === "list" && (
               <button
                 onClick={startNew}
-                className="flex-none text-[11px] font-semibold text-white/60 hover:text-white bg-white/10 hover:bg-white/15 px-2.5 py-1.5 rounded-lg transition-colors"
+                disabled={creatingConv}
+                className="flex-none text-[11px] font-semibold text-white/60 hover:text-white bg-white/10 hover:bg-white/15 px-2.5 py-1.5 rounded-lg transition-colors disabled:opacity-40"
               >
-                + Nova
+                {creatingConv ? "…" : "+ Nova"}
               </button>
             )}
           </div>
@@ -425,6 +438,11 @@ export function AiChat() {
           {/* ── List view ── */}
           {view === "list" && (
             <div className="flex-1 overflow-y-auto min-h-0">
+              {panelError && (
+                <div className="mx-4 mt-4 text-[11px] text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
+                  {panelError}
+                </div>
+              )}
               {loadingList ? (
                 <div className="flex items-center justify-center py-12">
                   <div className="w-4 h-4 border-2 border-[#111514]/20 border-t-[#111514] rounded-full animate-spin" />
@@ -436,9 +454,10 @@ export function AiChat() {
                   </p>
                   <button
                     onClick={startNew}
-                    className="text-[13px] font-semibold text-white bg-[#111514] px-4 py-2 rounded-xl hover:bg-[#32373c] transition-colors"
+                    disabled={creatingConv}
+                    className="text-[13px] font-semibold text-white bg-[#111514] px-4 py-2 rounded-xl hover:bg-[#32373c] transition-colors disabled:opacity-40"
                   >
-                    Iniciar conversa
+                    {creatingConv ? "A criar…" : "Iniciar conversa"}
                   </button>
                 </div>
               ) : (
