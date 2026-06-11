@@ -51,12 +51,12 @@ async function getBusinessSnapshot() {
       .lte("date", todayStr),
     supabase
       .from("transactions")
-      .select("id, supplier, total_cost, date, who_paid, status, accountant_verified, type")
+      .select("id, supplier, valor, date, who_paid, status, accountant_verified, type")
       .gte("date", thisMonthStart)
       .lte("date", todayStr),
     supabase
       .from("transactions")
-      .select("id, supplier, total_cost, date, who_paid, status, accountant_verified, type")
+      .select("id, supplier, valor, date, who_paid, status, accountant_verified, type")
       .gte("date", thisYearStart)
       .lte("date", todayStr),
     supabase
@@ -76,13 +76,13 @@ async function getBusinessSnapshot() {
       .order("key"),
   ]);
 
-  // Aggregate financials
-  const monthExpenses = (thisMonthTx ?? [])
-    .filter((t) => t.type !== "earning" && (t.total_cost ?? 0) < 0 || t.type === "expense")
-    .reduce((s, t) => s + Math.abs(t.total_cost ?? 0), 0);
+  // type is stored as "Earning" or "Expense" (capital); valor is positive for earnings, negative for expenses
   const monthEarnings = (thisMonthTx ?? [])
-    .filter((t) => t.type === "earning" || (t.total_cost ?? 0) > 0)
-    .reduce((s, t) => s + Math.abs(t.total_cost ?? 0), 0);
+    .filter((t) => t.type === "Earning")
+    .reduce((s, t) => s + Math.abs(t.valor ?? 0), 0);
+  const monthExpenses = (thisMonthTx ?? [])
+    .filter((t) => t.type === "Expense")
+    .reduce((s, t) => s + Math.abs(t.valor ?? 0), 0);
 
   // Pipeline summary
   const pipelineByStage: Record<string, number> = {};
@@ -136,7 +136,8 @@ async function getBusinessSnapshot() {
       earnings: monthEarnings.toFixed(2),
       transactions: (thisMonthTx ?? []).map((t) => ({
         supplier: t.supplier,
-        amount: t.total_cost,
+        type: t.type,       // "Earning" or "Expense"
+        amount: t.valor,    // positive for Earning, negative for Expense
         date: t.date,
         who_paid: t.who_paid,
         status: t.status,
@@ -145,6 +146,14 @@ async function getBusinessSnapshot() {
     thisYear: {
       salesCount: (thisYearSales ?? []).length,
       totalGuests: (thisYearSales ?? []).reduce((s, t) => s + (t.number_of_guests ?? 0), 0),
+      earnings: (thisYearTx ?? [])
+        .filter((t) => t.type === "Earning")
+        .reduce((s, t) => s + Math.abs(t.valor ?? 0), 0)
+        .toFixed(2),
+      expenses: (thisYearTx ?? [])
+        .filter((t) => t.type === "Expense")
+        .reduce((s, t) => s + Math.abs(t.valor ?? 0), 0)
+        .toFixed(2),
     },
     crm: {
       totalAccounts: (pipeline ?? []).length,
