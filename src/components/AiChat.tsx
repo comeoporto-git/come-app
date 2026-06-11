@@ -1,6 +1,145 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, Fragment } from "react";
+
+function renderMarkdown(text: string, isStreaming: boolean) {
+  const lines = text.split("\n");
+  const elements: React.ReactNode[] = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+
+    // Table: starts with |
+    if (line.trimStart().startsWith("|")) {
+      const tableLines: string[] = [];
+      while (i < lines.length && lines[i].trimStart().startsWith("|")) {
+        tableLines.push(lines[i]);
+        i++;
+      }
+      // Filter separator rows (---|---)
+      const rows = tableLines.filter((l) => !/^\s*\|[\s\-:|]+\|\s*$/.test(l));
+      if (rows.length > 0) {
+        const parsed = rows.map((r) =>
+          r.split("|").slice(1, -1).map((c) => c.trim())
+        );
+        elements.push(
+          <div key={`table-${i}`} className="overflow-x-auto my-2">
+            <table className="text-[11px] border-collapse w-full">
+              <thead>
+                <tr>
+                  {parsed[0].map((cell, ci) => (
+                    <th key={ci} className="px-2 py-1 text-left font-semibold border border-black/15 bg-black/5">
+                      {inlineFormat(cell)}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {parsed.slice(1).map((row, ri) => (
+                  <tr key={ri}>
+                    {row.map((cell, ci) => (
+                      <td key={ci} className="px-2 py-1 border border-black/10">
+                        {inlineFormat(cell)}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+      }
+      continue;
+    }
+
+    // Unordered list
+    if (/^[-*] /.test(line.trimStart())) {
+      const items: string[] = [];
+      while (i < lines.length && /^[-*] /.test(lines[i].trimStart())) {
+        items.push(lines[i].replace(/^[-*] /, "").trim());
+        i++;
+      }
+      elements.push(
+        <ul key={`ul-${i}`} className="list-disc list-inside space-y-0.5 my-1 pl-1">
+          {items.map((item, ii) => (
+            <li key={ii} className="text-[13px]">{inlineFormat(item)}</li>
+          ))}
+        </ul>
+      );
+      continue;
+    }
+
+    // Ordered list
+    if (/^\d+\. /.test(line.trimStart())) {
+      const items: string[] = [];
+      while (i < lines.length && /^\d+\. /.test(lines[i].trimStart())) {
+        items.push(lines[i].replace(/^\d+\. /, "").trim());
+        i++;
+      }
+      elements.push(
+        <ol key={`ol-${i}`} className="list-decimal list-inside space-y-0.5 my-1 pl-1">
+          {items.map((item, ii) => (
+            <li key={ii} className="text-[13px]">{inlineFormat(item)}</li>
+          ))}
+        </ol>
+      );
+      continue;
+    }
+
+    // Heading
+    if (/^#{1,3} /.test(line)) {
+      const text = line.replace(/^#{1,3} /, "");
+      elements.push(
+        <p key={`h-${i}`} className="font-semibold text-[13px] mt-2 mb-0.5">
+          {inlineFormat(text)}
+        </p>
+      );
+      i++;
+      continue;
+    }
+
+    // Empty line → spacing
+    if (line.trim() === "") {
+      elements.push(<div key={`br-${i}`} className="h-1.5" />);
+      i++;
+      continue;
+    }
+
+    // Regular paragraph
+    elements.push(
+      <p key={`p-${i}`} className="text-[13px] leading-relaxed">
+        {inlineFormat(line)}
+      </p>
+    );
+    i++;
+  }
+
+  if (isStreaming) {
+    elements.push(
+      <span key="cursor" className="inline-block w-1.5 h-3.5 bg-[#32373c]/40 animate-pulse ml-0.5 align-text-bottom rounded-sm" />
+    );
+  }
+
+  return elements;
+}
+
+function inlineFormat(text: string): React.ReactNode {
+  // Split on **bold** and *italic*
+  const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g);
+  return parts.map((part, i) => {
+    if (part.startsWith("**") && part.endsWith("**")) {
+      return <strong key={i}>{part.slice(2, -2)}</strong>;
+    }
+    if (part.startsWith("*") && part.endsWith("*")) {
+      return <em key={i}>{part.slice(1, -1)}</em>;
+    }
+    if (part.startsWith("`") && part.endsWith("`")) {
+      return <code key={i} className="bg-black/8 px-1 rounded text-[12px] font-mono">{part.slice(1, -1)}</code>;
+    }
+    return <Fragment key={i}>{part}</Fragment>;
+  });
+}
 
 type Message = {
   role: "user" | "assistant";
@@ -188,16 +327,15 @@ export function AiChat() {
                   className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
                 >
                   <div
-                    className={`max-w-[85%] text-[13px] leading-relaxed px-3 py-2 rounded-xl whitespace-pre-wrap break-words ${
+                    className={`max-w-[85%] text-[13px] leading-relaxed px-3 py-2 rounded-xl break-words ${
                       msg.role === "user"
-                        ? "bg-[#111514] text-white rounded-br-sm"
+                        ? "bg-[#111514] text-white rounded-br-sm whitespace-pre-wrap"
                         : "bg-[#f5f5f0] text-[#32373c] rounded-bl-sm"
                     }`}
                   >
-                    {msg.content}
-                    {msg.role === "assistant" && streaming && i === messages.length - 1 && (
-                      <span className="inline-block w-1.5 h-3.5 bg-[#32373c]/40 animate-pulse ml-0.5 align-text-bottom rounded-sm" />
-                    )}
+                    {msg.role === "user"
+                      ? msg.content
+                      : renderMarkdown(msg.content, streaming && i === messages.length - 1)}
                   </div>
                 </div>
               ))
