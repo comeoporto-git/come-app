@@ -121,13 +121,15 @@ function SectionCard({ title, sub, children }: {
 
 /** VBars — vertical bar chart. Pass `colors` for per-bar color overrides.
  *  Pass `baseValues`+`baseColors` to render a solid darker layer within each bar
- *  (used to split past vs future services in the yearly chart). */
-function VBars({ entries, max, color, colors, formatValue, barHeight = 88, baseValues, baseColors }: {
+ *  (used to split past vs future services in the yearly chart).
+ *  Pass `formatValues` for per-bar label overrides (e.g. signed profit strings). */
+function VBars({ entries, max, color, colors, formatValue, formatValues, barHeight = 88, baseValues, baseColors }: {
   entries: [string, number][];
   max: number;
   color: string;
   colors?: string[];
   formatValue?: (v: number) => string;
+  formatValues?: string[];
   barHeight?: number;
   baseValues?: number[];
   baseColors?: string[];
@@ -140,14 +142,15 @@ function VBars({ entries, max, color, colors, formatValue, barHeight = 88, baseV
         const baseVal   = baseValues?.[i] ?? value;
         const baseColor = baseColors?.[i] ?? barColor;
         const basePct      = max > 0 ? (baseVal / max) * 100 : 0;
+        const displayLabel = formatValues?.[i] ?? (formatValue ? formatValue(value) : fmt(value));
         const tooltipLabel = baseValues
           ? `${fmt(value)} total · ${fmt(baseVal)} realizado${baseVal !== 1 ? "s" : ""}`
-          : formatValue ? formatValue(value) : fmt(value);
+          : displayLabel;
         return (
           <div key={label} className="group/vbar flex-1 min-w-0 flex flex-col items-center gap-1 h-full justify-end">
             {value > 0 && (
               <span className="block w-full text-center text-[10px] font-semibold text-gray-500 leading-none overflow-hidden">
-                {formatValue ? formatValue(value) : fmt(value)}
+                {displayLabel}
               </span>
             )}
             <div className="w-full relative" style={{ height: `${barHeight}px` }}>
@@ -156,6 +159,7 @@ function VBars({ entries, max, color, colors, formatValue, barHeight = 88, baseV
                   {tooltipLabel}
                 </div>
               </div>
+
               <div
                 className={`absolute bottom-0 w-full ${barColor} rounded-t-lg`}
                 style={{ height: `${pct}%`, minHeight: value > 0 ? "4px" : "0" }}
@@ -491,6 +495,37 @@ export function AnalyticsDashboard({
     const topMethods = Object.entries(byMethod).sort((a, b) => b[1] - a[1]);
     const maxMethod  = Math.max(...topMethods.map(([, v]) => v), 1);
 
+    // Monthly financials (same window as service monthly trend)
+    const finRevMap: Record<string, number> = {};
+    const finCostMap: Record<string, number> = {};
+    for (let i = numMonths - 1; i >= 0; i--) {
+      const d2 = new Date(effectiveEnd); d2.setDate(1); d2.setMonth(d2.getMonth() - i);
+      const k = monthKey(d2);
+      finRevMap[k] = 0;
+      finCostMap[k] = 0;
+    }
+    for (const t of txns) {
+      if (!t.date) continue;
+      const k = monthKey(new Date(t.date));
+      if (t.supplier.startsWith("IN -")) {
+        finRevMap[k] = (finRevMap[k] ?? 0) + t.totalCost;
+      } else {
+        finCostMap[k] = (finCostMap[k] ?? 0) + t.totalCost;
+      }
+    }
+    const allFinMonths = [...new Set([...Object.keys(finRevMap), ...Object.keys(finCostMap)])].sort();
+    const monthlyFinancials = allFinMonths.map((k) => ({
+      label: monthLabel(k),
+      revenue: finRevMap[k] ?? 0,
+      costs: finCostMap[k] ?? 0,
+      profit: (finRevMap[k] ?? 0) - (finCostMap[k] ?? 0),
+    }));
+    const maxMonthlyRev  = Math.max(...monthlyFinancials.map((d) => d.revenue), 1);
+    const maxMonthlyCost = Math.max(...monthlyFinancials.map((d) => d.costs), 1);
+    const maxMonthlyProfit = Math.max(...monthlyFinancials.map((d) => Math.abs(d.profit)), 1);
+    const profitColors    = monthlyFinancials.map((d) => d.profit >= 0 ? "bg-emerald-400" : "bg-red-400");
+    const profitFmtValues = monthlyFinancials.map((d) => fmtEur(d.profit));
+
     // Range label
     const fmtDate = (d: Date) => d.toLocaleDateString("pt-PT", { day: "numeric", month: "short", year: "numeric" });
     const rangeLbl = !start
@@ -513,6 +548,7 @@ export function AnalyticsDashboard({
       topClients, maxClientCount,
       topClientsByRevenue, maxClientRevenue,
       totalExpenses, totalEarnings, expPerTour, topMethods, maxMethod,
+      monthlyFinancials, maxMonthlyRev, maxMonthlyCost, maxMonthlyProfit, profitColors, profitFmtValues,
       rangeLbl,
     };
   }, [allTours, allTransactions, teamMap, clientNameMap, dateRange]);
@@ -820,60 +856,112 @@ export function AnalyticsDashboard({
 
       {/* FINANCEIRO */}
       {category === "financeiro" && (
-        <div className="grid md:grid-cols-2 gap-6">
-          <SectionCard title="Despesas" sub={periodLabel}>
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-gray-50 rounded-xl p-3">
-                  <p className="text-xs text-gray-400">Total despesas</p>
-                  <p className="text-lg font-bold text-[#32373c] mt-0.5">{fmtEur(a.totalExpenses)}</p>
+        <div className="space-y-6">
+          <div className="grid md:grid-cols-2 gap-6">
+            <SectionCard title="Despesas" sub={periodLabel}>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-gray-50 rounded-xl p-3">
+                    <p className="text-xs text-gray-400">Total despesas</p>
+                    <p className="text-lg font-bold text-[#32373c] mt-0.5">{fmtEur(a.totalExpenses)}</p>
+                  </div>
+                  <div className="bg-gray-50 rounded-xl p-3">
+                    <p className="text-xs text-gray-400">Média p/ serviço</p>
+                    <p className="text-lg font-bold text-[#32373c] mt-0.5">{fmtEur(a.expPerTour)}</p>
+                  </div>
                 </div>
-                <div className="bg-gray-50 rounded-xl p-3">
-                  <p className="text-xs text-gray-400">Média p/ serviço</p>
-                  <p className="text-lg font-bold text-[#32373c] mt-0.5">{fmtEur(a.expPerTour)}</p>
-                </div>
+                {a.topMethods.length > 0 && (
+                  <div className="space-y-2.5">
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Por método de pagamento</p>
+                    {a.topMethods.map(([method, total]) => (
+                      <HBar key={method} label={method} value={total} max={a.maxMethod} color="bg-orange-400" labelWidth="w-20 sm:w-28" formatValue={fmtEur} />
+                    ))}
+                  </div>
+                )}
+                {a.totalExpenses === 0 && <EmptyState message="Sem despesas registadas" />}
               </div>
-              {a.topMethods.length > 0 && (
-                <div className="space-y-2.5">
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Por método de pagamento</p>
-                  {a.topMethods.map(([method, total]) => (
-                    <HBar key={method} label={method} value={total} max={a.maxMethod} color="bg-orange-400" labelWidth="w-20 sm:w-28" formatValue={fmtEur} />
-                  ))}
-                </div>
-              )}
-              {a.totalExpenses === 0 && <EmptyState message="Sem despesas registadas" />}
-            </div>
-          </SectionCard>
+            </SectionCard>
 
-          <SectionCard title="Receita" sub={periodLabel}>
-            <div className="space-y-4">
-              <div className="bg-gray-50 rounded-xl p-4 flex flex-col gap-1">
-                <p className="text-xs text-gray-400">Total receita registada</p>
-                <p className="text-3xl font-bold text-[#32373c]">{fmtEur(a.totalEarnings)}</p>
-                {a.totalExpenses > 0 && a.totalEarnings > 0 && (
-                  <p className="text-xs text-gray-400 mt-1">
-                    Margem estimada:{" "}
-                    <span className={`font-semibold ${a.totalEarnings - a.totalExpenses >= 0 ? "text-green-600" : "text-red-500"}`}>
-                      {fmtEur(a.totalEarnings - a.totalExpenses)}
-                    </span>
+            <SectionCard title="Receita" sub={periodLabel}>
+              <div className="space-y-4">
+                <div className="bg-gray-50 rounded-xl p-4 flex flex-col gap-1">
+                  <p className="text-xs text-gray-400">Total receita registada</p>
+                  <p className="text-3xl font-bold text-[#32373c]">{fmtEur(a.totalEarnings)}</p>
+                  {a.totalExpenses > 0 && a.totalEarnings > 0 && (
+                    <p className="text-xs text-gray-400 mt-1">
+                      Margem estimada:{" "}
+                      <span className={`font-semibold ${a.totalEarnings - a.totalExpenses >= 0 ? "text-green-600" : "text-red-500"}`}>
+                        {fmtEur(a.totalEarnings - a.totalExpenses)}
+                      </span>
+                    </p>
+                  )}
+                </div>
+                {a.totalEarnings === 0 && (
+                  <p className="text-sm text-gray-400 text-center py-2">
+                    Receita não registada ou com prefixo diferente de &quot;IN -&quot;
                   </p>
                 )}
+                {a.totalEarnings > 0 && a.pastCompleted.length > 0 && (
+                  <div className="bg-gray-50 rounded-xl p-3">
+                    <p className="text-xs text-gray-400">Receita média p/ serviço realizado</p>
+                    <p className="text-lg font-bold text-[#32373c] mt-0.5">
+                      {fmtEur(a.totalEarnings / a.pastCompleted.length)}
+                    </p>
+                  </div>
+                )}
               </div>
-              {a.totalEarnings === 0 && (
-                <p className="text-sm text-gray-400 text-center py-2">
-                  Receita não registada ou com prefixo diferente de &quot;IN -&quot;
-                </p>
-              )}
-              {a.totalEarnings > 0 && a.pastCompleted.length > 0 && (
-                <div className="bg-gray-50 rounded-xl p-3">
-                  <p className="text-xs text-gray-400">Receita média p/ serviço realizado</p>
-                  <p className="text-lg font-bold text-[#32373c] mt-0.5">
-                    {fmtEur(a.totalEarnings / a.pastCompleted.length)}
-                  </p>
-                </div>
-              )}
-            </div>
-          </SectionCard>
+            </SectionCard>
+          </div>
+
+          {a.monthlyFinancials.length > 0 && (
+            <>
+              <SectionCard title="Faturação Por Mês" sub={periodLabel}>
+                {a.monthlyFinancials.every((d) => d.revenue === 0) ? (
+                  <EmptyState message="Sem receita registada no período" />
+                ) : (
+                  <VBars
+                    entries={a.monthlyFinancials.map((d) => [d.label, d.revenue])}
+                    max={a.maxMonthlyRev}
+                    color="bg-emerald-400"
+                    formatValue={fmtEur}
+                  />
+                )}
+              </SectionCard>
+
+              <SectionCard title="Custos Por Mês" sub={periodLabel}>
+                {a.monthlyFinancials.every((d) => d.costs === 0) ? (
+                  <EmptyState message="Sem despesas registadas no período" />
+                ) : (
+                  <VBars
+                    entries={a.monthlyFinancials.map((d) => [d.label, d.costs])}
+                    max={a.maxMonthlyCost}
+                    color="bg-orange-400"
+                    formatValue={fmtEur}
+                  />
+                )}
+              </SectionCard>
+
+              <SectionCard title="Lucro Por Mês" sub={periodLabel}>
+                {a.monthlyFinancials.every((d) => d.profit === 0) ? (
+                  <EmptyState message="Sem dados de lucro no período" />
+                ) : (
+                  <>
+                    <VBars
+                      entries={a.monthlyFinancials.map((d) => [d.label, Math.abs(d.profit)])}
+                      max={a.maxMonthlyProfit}
+                      color="bg-emerald-400"
+                      colors={a.profitColors}
+                      formatValues={a.profitFmtValues}
+                    />
+                    <ChartLegend items={[
+                      { color: "bg-emerald-400", label: "Lucro" },
+                      { color: "bg-red-400",     label: "Prejuízo" },
+                    ]} />
+                  </>
+                )}
+              </SectionCard>
+            </>
+          )}
         </div>
       )}
 
