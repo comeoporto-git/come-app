@@ -64,6 +64,12 @@ const nav: { group: string | null; items: NavItem[] }[] = [
       { label: "Permissões", href: "/admin/permissoes" },
     ],
   },
+  {
+    group: "Sistema",
+    items: [
+      { label: "Configurações", href: "/admin/configuracoes" },
+    ],
+  },
 ];
 
 type Props = {

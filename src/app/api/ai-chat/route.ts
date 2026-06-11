@@ -27,6 +27,7 @@ async function getBusinessSnapshot() {
     { data: pipeline },
     { data: team },
     { data: services },
+    { data: rulesRows },
   ] = await Promise.all([
     // All bookings from today + 90 days (for availability queries)
     supabase
@@ -69,6 +70,10 @@ async function getBusinessSnapshot() {
       .from("services")
       .select("id, name, type, equipa")
       .order("name"),
+    supabase
+      .from("business_rules")
+      .select("key, value, description")
+      .order("key"),
   ]);
 
   // Aggregate financials
@@ -103,10 +108,16 @@ async function getBusinessSnapshot() {
     };
   }
 
+  // Convert rules array to a plain object for easy AI consumption
+  const rules: Record<string, string> = {};
+  for (const r of rulesRows ?? []) rules[r.key] = r.value;
+
   return {
     today: todayStr,
     upcomingWindowEnd: in90Days,
     company: "COME Porto — Premium food tours and corporate events company based in Porto, Portugal",
+    businessRules: rulesRows?.map((r) => ({ key: r.key, value: r.value, description: r.description })) ?? [],
+    _rules: rules, // flat map for fast AI lookup
     team: (team ?? []).map((m) => ({ name: m.name, role: m.role })),
     services: (services ?? []).map((sv) => ({
       name: sv.name,
@@ -171,19 +182,33 @@ export async function POST(req: NextRequest) {
     snapshot = { today: new Date().toISOString().split("T")[0] } as never;
   }
 
+  const rules = snapshot._rules as Record<string, string>;
+  const maxPerDay = parseInt(rules["max_services_per_day"] ?? "2", 10);
+  const staleProspectDays = rules["prospect_stale_days"] ?? "30";
+
+  // Build rules block dynamically from DB
+  const rulesBlock = snapshot.businessRules.length > 0
+    ? snapshot.businessRules
+        .map((r) => `- **${r.key}** = ${r.value}${r.description ? ` — ${r.description}` : ""}`)
+        .join("\n")
+    : "- No rules configured in DB yet.";
+
   const systemPrompt = `You are the business assistant for COME Porto, a premium food tours and corporate events company based in Porto, Portugal.
 
 You have access to real-time business data including ALL upcoming bookings for the next 90 days (in snapshot.upcoming.bookings). Use this data to answer questions precisely.
 
-## Availability rules
-- **Maximum 2 services per day** — this is a hard business rule. If a date already has 2 active bookings (status != Cancelado), it is FULL and no more services can be added.
-- To check availability for a specific date: count all entries in snapshot.upcoming.bookings where `date` matches. If count >= 2 → NOT available. If count < 2 → available (subject to guide/chef assignment).
-- Always state clearly how many bookings already exist on that date and whether the limit has been reached.
+## Business rules (from database — these are authoritative)
+${rulesBlock}
+
+## How to apply the rules
+- **Availability check**: count entries in snapshot.upcoming.bookings where \`date\` matches the requested date (all non-cancelled bookings count). If that count >= ${maxPerDay} (max_services_per_day) → NOT available. If count < ${maxPerDay} → available.
+- **Stale prospects**: a CRM prospect is stale if last_contacted_at is more than ${staleProspectDays} days ago (prospect_stale_days).
+- Always state how many bookings already exist on the queried date and whether the limit has been reached.
 - The team list (snapshot.team) shows all available staff and their roles.
 
-## General rules
+## General
 - Be concise and precise. Use the actual data, never guess.
-- When the data doesn't cover something (e.g., external calendars, Calendly, real-time guide availability), say so clearly.
+- When the data doesn't cover something (e.g., external calendars, real-time guide availability), say so clearly.
 - Respond in the same language the user writes in (Portuguese if they write Portuguese, English if English).
 
 Current business data (today: ${snapshot.today}, upcoming window until: ${snapshot.upcomingWindowEnd}):
