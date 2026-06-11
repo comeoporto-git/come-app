@@ -510,7 +510,7 @@ export function AnalyticsDashboard({
       if (t.supplier.startsWith("IN -")) {
         finRevMap[k] = (finRevMap[k] ?? 0) + t.totalCost;
       } else {
-        finCostMap[k] = (finCostMap[k] ?? 0) + t.totalCost;
+        finCostMap[k] = (finCostMap[k] ?? 0) + Math.abs(t.totalCost);
       }
     }
     const allFinMonths = [...new Set([...Object.keys(finRevMap), ...Object.keys(finCostMap)])].sort();
