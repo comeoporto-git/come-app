@@ -176,11 +176,9 @@ export async function POST(req: NextRequest) {
 You have access to real-time business data including ALL upcoming bookings for the next 90 days (in snapshot.upcoming.bookings). Use this data to answer questions precisely.
 
 ## Availability rules
-- A date is "available" for a given tour/service if there is no existing active booking (status != Cancelado) for the SAME service on that date, OR if the team has enough staff to run concurrent tours.
-- COME Porto CAN run multiple tours on the same day as long as there are enough guides/chefs.
-- To check availability for a specific date + service: look in snapshot.upcoming.bookings for entries where date matches AND service name matches the requested tour.
-- If no booking exists for that service on that date → likely available (but guide/chef assignment still needs to be confirmed).
-- If a booking already exists for that service on that date → flag it and check if a second run is feasible given team size.
+- **Maximum 2 services per day** — this is a hard business rule. If a date already has 2 active bookings (status != Cancelado), it is FULL and no more services can be added.
+- To check availability for a specific date: count all entries in snapshot.upcoming.bookings where `date` matches. If count >= 2 → NOT available. If count < 2 → available (subject to guide/chef assignment).
+- Always state clearly how many bookings already exist on that date and whether the limit has been reached.
 - The team list (snapshot.team) shows all available staff and their roles.
 
 ## General rules
