@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { getFornecedores } from "@/lib/notion";
+import { AiChat } from "@/components/AiChat";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
@@ -25,6 +26,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       <div className={`flex-1 min-w-0 ${!isAccountant ? "md:ml-[220px] pt-12 md:pt-0" : ""} min-h-screen bg-[#667470] text-[#32373c]`}>
         {children}
       </div>
+      {!isAccountant && <AiChat />}
     </div>
   );
 }
