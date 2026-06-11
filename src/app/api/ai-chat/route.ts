@@ -8,12 +8,15 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 async function getBusinessSnapshot() {
   const now = new Date();
   const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0];
-  const thisYearStart = `${now.getFullYear()}-01-01`;
-  const todayStr = now.toISOString().split("T")[0];
-  const in90Days = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+  const thisMonthEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split("T")[0];
+  const thisYearStart  = `${now.getFullYear()}-01-01`;
+  const thisYearEnd    = `${now.getFullYear()}-12-31`;
+  const todayStr       = now.toISOString().split("T")[0];
+  const in90Days       = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
 
+  // Include service pricing so we can compute expected revenue per sale
   const SALE_SELECT = `id, date, status, number_of_guests, expenses_closed, start_time, end_time,
-    services(name, type, equipa),
+    services(name, type, equipa, pax_2_3, pax_4_6, pax_7_plus),
     clients(name),
     guide:guide_id(name),
     chef:chef_id(name)`;
@@ -37,28 +40,32 @@ async function getBusinessSnapshot() {
       .lte("date", in90Days)
       .neq("status", "Cancelado")
       .order("date", { ascending: true }),
-    // This month (past + today) for financial/ops stats
+    // Full current month sales (past + future) for revenue projection
     supabase
       .from("sales")
       .select(SALE_SELECT)
       .gte("date", thisMonthStart)
-      .lte("date", todayStr),
-    // YTD count
+      .lte("date", thisMonthEnd)
+      .neq("status", "Cancelado"),
+    // YTD sales for totals
     supabase
       .from("sales")
-      .select("id, date, number_of_guests")
+      .select(SALE_SELECT)
       .gte("date", thisYearStart)
-      .lte("date", todayStr),
+      .lte("date", thisYearEnd)
+      .neq("status", "Cancelado"),
+    // Full month transactions (earnings already recorded)
     supabase
       .from("transactions")
       .select("id, supplier, valor, date, who_paid, status, accountant_verified, type")
       .gte("date", thisMonthStart)
-      .lte("date", todayStr),
+      .lte("date", thisMonthEnd),
+    // YTD transactions
     supabase
       .from("transactions")
       .select("id, supplier, valor, date, who_paid, status, accountant_verified, type")
       .gte("date", thisYearStart)
-      .lte("date", todayStr),
+      .lte("date", thisYearEnd),
     supabase
       .from("sales_pipeline")
       .select("id, name, stage, industry, country, company_size, last_contacted_at, notes")
@@ -93,18 +100,24 @@ async function getBusinessSnapshot() {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   function mapSale(s: any) {
+    const svc = s.services ?? {};
+    const guests = s.number_of_guests ?? 0;
+    const p1  = (svc.pax_2_3 ?? 0) * 2;
+    const p23 = svc.pax_2_3   ?? 0;
+    const p46 = svc.pax_4_6   ?? 0;
+    const p7  = svc.pax_7_plus ?? 0;
+    const pricePerPax = guests >= 7 ? p7 : guests >= 4 ? p46 : guests >= 2 ? p23 : p1;
+    const expectedRevenue = pricePerPax * guests;
     return {
-      service: s.services?.name ?? "",
-      serviceType: s.services?.type ?? "",
-      requiredRoles: s.services?.equipa ?? [],
+      service: svc.name ?? "",
       client: s.clients?.name ?? "",
       date: s.date,
-      guests: s.number_of_guests,
+      guests,
       status: s.status,
       startTime: s.start_time ?? null,
       endTime: s.end_time ?? null,
       guide: s.guide?.name ?? null,
-      chef: s.chef?.name ?? null,
+      expectedRevenue: expectedRevenue > 0 ? expectedRevenue : null,
     };
   }
 
@@ -131,26 +144,34 @@ async function getBusinessSnapshot() {
     thisMonth: {
       salesCount: (thisMonthSales ?? []).length,
       totalGuests: (thisMonthSales ?? []).reduce((s, t) => s + (t.number_of_guests ?? 0), 0),
+      // Projected revenue = sum of expectedRevenue for all non-cancelled services this month
+      projectedRevenue: (thisMonthSales ?? [])
+        .map(mapSale)
+        .reduce((s, t) => s + (t.expectedRevenue ?? 0), 0)
+        .toFixed(2),
+      // Recorded earnings = Earning transactions already entered this month
+      recordedEarnings: monthEarnings.toFixed(2),
+      recordedExpenses: monthExpenses.toFixed(2),
       sales: (thisMonthSales ?? []).map(mapSale),
-      expenses: monthExpenses.toFixed(2),
-      earnings: monthEarnings.toFixed(2),
-      transactions: (thisMonthTx ?? []).map((t) => ({
-        supplier: t.supplier,
-        type: t.type,       // "Earning" or "Expense"
-        amount: t.valor,    // positive for Earning, negative for Expense
-        date: t.date,
-        who_paid: t.who_paid,
-        status: t.status,
-      })),
+      earningTransactions: (thisMonthTx ?? [])
+        .filter((t) => t.type === "Earning")
+        .map((t) => ({ supplier: t.supplier, amount: t.valor, date: t.date })),
+      expenseTransactions: (thisMonthTx ?? [])
+        .filter((t) => t.type === "Expense")
+        .map((t) => ({ supplier: t.supplier, amount: Math.abs(t.valor ?? 0), date: t.date, who_paid: t.who_paid })),
     },
     thisYear: {
       salesCount: (thisYearSales ?? []).length,
       totalGuests: (thisYearSales ?? []).reduce((s, t) => s + (t.number_of_guests ?? 0), 0),
-      earnings: (thisYearTx ?? [])
+      projectedRevenue: (thisYearSales ?? [])
+        .map(mapSale)
+        .reduce((s, t) => s + (t.expectedRevenue ?? 0), 0)
+        .toFixed(2),
+      recordedEarnings: (thisYearTx ?? [])
         .filter((t) => t.type === "Earning")
         .reduce((s, t) => s + Math.abs(t.valor ?? 0), 0)
         .toFixed(2),
-      expenses: (thisYearTx ?? [])
+      recordedExpenses: (thisYearTx ?? [])
         .filter((t) => t.type === "Expense")
         .reduce((s, t) => s + Math.abs(t.valor ?? 0), 0)
         .toFixed(2),
@@ -214,6 +235,12 @@ ${rulesBlock}
 - **Stale prospects**: a CRM prospect is stale if last_contacted_at is more than ${staleProspectDays} days ago (prospect_stale_days).
 - Always state how many bookings already exist on the queried date and whether the limit has been reached.
 - The team list (snapshot.team) shows all available staff and their roles.
+
+## Revenue / Faturação
+- **thisMonth.projectedRevenue**: total expected revenue for the full month based on confirmed services × service pricing tiers. Use this to answer "quanto vamos faturar este mês / em junho".
+- **thisMonth.recordedEarnings**: earnings already recorded as transactions (may be incomplete mid-month).
+- Each sale in thisMonth.sales has an \`expectedRevenue\` field (€) computed from the service price tier × number of guests.
+- When answering revenue questions, lead with projectedRevenue and clarify that recordedEarnings may differ if not all invoices have been entered yet.
 
 ## General
 - Be concise and precise. Use the actual data, never guess.
