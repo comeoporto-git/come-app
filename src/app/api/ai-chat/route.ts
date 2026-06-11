@@ -227,10 +227,18 @@ You have access to real-time business data including ALL upcoming bookings for t
 ## Business rules (from database — these are authoritative)
 ${rulesBlock}
 
-## How to apply the rules
-- **Availability check**: count entries in snapshot.upcoming.bookings where \`date\` matches the requested date (all non-cancelled bookings count). If that count >= ${maxPerDay} (max_services_per_day) → NOT available. If count < ${maxPerDay} → available.
-- **Stale prospects**: a CRM prospect is stale if last_contacted_at is more than ${staleProspectDays} days ago (prospect_stale_days).
-- Always state how many bookings already exist on the queried date and whether the limit has been reached.
+## Availability check — STRICT PROTOCOL (follow exactly, in this order)
+When asked about availability for a date + service:
+1. Filter snapshot.upcoming.bookings for that exact date.
+2. Count the results (N).
+3. Check service-specific rules first (e.g. "Maximum Cooking Class at Chefs House per day = 1" means max 1 of that service).
+4. Then check the general limit: max_services_per_day = ${maxPerDay} (total across all services).
+5. **Decide BEFORE writing your answer**: if N >= limit → NOT available. If N < limit → available.
+6. **State the conclusion in your very first sentence** — do NOT lead with "yes" and then correct yourself. Example: "Não há disponibilidade no dia X — já temos N serviços marcados (limite: ${maxPerDay})."
+7. List the existing bookings on that day as supporting evidence after the conclusion.
+
+## Other rules
+- **Stale prospects**: a CRM prospect is stale if last_contacted_at is more than ${staleProspectDays} days ago.
 - The team list (snapshot.team) shows all available staff and their roles.
 
 ## Revenue / Faturação
