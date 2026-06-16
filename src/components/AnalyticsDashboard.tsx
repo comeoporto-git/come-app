@@ -200,11 +200,13 @@ function StackedVBars({ data, max, barHeight = 88, formatValue }: {
   formatValue?: (v: number) => string;
 }) {
   const fmtVal = (v: number) => formatValue ? formatValue(v) : fmt(v);
+  const [hovered, setHovered] = useState<{ col: string; status: string } | null>(null);
   return (
     <div className="[overflow-x:clip] flex items-end gap-2" style={{ height: `${barHeight + 32}px` }}>
       {data.map(({ label, segments: seg, total, isFuture }) => {
         const totalPct = max > 0 ? (total / max) * 100 : 0;
         const entries  = Object.entries(seg).sort((a, b) => b[1] - a[1]);
+        const activeStatus = hovered?.col === label ? hovered.status : null;
         return (
           <div key={label} className="group/svbar flex-1 min-w-0 flex flex-col items-center gap-1 h-full justify-end">
             {total > 0 && (
@@ -215,9 +217,9 @@ function StackedVBars({ data, max, barHeight = 88, formatValue }: {
                 <div className="bg-[#32373c] text-white text-[11px] font-semibold rounded px-2 py-1.5 whitespace-nowrap shadow space-y-1">
                   <div className="border-b border-white/20 pb-1 mb-0.5">{fmtVal(total)}</div>
                   {entries.map(([status, value]) => (
-                    <div key={status} className="flex items-center gap-1.5">
+                    <div key={status} className={`flex items-center gap-1.5 transition-opacity ${activeStatus && activeStatus !== status ? "opacity-40" : ""}`}>
                       <span className={`inline-block w-2 h-2 rounded-sm shrink-0 ${STATUS_COLORS[status] ?? "bg-gray-400"}`} />
-                      <span>{status}: {fmtVal(value)}</span>
+                      <span className={activeStatus === status ? "font-bold" : ""}>{status}: {fmtVal(value)}</span>
                     </div>
                   ))}
                 </div>
@@ -235,8 +237,10 @@ function StackedVBars({ data, max, barHeight = 88, formatValue }: {
                     return (
                       <div
                         key={status}
-                        className={`absolute w-full ${STATUS_COLORS[status] ?? "bg-gray-400"}`}
+                        className={`absolute w-full ${STATUS_COLORS[status] ?? "bg-gray-400"} transition-opacity ${activeStatus && activeStatus !== status ? "opacity-50" : ""}`}
                         style={{ bottom: `${bottom}%`, height: `${segPct}%` }}
+                        onMouseEnter={() => setHovered({ col: label, status })}
+                        onMouseLeave={() => setHovered(null)}
                       />
                     );
                   });
