@@ -114,7 +114,7 @@ function SectionCard({ title, sub, children }: {
         <h2 className="text-sm font-semibold text-[#32373c]">{title}</h2>
         {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
       </div>
-      <div className="px-4 sm:px-5 py-4 overflow-hidden">{children}</div>
+      <div className="px-4 sm:px-5 py-4">{children}</div>
     </section>
   );
 }
@@ -135,7 +135,7 @@ function VBars({ entries, max, color, colors, formatValue, formatValues, barHeig
   baseColors?: string[];
 }) {
   return (
-    <div className="overflow-x-hidden flex items-end gap-2" style={{ height: `${barHeight + 32}px` }}>
+    <div className="[overflow-x:clip] flex items-end gap-2" style={{ height: `${barHeight + 32}px` }}>
       {entries.map(([label, value], i) => {
         const pct       = (value / max) * 100;
         const barColor  = colors?.[i] ?? color;
@@ -201,7 +201,7 @@ function StackedVBars({ data, max, barHeight = 88, formatValue }: {
 }) {
   const fmtVal = (v: number) => formatValue ? formatValue(v) : fmt(v);
   return (
-    <div className="overflow-x-hidden flex items-end gap-2" style={{ height: `${barHeight + 32}px` }}>
+    <div className="[overflow-x:clip] flex items-end gap-2" style={{ height: `${barHeight + 32}px` }}>
       {data.map(({ label, segments: seg, total, isFuture }) => {
         const totalPct = max > 0 ? (total / max) * 100 : 0;
         const entries  = Object.entries(seg).sort((a, b) => b[1] - a[1]);
