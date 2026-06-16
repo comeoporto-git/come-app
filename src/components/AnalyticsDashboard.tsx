@@ -324,7 +324,7 @@ export function AnalyticsDashboard({
   const maxYearlyRevenue  = Math.max(...yearlyData.map((d) => d.revenue), 1);
   const hasYearlyRevenue  = yearlyData.some((d) => d.revenue > 0);
   const yearlyHasFuture   = yearlyData.some((d) => d.isFuture || d.hasFuturePartial);
-  const yearlyBillingTotals = yearlyData.map((d) => Object.values(d.billingByStatus).reduce((a, b) => a + b, 0));
+  const yearlyBillingTotals = yearlyData.map((d) => Object.values(d.revenueByStatus).reduce((a, b) => a + b, 0));
   const maxYearlyBilling    = Math.max(...yearlyBillingTotals, 1);
   const hasYearlyBilling    = yearlyBillingTotals.some((v) => v > 0);
 
@@ -398,12 +398,15 @@ export function AnalyticsDashboard({
     const topStatuses = Object.entries(byStatus).sort((a, b) => b[1] - a[1]);
     const maxStatus   = Math.max(...topStatuses.map(([, v]) => v), 1);
 
-    // Revenue by status — expected billing (price × pax) grouped by tour status
+    // Revenue by status — actual transaction values grouped by the linked tour's status
+    const tourStatusById = new Map(
+      allTours.filter((t) => t.id).map((t) => [t.id!, t.status || "Sem estado"])
+    );
     const revenueByStatus: Record<string, number> = {};
-    for (const t of tours) {
-      if (!t.expectedRevenue) continue;
-      const s = t.status || "Sem estado";
-      revenueByStatus[s] = (revenueByStatus[s] ?? 0) + t.expectedRevenue;
+    for (const t of txns) {
+      if (!(t.supplier.startsWith("IN -") || t.txType === "Earning")) continue;
+      const s = t.tourId ? (tourStatusById.get(t.tourId) ?? "Sem estado") : "Sem estado";
+      revenueByStatus[s] = (revenueByStatus[s] ?? 0) + t.totalCost;
     }
     const topRevenueByStatus = Object.entries(revenueByStatus).sort((a, b) => b[1] - a[1]);
     const maxRevenueByStatus = Math.max(...topRevenueByStatus.map(([, v]) => v), 1);
@@ -505,25 +508,35 @@ export function AnalyticsDashboard({
     const topMethods = Object.entries(byMethod).sort((a, b) => b[1] - a[1]);
     const maxMethod  = Math.max(...topMethods.map(([, v]) => v), 1);
 
-    // Monthly financials (same window as service monthly trend)
+    // Monthly financials — build explicit month range from the selected date picker dates
     const finRevMap: Record<string, number> = {};
     const finCostMap: Record<string, number> = {};
-    for (let i = numMonths - 1; i >= 0; i--) {
-      const d2 = new Date(effectiveEnd); d2.setDate(1); d2.setMonth(d2.getMonth() - i);
-      const k = monthKey(d2);
-      finRevMap[k] = 0;
-      finCostMap[k] = 0;
+    const finMonthRange = new Set<string>();
+    if (start) {
+      const cur = new Date(start); cur.setDate(1);
+      const endBound = new Date(effectiveEnd); endBound.setDate(1);
+      while (cur <= endBound) {
+        finMonthRange.add(monthKey(cur));
+        cur.setMonth(cur.getMonth() + 1);
+      }
+    } else {
+      for (let i = numMonths - 1; i >= 0; i--) {
+        const d2 = new Date(effectiveEnd); d2.setDate(1); d2.setMonth(d2.getMonth() - i);
+        finMonthRange.add(monthKey(d2));
+      }
     }
+    for (const k of finMonthRange) { finRevMap[k] = 0; finCostMap[k] = 0; }
     for (const t of txns) {
       if (!t.date) continue;
       const k = monthKey(new Date(t.date));
+      if (!finMonthRange.has(k)) continue;
       if (isBillableEarning(t)) {
         finRevMap[k] = (finRevMap[k] ?? 0) + t.totalCost;
       } else if (!isEarning(t)) {
         finCostMap[k] = (finCostMap[k] ?? 0) + Math.abs(t.totalCost);
       }
     }
-    const allFinMonths = [...new Set([...Object.keys(finRevMap), ...Object.keys(finCostMap)])].sort();
+    const allFinMonths = [...finMonthRange].sort();
     const monthlyFinancials = allFinMonths.map((k) => ({
       label: monthLabel(k),
       revenue: finRevMap[k] ?? 0,
@@ -644,7 +657,7 @@ export function AnalyticsDashboard({
             )}
           </SectionCard>
 
-          <SectionCard title="Receita por Estado" sub="Faturação esperada (preço × pax) agrupada pelo estado do serviço">
+          <SectionCard title="Receita por Estado" sub="Receita registada em transações agrupada pelo estado do serviço">
             {a.topRevenueByStatus.length === 0 ? <EmptyState /> : (
               <div className="space-y-3">
                 {a.topRevenueByStatus.map(([status, rev]) => (
@@ -687,11 +700,11 @@ export function AnalyticsDashboard({
                   <div className="border-t border-gray-50" />
                   <div>
                     <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wide mb-3">Faturação por Status</p>
-                    <p className="text-[11px] text-gray-400 mb-3 -mt-2">Faturação esperada (preço × pax) · exclui cancelados</p>
+                    <p className="text-[11px] text-gray-400 mb-3 -mt-2">Receita registada em transações · exclui cancelados</p>
                     <StackedVBars
                       data={yearlyData.map((d, i) => ({
                         label: String(d.year),
-                        segments: d.billingByStatus,
+                        segments: d.revenueByStatus,
                         total: yearlyBillingTotals[i],
                         isFuture: d.isFuture,
                       }))}
@@ -699,7 +712,7 @@ export function AnalyticsDashboard({
                       formatValue={fmtEur}
                     />
                     {(() => {
-                      const statuses = [...new Set(yearlyData.flatMap((d) => Object.keys(d.billingByStatus)))];
+                      const statuses = [...new Set(yearlyData.flatMap((d) => Object.keys(d.revenueByStatus)))];
                       return statuses.length > 0 ? (
                         <ChartLegend items={statuses.map((s) => ({ color: STATUS_COLORS[s] ?? "bg-gray-400", label: s }))} />
                       ) : null;
