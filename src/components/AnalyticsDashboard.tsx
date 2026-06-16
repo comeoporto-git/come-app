@@ -109,12 +109,12 @@ function SectionCard({ title, sub, children }: {
   title: string; sub?: string; children: React.ReactNode;
 }) {
   return (
-    <section className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden [transform:translateZ(0)]">
+    <section className="bg-white rounded-2xl border border-gray-100 shadow-sm [transform:translateZ(0)]">
       <div className="px-4 sm:px-5 py-4 border-b border-gray-50">
         <h2 className="text-sm font-semibold text-[#32373c]">{title}</h2>
         {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
       </div>
-      <div className="px-4 sm:px-5 py-4">{children}</div>
+      <div className="px-4 sm:px-5 py-4 overflow-hidden">{children}</div>
     </section>
   );
 }

@@ -1459,8 +1459,8 @@ export async function getDashboardMonthlyStats(): Promise<DashboardMonthlyStats>
       .gte("data", lastMonthStart).lt("data", thisMonthStart).like("notion_id", "IN -%").gt("valor", 0),
   ]);
 
-  const notCancelled = (r: { valor: any; sales: { status: any }[] | null }) =>
-    !r.sales || r.sales.length === 0 || r.sales[0]?.status !== "Cancelled";
+  const notCancelled = (r: { valor: any; sales: any }) =>
+    !r.sales || (r.sales as { status: any }).status !== "Cancelled";
 
   return {
     serviceCount: salesThis.data?.length ?? 0,
