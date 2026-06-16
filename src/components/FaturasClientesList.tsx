@@ -67,6 +67,12 @@ function SaleCard({
   );
 }
 
+function saleValue(sale: FinalisedSale, earningsBySale: Record<string, Transaction>): number {
+  const existing = earningsBySale[sale.id];
+  if (existing) return Math.abs(existing.totalCost);
+  return Math.round(sale.pricePerPax * Math.max(sale.numGuests, 1) * 1.23 * 100) / 100;
+}
+
 export function FaturasClientesList({
   sales,
   invoicedSales,
@@ -78,8 +84,28 @@ export function FaturasClientesList({
 }) {
   const [selected, setSelected] = useState<FinalisedSale | null>(null);
 
+  const totalisedTotal = sales.reduce((sum, s) => sum + saleValue(s, earningsBySale), 0);
+  const invoicedTotal  = invoicedSales.reduce((sum, s) => sum + saleValue(s, earningsBySale), 0);
+
   return (
     <>
+      <div className="flex gap-3 mb-6">
+        {sales.length > 0 && (
+          <div className="flex-1 bg-white/20 rounded-2xl p-4">
+            <p className="text-xs font-semibold text-white/60 uppercase tracking-wider mb-1">Por faturar</p>
+            <p className="text-2xl font-bold text-white">€{totalisedTotal.toFixed(2)}</p>
+            <p className="text-xs text-white/50 mt-0.5">{sales.length} serviço{sales.length !== 1 ? "s" : ""} Finalised</p>
+          </div>
+        )}
+        {invoicedSales.length > 0 && (
+          <div className="flex-1 bg-white/10 rounded-2xl p-4">
+            <p className="text-xs font-semibold text-white/60 uppercase tracking-wider mb-1">Faturado</p>
+            <p className="text-2xl font-bold text-white/70">€{invoicedTotal.toFixed(2)}</p>
+            <p className="text-xs text-white/40 mt-0.5">{invoicedSales.length} serviço{invoicedSales.length !== 1 ? "s" : ""} Invoiced</p>
+          </div>
+        )}
+      </div>
+
       {sales.length > 0 && (
         <ul className="space-y-3">
           {sales.map((sale) => (
