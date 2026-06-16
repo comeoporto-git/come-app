@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import type { FinalisedSale, Transaction } from "@/lib/notion";
 import { ClientInvoiceModal } from "./ClientInvoiceModal";
 
@@ -37,7 +38,13 @@ function SaleCard({
           <p className="text-xs text-gray-400 mt-0.5">{sale.date?.slice(0, 10) ?? "—"}</p>
         </div>
         <div className="text-right shrink-0">
-          <p className="text-xs text-gray-400 font-mono">{sale.saleId}</p>
+          <Link
+            href={`/guide/tours/${sale.id}`}
+            onClick={(e) => e.stopPropagation()}
+            className="text-xs text-[#667470] font-mono font-semibold hover:underline"
+          >
+            {sale.saleId}
+          </Link>
           {sale.numGuests > 0 && (
             <p className="text-xs text-gray-500 mt-0.5">{sale.numGuests} pax</p>
           )}
@@ -154,7 +161,12 @@ export function FaturasClientesList({
                       <p className="text-xs text-gray-400 mt-0.5">{sale.date?.slice(0, 10) ?? "—"}</p>
                     </div>
                     <div className="text-right shrink-0">
-                      <p className="text-xs text-gray-400 font-mono">{sale.saleId}</p>
+                      <Link
+                        href={`/guide/tours/${sale.id}`}
+                        className="text-xs text-[#667470] font-mono font-semibold hover:underline"
+                      >
+                        {sale.saleId}
+                      </Link>
                       {sale.numGuests > 0 && (
                         <p className="text-xs text-gray-500 mt-0.5">{sale.numGuests} pax</p>
                       )}
