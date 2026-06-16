@@ -302,11 +302,12 @@ export function AnalyticsDashboard({
     );
     for (const t of allTransactions) {
       if (!t.date || !t.supplier.startsWith("IN -")) continue;
+      const tourStatus = t.tourId ? (tourStatusById.get(t.tourId) ?? "Sem estado") : "Sem estado";
+      if (tourStatus === "Cancelled") continue;
       const y = new Date(t.date).getFullYear();
       if (!map[y]) map[y] = { services: 0, futureSvcs: 0, servicesByStatus: {}, revenue: 0, revenueByStatus: {}, billingByStatus: {} };
       map[y].revenue += t.totalCost;
-      const status = t.tourId ? (tourStatusById.get(t.tourId) ?? "Sem estado") : "Sem estado";
-      map[y].revenueByStatus[status] = (map[y].revenueByStatus[status] ?? 0) + t.totalCost;
+      map[y].revenueByStatus[tourStatus] = (map[y].revenueByStatus[tourStatus] ?? 0) + t.totalCost;
     }
     return Object.entries(map)
       .map(([year, d]) => ({
