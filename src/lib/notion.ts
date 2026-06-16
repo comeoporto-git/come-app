@@ -1453,17 +1453,20 @@ export async function getDashboardMonthlyStats(): Promise<DashboardMonthlyStats>
     supabase.from("sales").select("id")
       .gte("date", lastMonthStart).lt("date", thisMonthStart)
       .neq("status", "Cancelled"),
-    supabase.from("transactions").select("valor")
+    supabase.from("transactions").select("valor, sales!transactions_sale_id_fkey(status)")
       .gte("data", thisMonthStart).lt("data", nextMonthStart).like("notion_id", "IN -%").gt("valor", 0),
-    supabase.from("transactions").select("valor")
+    supabase.from("transactions").select("valor, sales!transactions_sale_id_fkey(status)")
       .gte("data", lastMonthStart).lt("data", thisMonthStart).like("notion_id", "IN -%").gt("valor", 0),
   ]);
+
+  const notCancelled = (r: { valor: any; sales: { status: any }[] | null }) =>
+    !r.sales || r.sales.length === 0 || r.sales[0]?.status !== "Cancelled";
 
   return {
     serviceCount: salesThis.data?.length ?? 0,
     totalPax: (salesThis.data ?? []).reduce((s, r) => s + (r.number_of_guests ?? 0), 0),
-    revenue: (txThis.data ?? []).reduce((s, r) => s + (r.valor ?? 0), 0),
-    lastMonthRevenue: (txLast.data ?? []).reduce((s, r) => s + (r.valor ?? 0), 0),
+    revenue: (txThis.data ?? []).filter(notCancelled).reduce((s, r) => s + (r.valor ?? 0), 0),
+    lastMonthRevenue: (txLast.data ?? []).filter(notCancelled).reduce((s, r) => s + (r.valor ?? 0), 0),
     lastMonthServiceCount: salesLast.data?.length ?? 0,
   };
 }
