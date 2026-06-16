@@ -895,7 +895,7 @@ export async function getAnalyticsTransactions(): Promise<Transaction[]> {
     while (true) {
       const { data } = await supabase.from("transactions")
         .select(TX_SELECT)
-        .neq("status", "Archived")
+        .or("status.is.null,status.neq.Archived")
         .order("data", { ascending: false })
         .range(from, from + PAGE - 1);
       if (!data?.length) break;
