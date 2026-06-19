@@ -1,13 +1,13 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { getGuideExpenses } from "@/lib/notion";
+import { getGuideExpenses, getFornecedores } from "@/lib/notion";
 import { GuideExpensesList } from "@/components/GuideExpensesList";
 
 export default async function TransferenciasPage() {
   const session = await auth();
   if (!session || session.user.role !== "Admin") redirect("/");
 
-  const guideExpenses = await getGuideExpenses();
+  const [guideExpenses, fornecedores] = await Promise.all([getGuideExpenses(), getFornecedores()]);
 
   return (
     <div className="min-h-screen bg-[#667470] text-[#32373c]">
@@ -29,7 +29,7 @@ export default async function TransferenciasPage() {
               ✅ Sem transferências pendentes
             </div>
           ) : (
-            <GuideExpensesList expenses={guideExpenses} />
+            <GuideExpensesList expenses={guideExpenses} fornecedores={fornecedores} />
           )}
         </section>
       </main>

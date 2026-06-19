@@ -2,17 +2,19 @@
 
 import { useState, useRef } from "react";
 import Link from "next/link";
-import type { Transaction } from "@/lib/notion";
+import type { Transaction, Fornecedor } from "@/lib/notion";
 import { uploadComprovantivoAction, markTransferenciaFeitaAction } from "@/actions/transactions";
 import { useRouter } from "next/navigation";
+import { EditExpenseModal } from "./EditExpenseModal";
 
-function GuideExpenseRow({ expense }: { expense: Transaction }) {
+function GuideExpenseRow({ expense, fornecedores }: { expense: Transaction; fornecedores: Fornecedor[] }) {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [marking, setMarking] = useState(false);
   const [localComprovantivoUrl, setLocalComprovantivoUrl] = useState(expense.comprovantivoUrl);
   const [error, setError] = useState("");
+  const [editOpen, setEditOpen] = useState(false);
 
   const hasComprovativo = !!localComprovantivoUrl;
 
@@ -58,9 +60,22 @@ function GuideExpenseRow({ expense }: { expense: Transaction }) {
   const isPendingPayment = expense.status === "Pending Payment";
 
   return (
+    <>
+    {editOpen && (
+      <EditExpenseModal
+        transaction={expense}
+        tourId={expense.tourId ?? ""}
+        fornecedores={fornecedores}
+        userRole="Admin"
+        onClose={() => { setEditOpen(false); router.refresh(); }}
+      />
+    )}
     <li className="px-5 py-4 space-y-3">
       {/* Top row: supplier + amount */}
-      <div className="flex items-start justify-between gap-3">
+      <div
+        className="flex items-start justify-between gap-3 cursor-pointer hover:opacity-70 transition-opacity"
+        onClick={() => setEditOpen(true)}
+      >
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <p className="text-sm font-semibold text-[#32373c] truncate">{expense.supplier}</p>
@@ -160,10 +175,11 @@ function GuideExpenseRow({ expense }: { expense: Transaction }) {
         </label>
       </div>
     </li>
+    </>
   );
 }
 
-export function GuideExpensesList({ expenses }: { expenses: Transaction[] }) {
+export function GuideExpensesList({ expenses, fornecedores = [] }: { expenses: Transaction[]; fornecedores?: Fornecedor[] }) {
   const ready = expenses.filter((e) => !!(e.invoiceId || e.invoiceImageUrl));
   const waitingForInvoice = expenses.filter((e) => !(e.invoiceId || e.invoiceImageUrl));
 
@@ -195,7 +211,7 @@ export function GuideExpensesList({ expenses }: { expenses: Transaction[] }) {
           )}
           <ul className="divide-y divide-gray-50">
             {ready.map((expense) => (
-              <GuideExpenseRow key={expense.id} expense={expense} />
+              <GuideExpenseRow key={expense.id} expense={expense} fornecedores={fornecedores} />
             ))}
           </ul>
         </div>
@@ -207,7 +223,7 @@ export function GuideExpensesList({ expenses }: { expenses: Transaction[] }) {
           </div>
           <ul className="divide-y divide-gray-50 opacity-60">
             {waitingForInvoice.map((expense) => (
-              <GuideExpenseRow key={expense.id} expense={expense} />
+              <GuideExpenseRow key={expense.id} expense={expense} fornecedores={fornecedores} />
             ))}
           </ul>
         </div>
