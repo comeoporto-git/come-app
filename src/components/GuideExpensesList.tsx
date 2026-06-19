@@ -167,6 +167,14 @@ export function GuideExpensesList({ expenses }: { expenses: Transaction[] }) {
   const ready = expenses.filter((e) => !!(e.invoiceId || e.invoiceImageUrl));
   const waitingForInvoice = expenses.filter((e) => !(e.invoiceId || e.invoiceImageUrl));
 
+  const supplierTotals = ready.reduce((acc, expense) => {
+    const key = expense.supplier;
+    acc[key] = (acc[key] || 0) + Math.abs(expense.totalCost);
+    return acc;
+  }, {} as Record<string, number>);
+
+  const sortedSuppliers = Object.entries(supplierTotals).sort((a, b) => b[1] - a[1]);
+
   return (
     <div>
       {ready.length > 0 && (
@@ -174,6 +182,17 @@ export function GuideExpensesList({ expenses }: { expenses: Transaction[] }) {
           <div className="px-5 py-2 bg-green-50 border-b border-green-100">
             <p className="text-xs font-semibold text-green-700">✓ Prontas a transferir ({ready.length})</p>
           </div>
+          {sortedSuppliers.length > 0 && (
+            <div className="px-5 py-3 bg-green-50/50 border-b border-green-100 space-y-1.5">
+              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-2">Total por pessoa / fornecedor</p>
+              {sortedSuppliers.map(([supplier, total]) => (
+                <div key={supplier} className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-[#32373c]">{supplier}</span>
+                  <span className="text-xs font-bold text-red-600">€{total.toFixed(2)}</span>
+                </div>
+              ))}
+            </div>
+          )}
           <ul className="divide-y divide-gray-50">
             {ready.map((expense) => (
               <GuideExpenseRow key={expense.id} expense={expense} />
