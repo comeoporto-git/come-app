@@ -168,7 +168,7 @@ export function GuideExpensesList({ expenses }: { expenses: Transaction[] }) {
   const waitingForInvoice = expenses.filter((e) => !(e.invoiceId || e.invoiceImageUrl));
 
   const supplierTotals = ready.reduce((acc, expense) => {
-    const key = expense.supplier;
+    const key = expense.paidByName || expense.supplier;
     acc[key] = (acc[key] || 0) + Math.abs(expense.totalCost);
     return acc;
   }, {} as Record<string, number>);
