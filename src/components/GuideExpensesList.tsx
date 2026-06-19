@@ -190,6 +190,7 @@ export function GuideExpensesList({ expenses, fornecedores = [] }: { expenses: T
   }, {} as Record<string, number>);
 
   const sortedSuppliers = Object.entries(supplierTotals).sort((a, b) => b[1] - a[1]);
+  const grandTotal = sortedSuppliers.reduce((sum, [, v]) => sum + v, 0);
 
   return (
     <div>
@@ -207,6 +208,10 @@ export function GuideExpensesList({ expenses, fornecedores = [] }: { expenses: T
                   <span className="text-xs font-bold text-red-600">€{total.toFixed(2)}</span>
                 </div>
               ))}
+              <div className="flex items-center justify-between pt-2 mt-1 border-t border-green-200">
+                <span className="text-xs font-bold text-[#32373c]">Total</span>
+                <span className="text-xs font-bold text-red-700">€{grandTotal.toFixed(2)}</span>
+              </div>
             </div>
           )}
           <ul className="divide-y divide-gray-50">
