@@ -185,12 +185,14 @@ export function GuideExpensesList({ expenses, fornecedores = [] }: { expenses: T
 
   const supplierTotals = ready.reduce((acc, expense) => {
     const key = expense.paidByName || expense.supplier;
-    acc[key] = (acc[key] || 0) + Math.abs(expense.totalCost);
+    if (!acc[key]) acc[key] = { total: 0, iban: expense.payeeIban ?? "" };
+    acc[key].total += Math.abs(expense.totalCost);
+    if (!acc[key].iban && expense.payeeIban) acc[key].iban = expense.payeeIban;
     return acc;
-  }, {} as Record<string, number>);
+  }, {} as Record<string, { total: number; iban: string }>);
 
-  const sortedSuppliers = Object.entries(supplierTotals).sort((a, b) => b[1] - a[1]);
-  const grandTotal = sortedSuppliers.reduce((sum, [, v]) => sum + v, 0);
+  const sortedSuppliers = Object.entries(supplierTotals).sort((a, b) => b[1].total - a[1].total);
+  const grandTotal = sortedSuppliers.reduce((sum, [, v]) => sum + v.total, 0);
 
   return (
     <div>
@@ -202,10 +204,13 @@ export function GuideExpensesList({ expenses, fornecedores = [] }: { expenses: T
           {sortedSuppliers.length > 0 && (
             <div className="px-5 py-3 bg-green-50/50 border-b border-green-100 space-y-1.5">
               <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-2">Total por pessoa / fornecedor</p>
-              {sortedSuppliers.map(([supplier, total]) => (
-                <div key={supplier} className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-[#32373c]">{supplier}</span>
-                  <span className="text-xs font-bold text-red-600">€{total.toFixed(2)}</span>
+              {sortedSuppliers.map(([supplier, { total, iban }]) => (
+                <div key={supplier} className="flex items-center justify-between gap-3">
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-xs font-medium text-[#32373c]">{supplier}</span>
+                    {iban && <IbanCopy iban={iban} />}
+                  </div>
+                  <span className="text-xs font-bold text-red-600 shrink-0">€{total.toFixed(2)}</span>
                 </div>
               ))}
               <div className="flex items-center justify-between pt-2 mt-1 border-t border-green-200">
