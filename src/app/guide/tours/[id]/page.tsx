@@ -152,33 +152,33 @@ async function TourPageContent({
           <div className="space-y-5">
             {/* Service Info */}
             <section className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="px-4 py-3 border-b border-gray-50">
-                <h2 className="text-sm font-semibold text-gray-700">Informação do Serviço</h2>
-              </div>
-              <div className="px-4 py-3 space-y-3">
-                {canEditTeam ? (
-                  <ServiceInfoEditor
-                    tourId={id}
-                    status={tour.status}
-                    serviceType={tour.serviceType}
-                    serviceName={tour.serviceName}
-                    serviceId={tour.service}
-                    clientName={tour.clientName}
-                    clientId={tour.client}
-                    numGuests={tour.numGuests}
-                    names={tour.names}
-                    phoneNumber={tour.phoneNumber}
-                    notes={tour.notes}
-                    meetingPoint={tour.meetingPoint}
-                    notionId={tour.saleId}
-                    date={tour.date}
-                    startTime={tour.startTime}
-                    endTime={tour.endTime}
-                    services={servicesList}
-                    clients={clientsList}
-                  />
-                ) : (
-                  <>
+              {canEditTeam ? (
+                <ServiceInfoEditor
+                  tourId={id}
+                  status={tour.status}
+                  serviceType={tour.serviceType}
+                  serviceName={tour.serviceName}
+                  serviceId={tour.service}
+                  clientName={tour.clientName}
+                  clientId={tour.client}
+                  numGuests={tour.numGuests}
+                  names={tour.names}
+                  phoneNumber={tour.phoneNumber}
+                  notes={tour.notes}
+                  meetingPoint={tour.meetingPoint}
+                  notionId={tour.saleId}
+                  date={tour.date}
+                  startTime={tour.startTime}
+                  endTime={tour.endTime}
+                  services={servicesList}
+                  clients={clientsList}
+                />
+              ) : (
+                <>
+                  <div className="px-4 py-3 border-b border-gray-50">
+                    <h2 className="text-sm font-semibold text-gray-700">Informação do Serviço</h2>
+                  </div>
+                  <div className="px-4 py-3 space-y-3">
                     <div>
                       <p className="text-xs text-gray-500 mb-1">Estado</p>
                       {tour.status ? (
@@ -222,9 +222,9 @@ async function TourPageContent({
                       <p className="text-xs text-gray-500 mb-1">Notas</p>
                       <p className="text-sm font-bold text-red-600 whitespace-pre-line">{tour.notes || "—"}</p>
                     </div>
-                  </>
-                )}
-              </div>
+                  </div>
+                </>
+              )}
             </section>
 
             {/* Team */}
