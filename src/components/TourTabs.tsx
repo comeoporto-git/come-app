@@ -90,10 +90,10 @@ function TourCard({
       >
         <div className="flex items-start justify-between gap-3 p-5">
           <div className="flex-1 min-w-0 space-y-1">
-            <p className={`font-semibold text-sm ${past ? "text-[#32373c]/70" : "text-[#32373c]"}`}>
+            <p className={`text-xs ${past ? "text-[#32373c]/50" : "text-gray-400"}`}>
               {tour.saleId}
             </p>
-            <p className="text-xs text-gray-500 flex items-center gap-1">
+            <p className={`font-bold text-base flex items-center gap-1.5 ${past ? "text-[#32373c]/70" : "text-[#32373c]"}`}>
               {formatDate(tour.date)}
               {tour.startTime && (
                 <span>{tour.startTime}{tour.endTime ? ` - ${tour.endTime}` : ""}</span>
