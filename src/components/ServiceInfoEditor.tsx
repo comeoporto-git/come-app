@@ -132,7 +132,25 @@ export function ServiceInfoEditor({
   const statusColor = STATUS_COLORS[status] ?? "bg-gray-100 text-gray-500";
 
   return (
-    <div className="space-y-3">
+    <>
+      <div className="px-4 py-3 border-b border-gray-50 flex items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold text-gray-700">Informação do Serviço</h2>
+        {!editing && (
+          <button
+            type="button"
+            onClick={() => setEditing(true)}
+            aria-label="Editar Informação do Serviço"
+            title="Editar Informação do Serviço"
+            className="text-gray-400 hover:text-[#667470] transition-colors p-1 flex-shrink-0"
+          >
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path>
+              <path d="m15 5 4 4"></path>
+            </svg>
+          </button>
+        )}
+      </div>
+      <div className="px-4 py-3 space-y-3">
       {!editing ? (
         <>
           <div>
@@ -176,9 +194,6 @@ export function ServiceInfoEditor({
           {(date || startTime) && (
             <ReadField label="Horário" value={[date, startTime && endTime ? `${startTime} – ${endTime}` : startTime].filter(Boolean).join(" | ")} />
           )}
-          <button onClick={() => setEditing(true)} className="mt-1 text-xs text-[#667470] font-semibold hover:underline">
-            Editar Informação do Serviço
-          </button>
         </>
       ) : (
         <>
@@ -285,7 +300,8 @@ export function ServiceInfoEditor({
           </div>
         </>
       )}
-    </div>
+      </div>
+    </>
   );
 }
 
