@@ -23,16 +23,14 @@ import { EarningList } from "@/components/EarningList";
 import { SaleEmails } from "@/components/SaleEmails";
 import { getSaleEmails } from "@/lib/integration";
 
-function formatDate(iso: string | null): string {
+function formatDate(iso: string | null, startTime: string | null): string {
   if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("pt-PT", {
+  const datePart = new Date(`${iso}T00:00:00`).toLocaleDateString("pt-PT", {
     weekday: "long",
     day: "numeric",
     month: "long",
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: "Europe/Lisbon",
   });
+  return startTime ? `${datePart} às ${startTime}` : datePart;
 }
 
 // ── Shell (renders immediately, only needs auth cookie) ───────────────────────
@@ -135,7 +133,7 @@ async function TourPageContent({
           <Link href={backHref} className="text-gray-400 hover:text-gray-700">←</Link>
           <div className="flex-1 min-w-0">
             <h1 className="text-base font-semibold text-gray-900 truncate">{tour.saleId}</h1>
-            <p className="text-xs text-gray-500">{formatDate(tour.date)}</p>
+            <p className="text-xs text-gray-500">{formatDate(tour.date, tour.startTime)}</p>
           </div>
           {isClosed && (
             <span className="text-xs bg-gray-100 text-gray-500 px-2 py-1 rounded-full font-medium">
