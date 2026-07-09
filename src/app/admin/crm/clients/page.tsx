@@ -85,12 +85,12 @@ export default async function CRMClientsPage() {
                 <Link
                   key={c.id}
                   href={`/admin/crm/accounts/${c.id}`}
-                  className="flex items-center gap-4 px-5 py-3 hover:bg-gray-50 transition-colors"
+                  className="flex flex-wrap items-center gap-x-4 gap-y-1 px-5 py-3 hover:bg-gray-50 transition-colors"
                 >
                   <div className="w-9 h-9 rounded-full bg-[#667470]/10 flex items-center justify-center text-sm font-bold text-[#667470] shrink-0">
                     {c.name[0]?.toUpperCase()}
                   </div>
-                  <div className="flex-1 min-w-0">
+                  <div className="flex-1 min-w-[140px]">
                     <div className="flex items-center gap-2">
                       <p className="text-sm font-semibold text-[#32373c] truncate">{c.name}</p>
                       {c.category && (
@@ -104,23 +104,25 @@ export default async function CRMClientsPage() {
                       {c.assigned_name ? ` · ${c.assigned_name}` : ""}
                     </p>
                   </div>
-                  <div className="text-right shrink-0">
-                    {c.bookings > 0 ? (
-                      <>
-                        <p className="text-sm font-bold text-[#32373c]">{c.bookings} serviços</p>
-                        <p className="text-xs text-gray-400">{c.totalPax} pax</p>
-                      </>
-                    ) : (
-                      <p className="text-xs text-gray-300">sem serviços</p>
+                  <div className="flex items-center gap-4 ml-auto shrink-0">
+                    <div className="text-right shrink-0">
+                      {c.bookings > 0 ? (
+                        <>
+                          <p className="text-sm font-bold text-[#32373c]">{c.bookings} serviços</p>
+                          <p className="text-xs text-gray-400">{c.totalPax} pax</p>
+                        </>
+                      ) : (
+                        <p className="text-xs text-gray-300">sem serviços</p>
+                      )}
+                    </div>
+                    {c.revenue > 0 && (
+                      <div className="text-right shrink-0 w-20">
+                        <p className="text-xs font-medium text-emerald-600">
+                          {new Intl.NumberFormat("pt-PT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(c.revenue)}
+                        </p>
+                      </div>
                     )}
                   </div>
-                  {c.revenue > 0 && (
-                    <div className="text-right shrink-0 w-24">
-                      <p className="text-xs font-medium text-emerald-600">
-                        {new Intl.NumberFormat("pt-PT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(c.revenue)}
-                      </p>
-                    </div>
-                  )}
                 </Link>
               ))}
             </div>

@@ -26,12 +26,12 @@ export function TopClientsLeaderboard({ clients }: { clients: CRMTopClient[] }) 
       </div>
       <div className="space-y-3">
         {clients.map((c, i) => (
-          <Link key={c.id} href={`/admin/crm/accounts/${c.id}`} className="flex items-center gap-3 group">
+          <Link key={c.id} href={`/admin/crm/accounts/${c.id}`} className="flex flex-wrap items-center gap-x-3 gap-y-1 group">
             {/* Rank */}
             <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${i === 0 ? "bg-yellow-100 text-yellow-600" : i === 1 ? "bg-gray-100 text-gray-500" : i === 2 ? "bg-orange-100 text-orange-600" : "bg-gray-50 text-gray-400"}`}>
               {i + 1}
             </div>
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-[140px]">
               <div className="flex items-center gap-1.5 mb-1">
                 <span className="text-sm font-medium text-[#32373c] truncate group-hover:text-[#667470] transition-colors">{c.name}</span>
                 {c.category && (
@@ -45,15 +45,17 @@ export function TopClientsLeaderboard({ clients }: { clients: CRMTopClient[] }) 
                 />
               </div>
             </div>
-            <div className="text-right shrink-0">
-              <p className="text-sm font-bold text-[#32373c]">{c.bookings}</p>
-              <p className="text-xs text-gray-400">{c.totalPax} pax</p>
-            </div>
-            {c.revenue > 0 && (
-              <div className="text-right shrink-0 w-20">
-                <p className="text-xs font-medium text-emerald-600">{euros(c.revenue)}</p>
+            <div className="flex items-center gap-3 ml-auto shrink-0">
+              <div className="text-right shrink-0">
+                <p className="text-sm font-bold text-[#32373c]">{c.bookings}</p>
+                <p className="text-xs text-gray-400">{c.totalPax} pax</p>
               </div>
-            )}
+              {c.revenue > 0 && (
+                <div className="text-right shrink-0 w-20">
+                  <p className="text-xs font-medium text-emerald-600">{euros(c.revenue)}</p>
+                </div>
+              )}
+            </div>
           </Link>
         ))}
       </div>
