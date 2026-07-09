@@ -430,7 +430,7 @@ export function AccountDetailClient({
               </form>
             )}
           </div>
-          <div className="flex items-center gap-2 flex-wrap shrink-0">
+          <div className="flex flex-wrap items-center gap-2">
             <select
               value={category}
               onChange={handleCategoryChange}
