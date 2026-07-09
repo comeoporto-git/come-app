@@ -95,21 +95,21 @@ export default async function AccountantPage({
           <>
             {/* Summary */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 overflow-hidden">
                 <p className="text-xs text-gray-400 mb-1">Movimentos</p>
-                <p className="text-xl font-bold text-gray-900">{bankTxns.length}</p>
+                <p className="text-xl font-bold text-gray-900 truncate">{bankTxns.length}</p>
               </div>
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 overflow-hidden">
                 <p className="text-xs text-gray-400 mb-1">Saídas</p>
-                <p className="text-xl font-bold text-red-600">-{totalOut.toFixed(2)}€</p>
+                <p className="text-xl font-bold text-red-600 truncate">-{totalOut.toFixed(2)}€</p>
               </div>
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 overflow-hidden">
                 <p className="text-xs text-gray-400 mb-1">Entradas</p>
-                <p className="text-xl font-bold text-green-600">+{totalIn.toFixed(2)}€</p>
+                <p className="text-xl font-bold text-green-600 truncate">+{totalIn.toFixed(2)}€</p>
               </div>
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 overflow-hidden">
                 <p className="text-xs text-gray-400 mb-1">Com fatura</p>
-                <p className="text-xl font-bold text-[#667470]">{matchedCount}/{debits.length}</p>
+                <p className="text-xl font-bold text-[#667470] truncate">{matchedCount}/{debits.length}</p>
               </div>
             </div>
 

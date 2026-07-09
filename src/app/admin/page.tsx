@@ -193,18 +193,18 @@ export default async function AdminDashboard({
         {/* ── KPI Cards ──────────────────────────────────────────────────── */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {/* Revenue */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 overflow-hidden">
             <p className="text-xs text-gray-400 font-medium uppercase tracking-widest mb-1">Receita (mês)</p>
-            <p className="text-2xl font-bold text-[#32373c] tabular-nums">{fmtEur(monthlyStats.revenue)}</p>
+            <p className="text-2xl font-bold text-[#32373c] tabular-nums truncate">{fmtEur(monthlyStats.revenue)}</p>
             <p className={`text-xs mt-1 font-medium ${revTrend.up ? "text-emerald-600" : "text-red-500"}`}>
               {revTrend.text} vs mês passado
             </p>
           </div>
 
           {/* Services */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 overflow-hidden">
             <p className="text-xs text-gray-400 font-medium uppercase tracking-widest mb-1">Serviços (mês)</p>
-            <p className="text-2xl font-bold text-[#32373c] tabular-nums">{monthlyStats.serviceCount}</p>
+            <p className="text-2xl font-bold text-[#32373c] tabular-nums truncate">{monthlyStats.serviceCount}</p>
             <p className="text-xs text-gray-400 mt-1">
               {monthlyStats.totalPax} pax
               <span className={`ml-2 font-medium ${svcTrend.up ? "text-emerald-600" : "text-red-500"}`}>
@@ -214,9 +214,9 @@ export default async function AdminDashboard({
           </div>
 
           {/* CRM Activity */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 overflow-hidden">
             <p className="text-xs text-gray-400 font-medium uppercase tracking-widest mb-1">CRM (mês)</p>
-            <p className="text-2xl font-bold text-[#32373c] tabular-nums">
+            <p className="text-2xl font-bold text-[#32373c] tabular-nums truncate">
               {crmActivity.emailCount + crmActivity.callCount}
             </p>
             <p className="text-xs text-gray-400 mt-1">
@@ -226,9 +226,9 @@ export default async function AdminDashboard({
           </div>
 
           {/* Alerts */}
-          <div className={`rounded-2xl shadow-sm border p-5 ${totalAlerts > 0 ? "bg-red-50 border-red-200" : "bg-emerald-50 border-emerald-200"}`}>
+          <div className={`rounded-2xl shadow-sm border p-5 overflow-hidden ${totalAlerts > 0 ? "bg-red-50 border-red-200" : "bg-emerald-50 border-emerald-200"}`}>
             <p className="text-xs text-gray-500 font-medium uppercase tracking-widest mb-1">Alertas</p>
-            <p className={`text-2xl font-bold tabular-nums ${totalAlerts > 0 ? "text-red-600" : "text-emerald-600"}`}>
+            <p className={`text-2xl font-bold tabular-nums truncate ${totalAlerts > 0 ? "text-red-600" : "text-emerald-600"}`}>
               {totalAlerts > 0 ? totalAlerts : "✓"}
             </p>
             {totalAlerts > 0 ? (

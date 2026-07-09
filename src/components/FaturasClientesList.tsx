@@ -98,16 +98,16 @@ export function FaturasClientesList({
     <>
       <div className="flex gap-3 mb-6">
         {sales.length > 0 && (
-          <div className="flex-1 bg-white/20 rounded-2xl p-4">
+          <div className="flex-1 min-w-0 bg-white/20 rounded-2xl p-4 overflow-hidden">
             <p className="text-xs font-semibold text-white/60 uppercase tracking-wider mb-1">Por faturar</p>
-            <p className="text-2xl font-bold text-white">€{totalisedTotal.toFixed(2)}</p>
+            <p className="text-2xl font-bold text-white truncate">€{totalisedTotal.toFixed(2)}</p>
             <p className="text-xs text-white/50 mt-0.5">{sales.length} serviço{sales.length !== 1 ? "s" : ""} Finalised</p>
           </div>
         )}
         {invoicedSales.length > 0 && (
-          <div className="flex-1 bg-white/10 rounded-2xl p-4">
+          <div className="flex-1 min-w-0 bg-white/10 rounded-2xl p-4 overflow-hidden">
             <p className="text-xs font-semibold text-white/60 uppercase tracking-wider mb-1">Faturado</p>
-            <p className="text-2xl font-bold text-white/70">€{invoicedTotal.toFixed(2)}</p>
+            <p className="text-2xl font-bold text-white/70 truncate">€{invoicedTotal.toFixed(2)}</p>
             <p className="text-xs text-white/40 mt-0.5">{invoicedSales.length} serviço{invoicedSales.length !== 1 ? "s" : ""} Invoiced</p>
           </div>
         )}

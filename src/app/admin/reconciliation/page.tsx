@@ -74,16 +74,16 @@ export default async function ReconciliationPage() {
 
         {/* Match status KPIs */}
         <div className="grid grid-cols-3 gap-2">
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 text-center">
-            <p className="text-xl font-bold text-[#32373c]">{totalAll}</p>
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 text-center overflow-hidden">
+            <p className="text-xl font-bold text-[#32373c] truncate">{totalAll}</p>
             <p className="text-xs text-gray-400 mt-1 leading-tight">Transações no banco</p>
           </div>
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 text-center">
-            <p className="text-xl font-bold text-green-600">{matchedCount}</p>
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 text-center overflow-hidden">
+            <p className="text-xl font-bold text-green-600 truncate">{matchedCount}</p>
             <p className="text-xs text-gray-400 mt-1 leading-tight">Com registo Notion</p>
           </div>
-          <div className={`rounded-2xl border shadow-sm p-3 text-center ${pendingCount > 0 ? "bg-orange-50 border-orange-100" : "bg-white border-gray-100"}`}>
-            <p className={`text-xl font-bold ${pendingCount > 0 ? "text-orange-500" : "text-gray-400"}`}>{pendingCount}</p>
+          <div className={`rounded-2xl border shadow-sm p-3 text-center overflow-hidden ${pendingCount > 0 ? "bg-orange-50 border-orange-100" : "bg-white border-gray-100"}`}>
+            <p className={`text-xl font-bold truncate ${pendingCount > 0 ? "text-orange-500" : "text-gray-400"}`}>{pendingCount}</p>
             <p className="text-xs text-gray-400 mt-1 leading-tight">Sem correspondência</p>
           </div>
         </div>

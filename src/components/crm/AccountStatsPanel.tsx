@@ -26,23 +26,23 @@ export function AccountStatsPanel({ stats }: { stats: CRMAccountStats }) {
 
       {/* KPI row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
-        <div className="bg-gray-50 rounded-xl p-3">
+        <div className="bg-gray-50 rounded-xl p-3 overflow-hidden">
           <p className="text-xs text-gray-400">Serviços</p>
-          <p className="text-2xl font-bold text-[#32373c]">{stats.totalBookings}</p>
+          <p className="text-2xl font-bold text-[#32373c] truncate">{stats.totalBookings}</p>
         </div>
-        <div className="bg-gray-50 rounded-xl p-3">
+        <div className="bg-gray-50 rounded-xl p-3 overflow-hidden">
           <p className="text-xs text-gray-400">Total Pax</p>
-          <p className="text-2xl font-bold text-[#32373c]">{stats.totalPax}</p>
-          <p className="text-xs text-gray-400">média {stats.avgGroupSize} pax</p>
+          <p className="text-2xl font-bold text-[#32373c] truncate">{stats.totalPax}</p>
+          <p className="text-xs text-gray-400 truncate">média {stats.avgGroupSize} pax</p>
         </div>
-        <div className="bg-emerald-50 rounded-xl p-3">
+        <div className="bg-emerald-50 rounded-xl p-3 overflow-hidden">
           <p className="text-xs text-emerald-600">Faturação</p>
-          <p className="text-xl font-bold text-emerald-700">{euros(stats.totalRevenue)}</p>
+          <p className="text-xl font-bold text-emerald-700 truncate">{euros(stats.totalRevenue)}</p>
         </div>
-        <div className="bg-gray-50 rounded-xl p-3">
+        <div className="bg-gray-50 rounded-xl p-3 overflow-hidden">
           <p className="text-xs text-gray-400">Cliente desde</p>
-          <p className="text-sm font-bold text-[#32373c]">{formatDate(stats.firstBooking)}</p>
-          <p className="text-xs text-gray-400">último: {formatDate(stats.lastBooking)}</p>
+          <p className="text-sm font-bold text-[#32373c] truncate">{formatDate(stats.firstBooking)}</p>
+          <p className="text-xs text-gray-400 truncate">último: {formatDate(stats.lastBooking)}</p>
         </div>
       </div>
 

@@ -64,20 +64,20 @@ export function BankSyncButton() {
             </div>
           )}
           <div className="grid grid-cols-4 gap-2 text-center">
-            <div className="bg-blue-50 rounded-xl p-3">
-              <p className="text-lg font-bold text-blue-600">{result.fetched}</p>
+            <div className="bg-blue-50 rounded-xl p-3 overflow-hidden">
+              <p className="text-lg font-bold text-blue-600 truncate">{result.fetched}</p>
               <p className="text-xs text-gray-500">Importados</p>
             </div>
-            <div className="bg-green-50 rounded-xl p-3">
-              <p className="text-lg font-bold text-green-600">{result.matched}</p>
+            <div className="bg-green-50 rounded-xl p-3 overflow-hidden">
+              <p className="text-lg font-bold text-green-600 truncate">{result.matched}</p>
               <p className="text-xs text-gray-500">Matched</p>
             </div>
-            <div className="bg-orange-50 rounded-xl p-3">
-              <p className="text-lg font-bold text-orange-500">{result.unmatched}</p>
+            <div className="bg-orange-50 rounded-xl p-3 overflow-hidden">
+              <p className="text-lg font-bold text-orange-500 truncate">{result.unmatched}</p>
               <p className="text-xs text-gray-500">Sem fatura</p>
             </div>
-            <div className="bg-red-50 rounded-xl p-3">
-              <p className="text-lg font-bold text-red-500">{result.flagged}</p>
+            <div className="bg-red-50 rounded-xl p-3 overflow-hidden">
+              <p className="text-lg font-bold text-red-500 truncate">{result.flagged}</p>
               <p className="text-xs text-gray-500">Flagged</p>
             </div>
           </div>

@@ -75,8 +75,8 @@ function KpiCard({ label, value, sub, accent = false, subAccent = false }: {
 
 function MiniStat({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="bg-gray-50 rounded-xl p-3 text-center">
-      <p className="text-xl font-bold text-[#32373c]">{value}</p>
+    <div className="bg-gray-50 rounded-xl p-3 text-center overflow-hidden">
+      <p className="text-xl font-bold text-[#32373c] truncate">{value}</p>
       <p className="text-xs text-gray-400 mt-0.5">{label}</p>
     </div>
   );

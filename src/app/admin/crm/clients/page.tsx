@@ -47,21 +47,21 @@ export default async function CRMClientsPage() {
       <main className="max-w-5xl mx-auto px-4 py-6 space-y-6">
 
         {/* Header stats */}
-        <div className="grid grid-cols-3 gap-4">
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 text-center">
-            <p className="text-2xl font-bold text-[#32373c]">{clientAccounts.length}</p>
-            <p className="text-xs text-gray-400 mt-1">Total clientes</p>
+        <div className="grid grid-cols-3 gap-2 sm:gap-4">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 sm:p-4 text-center overflow-hidden">
+            <p className="text-lg sm:text-2xl font-bold text-[#32373c] truncate">{clientAccounts.length}</p>
+            <p className="text-[11px] sm:text-xs text-gray-400 mt-1">Total clientes</p>
           </div>
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 text-center">
-            <p className="text-2xl font-bold text-[#32373c]">{withBookings.length}</p>
-            <p className="text-xs text-gray-400 mt-1">Com serviços registados</p>
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 sm:p-4 text-center overflow-hidden">
+            <p className="text-lg sm:text-2xl font-bold text-[#32373c] truncate">{withBookings.length}</p>
+            <p className="text-[11px] sm:text-xs text-gray-400 mt-1">Com serviços registados</p>
           </div>
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 text-center">
-            <p className="text-2xl font-bold text-[#32373c]">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 sm:p-4 text-center overflow-hidden">
+            <p className="text-lg sm:text-2xl font-bold text-[#32373c] truncate">
               {new Intl.NumberFormat("pt-PT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 })
                 .format(withStats.reduce((s, c) => s + c.revenue, 0))}
             </p>
-            <p className="text-xs text-gray-400 mt-1">Receita total registada</p>
+            <p className="text-[11px] sm:text-xs text-gray-400 mt-1">Receita total registada</p>
           </div>
         </div>
 
