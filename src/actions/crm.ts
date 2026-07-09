@@ -89,6 +89,36 @@ export async function deleteCRMAccount(id: string): Promise<{ error?: string }> 
   return {};
 }
 
+// Deletes an account across both sales_pipeline and clients (they share the
+// same id — see supabase/migrations/sync_clients_to_pipeline.sql). Refuses to
+// delete if the client has real sales/transactions/activity/tasks attached,
+// instead of silently cascading and losing financial history.
+export async function deleteClient(id: string): Promise<{ error?: string }> {
+  const [{ count: salesCount }, { count: txCount }, { count: activityCount }, { count: taskCount }] = await Promise.all([
+    supabase.from("sales").select("id", { count: "exact", head: true }).eq("client_id", id),
+    supabase.from("transactions").select("id", { count: "exact", head: true }).eq("client_id", id),
+    supabase.from("sales_activities").select("id", { count: "exact", head: true }).eq("sales_pipeline_id", id),
+    supabase.from("tasks").select("id", { count: "exact", head: true }).eq("sales_pipeline_id", id),
+  ]);
+
+  if ((salesCount ?? 0) > 0 || (txCount ?? 0) > 0) {
+    return { error: "Não é possível eliminar: este cliente tem vendas ou transações registadas." };
+  }
+  if ((activityCount ?? 0) > 0 || (taskCount ?? 0) > 0) {
+    return { error: "Não é possível eliminar: este cliente tem atividades ou tarefas associadas." };
+  }
+
+  const { error: pipelineError } = await supabase.from("sales_pipeline").delete().eq("id", id);
+  if (pipelineError) return { error: pipelineError.message };
+
+  const { error: clientError } = await supabase.from("clients").delete().eq("id", id);
+  if (clientError) return { error: clientError.message };
+
+  revalidatePath("/admin/crm");
+  revalidatePath("/admin/crm/clients");
+  return {};
+}
+
 // ── Contacts ──────────────────────────────────────────────────────────────────
 
 export async function createCRMContact(data: {

@@ -2,13 +2,14 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { CRMAccount, CRMActivity, CRMContact } from "@/lib/notion";
 import type { EmailMessage } from "@/lib/integration";
 import { AddContactModal } from "./AddContactModal";
 import { LogActivityModal } from "./LogActivityModal";
 import { StageSelect, StageBadge } from "./StageSelect";
 import { SaleEmails } from "@/components/SaleEmails";
-import { deleteCRMActivity, deleteCRMContact, updateCRMContact, updateCRMAccount, clearAccountEnrichment } from "@/actions/crm";
+import { deleteCRMActivity, deleteCRMContact, updateCRMContact, updateCRMAccount, clearAccountEnrichment, deleteClient } from "@/actions/crm";
 import { AccountStatsPanel } from "./AccountStatsPanel";
 import { ClientSalesKanban } from "./ClientSalesKanban";
 import type { CRMAccountStats, ClientSale } from "@/lib/notion";
@@ -231,8 +232,24 @@ export function AccountDetailClient({
   const [editingDetails, setEditingDetails] = useState(false);
   const [, startCategoryTransition] = useTransition();
   const [, startDetailsTransition] = useTransition();
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const router = useRouter();
 
   const contacts = account.contacts ?? [];
+
+  async function handleDelete() {
+    if (!confirm(`Eliminar "${account.name}"? Esta ação não pode ser desfeita.`)) return;
+    setIsDeleting(true);
+    setDeleteError(null);
+    const res = await deleteClient(account.id);
+    if (res.error) {
+      setDeleteError(res.error);
+      setIsDeleting(false);
+    } else {
+      router.push("/admin/crm/clients");
+    }
+  }
 
   async function handleEnrich() {
     setIsEnriching(true);
@@ -430,10 +447,20 @@ export function AccountDetailClient({
             >
               {isEnriching ? "A pesquisar…" : "✨ Enriquecer com IA"}
             </button>
+            <button
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-red-50 text-red-600 hover:bg-red-100 transition-colors disabled:opacity-50"
+            >
+              {isDeleting ? "A eliminar…" : "🗑 Eliminar"}
+            </button>
           </div>
         </div>
         {enrichMsg && (
           <p className="mt-2 text-xs text-purple-600 bg-purple-50 rounded-lg px-3 py-2">{enrichMsg}</p>
+        )}
+        {deleteError && (
+          <p className="mt-2 text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">{deleteError}</p>
         )}
         {account.enriched_at && (
           <p className="mt-1 text-xs text-gray-400">Enriquecido a {formatDate(account.enriched_at)}</p>
