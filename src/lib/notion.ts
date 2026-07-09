@@ -96,6 +96,11 @@ export type Transaction = {
 export type Fornecedor = {
   id: string;
   name: string;
+  email?: string | null;
+  contact?: string | null;
+  iban?: string | null;
+  contribuinte?: string | null;
+  categoria?: string | null;
 };
 
 // ── Row mappers ───────────────────────────────────────────────────────────────
@@ -1064,6 +1069,31 @@ export async function createFornecedor(name: string): Promise<Fornecedor> {
     .single();
   if (error) throw new Error(`createFornecedor: ${error.message}`);
   return data;
+}
+
+export async function getFornecedorById(id: string): Promise<Fornecedor | null> {
+  const { data } = await supabase
+    .from("fornecedores")
+    .select("id, name, email, contact, iban, contribuinte, categoria")
+    .eq("id", id)
+    .maybeSingle();
+  return data;
+}
+
+export async function updateFornecedor(
+  id: string,
+  data: { name?: string; email?: string; contact?: string; iban?: string; contribuinte?: string; categoria?: string },
+): Promise<void> {
+  const updates = {
+    name:         data.name?.trim()         || undefined,
+    email:        data.email?.trim()        || null,
+    contact:      data.contact?.trim()      || null,
+    iban:         data.iban?.trim()         || null,
+    contribuinte: data.contribuinte?.trim() || null,
+    categoria:    data.categoria?.trim()    || null,
+  };
+  const { error } = await supabase.from("fornecedores").update(updates).eq("id", id);
+  if (error) throw new Error(`updateFornecedor: ${error.message}`);
 }
 
 // ── Utilities ─────────────────────────────────────────────────────────────────

@@ -9,6 +9,7 @@ import {
   archiveTransaction,
   closeTour,
   createFornecedor,
+  updateFornecedor,
   markTransferenciaFeita,
   setComprovativoUrl,
   getFornecedores,
@@ -81,6 +82,23 @@ export async function updateTourServiceInfoAction(
 export async function createFornecedorAction(name: string): Promise<Fornecedor> {
   await requireAuth();
   return createFornecedor(name);
+}
+
+export async function updateFornecedorAction(
+  id: string,
+  data: { name?: string; email?: string; contact?: string; iban?: string; contribuinte?: string; categoria?: string },
+): Promise<{ error?: string }> {
+  const session = await requireAuth();
+  if (session.user.role !== "Admin") return { error: "Forbidden" };
+  try {
+    await updateFornecedor(id, data);
+    revalidatePath(`/admin/fornecedores/${id}`);
+    revalidatePath("/admin/fornecedores");
+    return {};
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { error: msg };
+  }
 }
 
 export async function markInvoiceCollectedAction(
