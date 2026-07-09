@@ -85,26 +85,28 @@ export default async function CRMClientsPage() {
                 <Link
                   key={c.id}
                   href={`/admin/crm/accounts/${c.id}`}
-                  className="flex flex-wrap items-center gap-x-4 gap-y-1 px-5 py-3 hover:bg-gray-50 transition-colors"
+                  className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 px-5 py-3 hover:bg-gray-50 transition-colors"
                 >
-                  <div className="w-9 h-9 rounded-full bg-[#667470]/10 flex items-center justify-center text-sm font-bold text-[#667470] shrink-0">
-                    {c.name[0]?.toUpperCase()}
-                  </div>
-                  <div className="flex-1 min-w-[140px]">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-semibold text-[#32373c] truncate">{c.name}</p>
-                      {c.category && (
-                        <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full shrink-0 ${CATEGORY_COLORS[c.category] ?? CATEGORY_COLORS.Other}`}>
-                          {c.category}
-                        </span>
-                      )}
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-9 h-9 rounded-full bg-[#667470]/10 flex items-center justify-center text-sm font-bold text-[#667470] shrink-0">
+                      {c.name[0]?.toUpperCase()}
                     </div>
-                    <p className="text-xs text-gray-400 truncate">
-                      {c.country ?? ""}
-                      {c.assigned_name ? ` · ${c.assigned_name}` : ""}
-                    </p>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-semibold text-[#32373c] truncate">{c.name}</p>
+                        {c.category && (
+                          <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full shrink-0 ${CATEGORY_COLORS[c.category] ?? CATEGORY_COLORS.Other}`}>
+                            {c.category}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-400 truncate">
+                        {c.country ?? ""}
+                        {c.assigned_name ? ` · ${c.assigned_name}` : ""}
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-4 ml-auto shrink-0">
+                  <div className="flex items-center gap-4 pl-12 sm:pl-0 sm:ml-auto shrink-0">
                     <div className="text-right shrink-0">
                       {c.bookings > 0 ? (
                         <>
