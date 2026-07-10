@@ -154,21 +154,23 @@ export function FornecedorDetailClient({
               >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <p className="text-sm font-medium text-[#32373c]">
-                      {t.date ?? "—"}
+                    <p className="text-sm font-medium text-[#32373c] truncate">
+                      {t.supplier || "Despesa"}
                     </p>
-                    {t.tourName && (
-                      <span className="text-xs text-gray-400 truncate max-w-[180px]">
-                        {t.tourName}
-                      </span>
+                    {t.invoiceId && (
+                      <span className="text-xs text-gray-400 shrink-0">#{t.invoiceId}</span>
                     )}
                   </div>
                   <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                    <span className="text-xs text-gray-400">{t.date ?? "—"}</span>
                     {t.whoPaid && (
-                      <span className="text-xs text-gray-400">{t.whoPaid}</span>
+                      <span className="text-xs text-gray-400">· {t.whoPaid}</span>
                     )}
                     {t.paymentMethod && (
                       <span className="text-xs text-gray-300">· {t.paymentMethod}</span>
+                    )}
+                    {t.tourName && (
+                      <span className="text-xs text-gray-400 truncate max-w-[180px]">· {t.tourName}</span>
                     )}
                   </div>
                 </div>
