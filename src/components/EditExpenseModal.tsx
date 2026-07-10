@@ -442,7 +442,23 @@ function InvoicePreview({ url, onZoom }: { url: string; onZoom: (src: string) =>
     url.includes("application/pdf") ||
     url.includes("/invoice-image/"); // proxy route may serve PDF
 
-  if (isPdf || failed) {
+  // Old files imported from Notion have a permanently expired link (Notion's
+  // presigned S3 URLs die ~1h after being generated) — there's no way to
+  // recover the original bytes, so point at "Substituir Fatura" below instead
+  // of showing a link that just leads to an AccessDenied error page.
+  if (failed) {
+    return (
+      <div className="flex items-center gap-3 p-3 rounded-xl border border-amber-200 bg-amber-50">
+        <span className="text-2xl">⚠️</span>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-amber-800">Fatura indisponível</p>
+          <p className="text-xs text-amber-600">Link expirado — se tiver o ficheiro, carregue-o em &quot;Substituir Fatura&quot; abaixo</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isPdf) {
     return (
       <a
         href={url}
@@ -450,11 +466,9 @@ function InvoicePreview({ url, onZoom }: { url: string; onZoom: (src: string) =>
         rel="noopener noreferrer"
         className="flex items-center gap-3 p-3 rounded-xl border border-gray-200 bg-gray-50 hover:bg-gray-100 transition-colors"
       >
-        <span className="text-2xl">{failed ? "🖼️" : "📄"}</span>
+        <span className="text-2xl">📄</span>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-gray-700">
-            {failed ? "Ver fatura" : "Fatura em PDF"}
-          </p>
+          <p className="text-sm font-medium text-gray-700">Fatura em PDF</p>
           <p className="text-xs text-[#667470]">Toque para abrir</p>
         </div>
         <span className="text-xs text-gray-400">↗</span>
