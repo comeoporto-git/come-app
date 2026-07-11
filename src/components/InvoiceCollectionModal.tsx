@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { analyzeInvoice, type InvoiceData } from "@/actions/invoice";
 import { markInvoiceCollectedAction, createFornecedorAction, markAiScanFailedAction, markNoInvoiceNeededAction } from "@/actions/transactions";
 import type { Transaction, Fornecedor } from "@/lib/notion";
+import { normalizeImage } from "@/lib/image";
 
 type Step = "capture" | "scanning" | "review";
 
@@ -68,57 +69,6 @@ export function InvoiceCollectionModal({
   const cameraRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  async function normalizeImage(file: File): Promise<{
-    dataUrl: string; base64: string;
-    mediaType: "image/jpeg" | "image/png" | "image/webp";
-    normalizedFile: File;
-  }> {
-    const MAX_PX = 2048;
-    const isHeic = file.type === "image/heic" || file.type === "image/heif" ||
-      file.name.toLowerCase().endsWith(".heic") || file.name.toLowerCase().endsWith(".heif");
-
-    const rawDataUrl = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => resolve(e.target!.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-
-    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-      const el = new Image();
-      el.onload = () => resolve(el);
-      el.onerror = reject;
-      el.src = rawDataUrl;
-    });
-
-    const scale = Math.min(1, MAX_PX / Math.max(img.naturalWidth || 1, img.naturalHeight || 1));
-    const canvas = document.createElement("canvas");
-    canvas.width  = Math.round((img.naturalWidth  || 1) * scale);
-    canvas.height = Math.round((img.naturalHeight || 1) * scale);
-    const ctx = canvas.getContext("2d");
-    if (!ctx) throw new Error("Canvas 2D context unavailable");
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-    const mediaType = (!isHeic && file.type === "image/png") ? "image/png" : "image/jpeg";
-    const quality   = mediaType === "image/jpeg" ? 0.85 : undefined;
-
-    const blob = await new Promise<Blob | null>((resolve) =>
-      canvas.toBlob((b) => resolve(b), mediaType, quality)
-    );
-
-    const dataUrl = (() => {
-      const d = canvas.toDataURL(mediaType, quality);
-      return d.length > 50 ? d : rawDataUrl;
-    })();
-
-    const ext = mediaType === "image/png" ? "png" : "jpg";
-    const normalizedFile = blob
-      ? new File([blob], `invoice.${ext}`, { type: mediaType })
-      : file;
-
-    return { dataUrl, base64: dataUrl.split(",")[1], mediaType, normalizedFile };
-  }
-
   async function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -133,12 +83,22 @@ export function InvoiceCollectionModal({
     }
 
     setStep("scanning");
-    let capturedNormalizedFile: File | null = null;
+
+    let normalized;
     try {
-      const { dataUrl, base64, mediaType, normalizedFile } = await normalizeImage(file);
-      capturedNormalizedFile = normalizedFile;
-      setImageFile(normalizedFile);
-      setImageDataUrl(dataUrl);
+      normalized = await normalizeImage(file);
+    } catch (err) {
+      console.error("[InvoiceCollectionModal] image processing error:", err);
+      setError("Não foi possível processar a imagem. Tenta tirar a foto novamente.");
+      setStep("capture");
+      return;
+    }
+
+    const { dataUrl, base64, mediaType, normalizedFile } = normalized;
+    setImageFile(normalizedFile);
+    setImageDataUrl(dataUrl);
+
+    try {
       const result = await analyzeInvoice(base64, mediaType, fornecedores.map((f) => f.name));
       setForm((f) => ({ ...f, ...result }));
       const matched = fornecedores.find(
@@ -148,23 +108,20 @@ export function InvoiceCollectionModal({
         setSelectedFornecedorId(matched.id);
         setFornecedorQuery(matched.name);
       }
-    } catch {
+    } catch (err) {
+      console.error("[InvoiceCollectionModal] AI scan error:", err);
       setAiScanFailed(true);
-      if (capturedNormalizedFile) {
-        setError("Scan IA falhou — a foto foi guardada. Podes preencher manualmente.");
-        try {
-          const fd = new FormData();
-          fd.append("file", capturedNormalizedFile);
-          const res = await fetch("/api/upload", { method: "POST", body: fd });
-          if (res.ok) {
-            const { url } = await res.json() as { url: string };
-            await markAiScanFailedAction(transaction.id, url);
-            router.refresh();
-          }
-        } catch { /* ignore upload errors — photo still in review */ }
-      } else {
-        setError("Não foi possível analisar a imagem. Podes preencher manualmente.");
-      }
+      setError("Scan IA falhou — a foto foi guardada. Podes preencher manualmente.");
+      try {
+        const fd = new FormData();
+        fd.append("file", normalizedFile);
+        const res = await fetch("/api/upload", { method: "POST", body: fd });
+        if (res.ok) {
+          const { url } = await res.json() as { url: string };
+          await markAiScanFailedAction(transaction.id, url);
+          router.refresh();
+        }
+      } catch { /* ignore upload errors — photo still in review */ }
     } finally {
       setStep("review");
     }
