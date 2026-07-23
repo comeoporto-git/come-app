@@ -3,11 +3,17 @@
  * account-reconnect bug: before the stable-account-id fix, every
  * Enable Banking reconnect issued a new ephemeral account uid, which fed
  * into the synthetic transaction ID, so re-fetched (already-imported)
- * transactions were inserted again as "new" unmatched rows.
+ * transactions were inserted again as "new" unmatched rows under the new
+ * uid.
  *
- * Groups synthetic-ID rows by (date, amount, currency, direction,
- * institution) and removes the extras, preferring to keep whichever row in
- * the group is already linked to a Notion invoice.
+ * Only flags a row as a duplicate when it is UNMATCHED and its full content
+ * (date, amount, currency, direction, institution, merchant, remittance)
+ * exactly matches an already-MATCHED row from a DIFFERENT account_uid.
+ * That combination is the actual reconnect-duplicate signature. Rows that
+ * repeat under the *same* account_uid are left alone — the synthetic-ID
+ * generator already appends a counter suffix for those on purpose, to
+ * support legitimate same-day/same-amount repeats (e.g. several identical
+ * bank fees), and deleting them would destroy real transactions.
  *
  * GET ?dryRun=1 to preview without deleting.
  */
@@ -25,7 +31,22 @@ type Row = {
   currency: string;
   credit_debit: string;
   institution_name: string;
+  account_uid: string;
+  merchant_name: string | null;
+  remittance_info: string | null;
 };
+
+function contentKey(r: Row): string {
+  return [
+    r.transaction_date,
+    r.amount,
+    r.currency,
+    r.credit_debit,
+    r.institution_name,
+    r.merchant_name ?? "",
+    r.remittance_info ?? "",
+  ].join("|");
+}
 
 export async function GET(req: Request) {
   const session = await auth();
@@ -37,7 +58,8 @@ export async function GET(req: Request) {
   const sql = getDb();
 
   const rows = (await sql`
-    SELECT id, transaction_id, transaction_date, amount, currency, credit_debit, institution_name
+    SELECT id, transaction_id, transaction_date, amount, currency, credit_debit,
+           institution_name, account_uid, merchant_name, remittance_info
     FROM bank_transactions
     WHERE transaction_id LIKE 'synth-%'
     ORDER BY id ASC
@@ -48,18 +70,24 @@ export async function GET(req: Request) {
 
   const groups = new Map<string, Row[]>();
   for (const r of rows) {
-    const key = [r.transaction_date, r.amount, r.currency, r.credit_debit, r.institution_name].join("|");
+    const key = contentKey(r);
     const arr = groups.get(key);
     if (arr) arr.push(r); else groups.set(key, [r]);
   }
 
-  const toDelete: { id: number; transaction_id: string }[] = [];
+  const toDelete: { id: number; transaction_id: string; account_uid: string }[] = [];
   for (const group of groups.values()) {
     if (group.length < 2) continue;
+
     const matched = group.filter((r) => matchedRefs.has(r.transaction_id));
-    const keepIds = new Set((matched.length > 0 ? matched : [group[0]]).map((r) => r.id));
-    for (const r of group) {
-      if (!keepIds.has(r.id)) toDelete.push({ id: r.id, transaction_id: r.transaction_id });
+    if (matched.length === 0) continue; // ambiguous repeats with no matched anchor — leave for manual review
+
+    const unmatched = group.filter((r) => !matchedRefs.has(r.transaction_id));
+    for (const u of unmatched) {
+      const isCrossAccountDuplicateOfMatched = matched.some((m) => m.account_uid !== u.account_uid);
+      if (isCrossAccountDuplicateOfMatched) {
+        toDelete.push({ id: u.id, transaction_id: u.transaction_id, account_uid: u.account_uid });
+      }
     }
   }
 
