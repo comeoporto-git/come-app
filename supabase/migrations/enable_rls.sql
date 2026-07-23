@@ -36,3 +36,12 @@ ALTER TABLE users                   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE accounts                ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sessions                ENABLE ROW LEVEL SECURITY;
 ALTER TABLE verification_token      ENABLE ROW LEVEL SECURITY;
+
+-- Banking / AI-learning tables (neon/schema.sql — now living in the same
+-- Postgres database) and sync_logs, created lazily by writeSyncLog() in
+-- src/lib/enablebanking.ts. Same direct-connection-only access pattern.
+ALTER TABLE ai_corrections          ENABLE ROW LEVEL SECURITY;
+ALTER TABLE supplier_mappings       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE enablebanking_sessions  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE bank_transactions       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sync_logs               ENABLE ROW LEVEL SECURITY;
