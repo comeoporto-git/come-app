@@ -12,10 +12,12 @@ import {
   getAccountTransactions,
   upsertBankTransactions,
   updateEBLastFetched,
+  removeEBSession,
   writeSyncLog,
   remittanceText,
   syntheticId,
   getStoredTransactions,
+  EnableBankingSessionClosedError,
   type EBTransaction,
 } from "@/lib/enablebanking";
 import {
@@ -81,12 +83,20 @@ export async function doFetch(opts?: { fullSync?: boolean }): Promise<FetchResul
         : formatDate(new Date(Date.now() - 30 * 86_400_000));
     const to = formatDate(new Date());
 
+    let sessionClosed = false;
+
     for (const accountId of session.accountIds) {
       const txns: EBTransaction[] = [];
       try {
         const page = await getAccountTransactions(accountId, from, to);
         txns.push(...page);
       } catch (err) {
+        if (err instanceof EnableBankingSessionClosedError) {
+          sessionClosed = true;
+          console.error(`[doFetch] session closed for ${session.institution_name} (${session.session_id}), removing`);
+          errors.push(`Sessão do ${session.institution_name} expirou — reconecta a conta em Banco.`);
+          break;
+        }
         const msg = err instanceof Error ? err.message : String(err);
         console.error(`[doFetch] failed to fetch account ${accountId}:`, msg);
         errors.push(msg);
@@ -101,6 +111,15 @@ export async function doFetch(opts?: { fullSync?: boolean }): Promise<FetchResul
         console.error("[doFetch] upsert failed:", msg);
         errors.push(`DB upsert failed: ${msg}`);
       }
+    }
+
+    if (sessionClosed) {
+      try {
+        await removeEBSession(session.session_id);
+      } catch (e) {
+        errors.push(`removeEBSession: ${e instanceof Error ? e.message : String(e)}`);
+      }
+      continue;
     }
 
     try {

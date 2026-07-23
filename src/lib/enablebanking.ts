@@ -62,6 +62,11 @@ async function jwt(): Promise<string> {
 
 // ── Raw API calls ─────────────────────────────────────────────────────────────
 
+/** Thrown when the bank consent session has been closed/revoked at the ASPSP.
+ *  The stored session is no longer usable and must be re-created via a fresh
+ *  auth flow — retrying the same session_id will never succeed. */
+export class EnableBankingSessionClosedError extends Error {}
+
 async function api<T = unknown>(
   method: string,
   path: string,
@@ -79,7 +84,11 @@ async function api<T = unknown>(
   if (res.status === 204) return null as T;
   const data = await res.json();
   if (!res.ok) {
-    throw new Error(`EnableBanking ${method} ${path} → ${res.status}: ${JSON.stringify(data)}`);
+    const message = `EnableBanking ${method} ${path} → ${res.status}: ${JSON.stringify(data)}`;
+    if (res.status === 401 && (data as { error?: string })?.error === "CLOSED_SESSION") {
+      throw new EnableBankingSessionClosedError(message);
+    }
+    throw new Error(message);
   }
   return data as T;
 }

@@ -50,24 +50,34 @@ export default async function BancoPage({
             </div>
           ) : (
             <ul className="divide-y divide-gray-50">
-              {ebSessions.map((s) => (
-                <li key={s.session_id} className="px-5 py-3 flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-sm flex-shrink-0">🏦</div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-[#32373c]">{s.institution_name}</p>
-                    <p className="text-xs text-gray-400">
-                      {s.last_fetched_at
-                        ? `Último sync: ${new Date(s.last_fetched_at).toLocaleDateString("pt-PT")}`
-                        : "Aguarda primeira sincronização"}
-                      {s.valid_until && <span className="ml-2">· Válido até {new Date(s.valid_until).toLocaleDateString("pt-PT")}</span>}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3 flex-shrink-0">
-                    <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium">Ligado</span>
-                    <DisconnectEnableBankingButton sessionId={s.session_id} name={s.institution_name} />
-                  </div>
-                </li>
-              ))}
+              {ebSessions.map((s) => {
+                const expired = !!s.valid_until && new Date(s.valid_until) < new Date();
+                return (
+                  <li key={s.session_id} className="px-5 py-3 flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm flex-shrink-0 ${expired ? "bg-red-100" : "bg-green-100"}`}>🏦</div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-[#32373c]">{s.institution_name}</p>
+                      <p className="text-xs text-gray-400">
+                        {s.last_fetched_at
+                          ? `Último sync: ${new Date(s.last_fetched_at).toLocaleDateString("pt-PT")}`
+                          : "Aguarda primeira sincronização"}
+                        {s.valid_until && <span className="ml-2">· Válido até {new Date(s.valid_until).toLocaleDateString("pt-PT")}</span>}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3 flex-shrink-0">
+                      {expired ? (
+                        <>
+                          <span className="text-xs bg-red-100 text-red-600 px-2 py-1 rounded-full font-medium">Expirado</span>
+                          <EnableBankingConnectButton />
+                        </>
+                      ) : (
+                        <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium">Ligado</span>
+                      )}
+                      <DisconnectEnableBankingButton sessionId={s.session_id} name={s.institution_name} />
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </section>
