@@ -42,12 +42,13 @@ export default async function TourDetailPage({ params }: { params: Promise<{ id:
   const { id } = await params;
   const role = session.user.role;
   const email = session.user.email ?? "";
+  const notionId = session.user.notionId;
   const backHref = role === "Admin" ? "/admin/servicos" : "/guide/services";
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
       <Suspense fallback={<PageSkeleton backHref={backHref} />}>
-        <TourPageContent id={id} role={role} email={email} backHref={backHref} />
+        <TourPageContent id={id} role={role} email={email} notionId={notionId} backHref={backHref} />
       </Suspense>
     </div>
   );
@@ -88,11 +89,13 @@ async function TourPageContent({
   id,
   role,
   email,
+  notionId,
   backHref,
 }: {
   id: string;
   role: string;
   email: string;
+  notionId: string;
   backHref: string;
 }) {
   const isChef = role === "Chef";
@@ -113,11 +116,24 @@ async function TourPageContent({
 
   const transactions = canSeeFinancials ? txResult.expenses : txResult.expenses;
   const earnings     = canSeeFinancials ? txResult.earnings : [];
-  // Derive chefMember/guideMember from the already-fetched team list — no extra Notion call needed
-  const chefMember   = isChef ? (teamMembers.find((m) => m.email === email) ?? null) : null;
-  const guideMember  = role === "Guide" ? (teamMembers.find((m) => m.email === email) ?? null) : null;
 
   if (!tour) notFound();
+
+  // The role the logged-in user actually has on THIS tour — may differ from their
+  // global account role (e.g. someone whose account role is "Guide" is booked as
+  // Chef on this particular tour). Falls back to the account role when the user
+  // isn't one of the tour's assigned Guide/Chef/Driver.
+  const tourRole = tour.chefId === notionId ? "Chef"
+    : tour.guideId === notionId ? "Guide"
+    : tour.driverId === notionId ? "Driver"
+    : null;
+  const effectiveRole = (role === "Chef" || role === "Guide" || role === "Driver") && tourRole
+    ? tourRole
+    : role;
+
+  // Derive chefMember/guideMember from the already-fetched team list — no extra Notion call needed
+  const chefMember   = effectiveRole === "Chef"  ? (teamMembers.find((m) => m.email === email) ?? null) : null;
+  const guideMember  = effectiveRole === "Guide" ? (teamMembers.find((m) => m.email === email) ?? null) : null;
 
   const totalSpent = transactions.reduce((s, t) => s + t.totalCost, 0); // negative values
   const faturacao  = earnings.reduce((s, t) => s + t.totalCost, 0);
@@ -315,7 +331,7 @@ async function TourPageContent({
                   <AddExpenseButton
                     tourId={id}
                     fornecedores={fornecedores}
-                    userRole={role}
+                    userRole={effectiveRole}
                     chefName={chefMember?.name}
                     guideName={guideMember?.name}
                     tourTeam={[
@@ -326,7 +342,7 @@ async function TourPageContent({
                   />
                 )}
               </div>
-              <ExpenseList transactions={transactions} tourId={id} isClosed={isClosed} fornecedores={fornecedores} guideName={tour.guideName} chefName={tour.chefName} driverName={tour.driverName} userRole={role} />
+              <ExpenseList transactions={transactions} tourId={id} isClosed={isClosed} fornecedores={fornecedores} guideName={tour.guideName} chefName={tour.chefName} driverName={tour.driverName} userRole={effectiveRole} />
             </section>
 
             {/* Close Tour — only admins */}
