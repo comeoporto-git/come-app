@@ -8,9 +8,19 @@ import Image from "next/image";
 
 async function authorizeContacts() {
   "use server";
-  // prompt:consent forces Google to show the scope screen and return a
-  // fresh token that includes contacts.readonly even for returning users.
-  await signIn("google", { redirectTo: "/admin/crm/google-contacts" }, { prompt: "consent" });
+  // Incremental auth: the base login flow only requests openid/email/profile,
+  // so re-request with the contacts scope added, plus access_type=offline to
+  // get a refresh token. prompt:consent forces Google to show the scope
+  // screen and return a fresh token even for returning users.
+  await signIn(
+    "google",
+    { redirectTo: "/admin/crm/google-contacts" },
+    {
+      scope: "openid email profile https://www.googleapis.com/auth/contacts.readonly",
+      access_type: "offline",
+      prompt: "consent",
+    }
+  );
 }
 
 export default async function GoogleContactsPage({

@@ -33,10 +33,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      // Only request basic scopes at login — contacts.readonly is a sensitive
+      // scope that triggers Google's "app not verified" warning for every user.
+      // It's requested separately (incremental auth) from the CRM Google
+      // Contacts page, where it's actually needed.
       authorization: {
         params: {
-          scope: "openid email profile https://www.googleapis.com/auth/contacts.readonly",
-          access_type: "offline",
+          scope: "openid email profile",
         },
       },
     }),
