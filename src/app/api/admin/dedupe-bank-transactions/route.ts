@@ -1,19 +1,23 @@
 /**
  * One-off cleanup for duplicate bank_transactions rows created by the
- * account-reconnect bug: before the stable-account-id fix, every
- * Enable Banking reconnect issued a new ephemeral account uid, which fed
- * into the synthetic transaction ID, so re-fetched (already-imported)
- * transactions were inserted again as "new" unmatched rows under the new
- * uid.
+ * account-reconnect bug: Enable Banking issues a brand-new ephemeral account
+ * uid every time a consent is reconnected, even for the same physical
+ * account. Before the institution-namespaced synthetic-ID fix, that uid fed
+ * into the transaction's synthetic ID, so re-fetching after a reconnect
+ * re-imported already-stored transactions under a new ID instead of hitting
+ * the ON CONFLICT dedup.
  *
- * Only flags a row as a duplicate when it is UNMATCHED and its full content
- * (date, amount, currency, direction, institution, merchant, remittance)
- * exactly matches an already-MATCHED row from a DIFFERENT account_uid.
- * That combination is the actual reconnect-duplicate signature. Rows that
- * repeat under the *same* account_uid are left alone — the synthetic-ID
- * generator already appends a counter suffix for those on purpose, to
- * support legitimate same-day/same-amount repeats (e.g. several identical
- * bank fees), and deleting them would destroy real transactions.
+ * Groups synthetic-ID rows by full content (date, amount, currency,
+ * direction, institution, merchant, remittance), then further splits each
+ * group by account_uid. A content-identical group spanning more than one
+ * account_uid — with every uid contributing the same number of rows — is the
+ * signature of a wholesale re-import across a reconnect, so all but one
+ * uid's rows are removed (preferring a uid that has a Notion-matched row;
+ * otherwise the most recently synced one). Content-identical rows that all
+ * share a single account_uid are left untouched — the synthetic-ID batch
+ * counter creates those on purpose for legitimate same-day/same-amount
+ * repeats (e.g. several identical bank fees). Groups where account_uids
+ * contribute mismatched counts are ambiguous and also left untouched.
  *
  * GET ?dryRun=1 to preview without deleting.
  */
@@ -48,6 +52,8 @@ function contentKey(r: Row): string {
   ].join("|");
 }
 
+const maxId = (rows: Row[]) => Math.max(...rows.map((r) => r.id));
+
 export async function GET(req: Request) {
   const session = await auth();
   if (!session || session.user.role !== "Admin") {
@@ -76,17 +82,39 @@ export async function GET(req: Request) {
   }
 
   const toDelete: { id: number; transaction_id: string; account_uid: string }[] = [];
+  const ambiguous: { key: string; accountUids: string[]; counts: number[] }[] = [];
+
   for (const group of groups.values()) {
     if (group.length < 2) continue;
 
-    const matched = group.filter((r) => matchedRefs.has(r.transaction_id));
-    if (matched.length === 0) continue; // ambiguous repeats with no matched anchor — leave for manual review
+    const byUid = new Map<string, Row[]>();
+    for (const r of group) {
+      const arr = byUid.get(r.account_uid);
+      if (arr) arr.push(r); else byUid.set(r.account_uid, [r]);
+    }
+    if (byUid.size < 2) continue; // same account only — legitimate repeats, skip
 
-    const unmatched = group.filter((r) => !matchedRefs.has(r.transaction_id));
-    for (const u of unmatched) {
-      const isCrossAccountDuplicateOfMatched = matched.some((m) => m.account_uid !== u.account_uid);
-      if (isCrossAccountDuplicateOfMatched) {
-        toDelete.push({ id: u.id, transaction_id: u.transaction_id, account_uid: u.account_uid });
+    const uidGroups = [...byUid.values()];
+    const sizes = new Set(uidGroups.map((g) => g.length));
+    if (sizes.size > 1) {
+      // Mismatched counts across accounts — can't safely reconstruct 1:1
+      // correspondence, leave for manual review.
+      ambiguous.push({
+        key: contentKey(group[0]),
+        accountUids: uidGroups.map((g) => g[0].account_uid),
+        counts: uidGroups.map((g) => g.length),
+      });
+      continue;
+    }
+
+    const keepGroup =
+      uidGroups.find((g) => g.some((r) => matchedRefs.has(r.transaction_id))) ??
+      uidGroups.reduce((a, b) => (maxId(a) >= maxId(b) ? a : b));
+
+    const keepIds = new Set(keepGroup.map((r) => r.id));
+    for (const r of group) {
+      if (!keepIds.has(r.id)) {
+        toDelete.push({ id: r.id, transaction_id: r.transaction_id, account_uid: r.account_uid });
       }
     }
   }
@@ -102,5 +130,6 @@ export async function GET(req: Request) {
     groupsChecked: groups.size,
     deleted: toDelete.length,
     deletedRows: toDelete,
+    ambiguousGroups: ambiguous,
   });
 }

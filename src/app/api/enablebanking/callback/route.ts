@@ -14,9 +14,9 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const { sessionId, accounts, institutionName, validUntil } =
+    const { sessionId, accountIds, institutionName, validUntil } =
       await exchangeCode(code);
-    await saveEBSession(sessionId, institutionName, accounts, validUntil);
+    await saveEBSession(sessionId, institutionName, accountIds, validUntil);
     return NextResponse.redirect(new URL("/admin?bank_connected=1", req.url));
   } catch (err) {
     console.error("[EnableBanking callback]", err);

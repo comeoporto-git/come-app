@@ -32,7 +32,7 @@ export async function GET() {
     dbSessions: dbSessions.map((s) => ({
       session_id: s.session_id,
       institution: s.institution_name,
-      accounts: s.accounts,
+      accountIds: s.accountIds,
       last_fetched_at: s.last_fetched_at,
     })),
     tableExists,
