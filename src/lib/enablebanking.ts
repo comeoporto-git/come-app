@@ -112,34 +112,10 @@ export async function createAuthUrl(
   return data.url;
 }
 
-/** A reference to one bank account within a session.
- *  `uid` is the ephemeral per-session ID used in API paths — Enable Banking
- *  issues a NEW `uid` for the same physical account every time the user
- *  reconnects. `stableId` is derived from the account's real identifier
- *  (IBAN etc.), which stays the same across reconnects, so it's what we use
- *  to key stored transactions and keep synthetic IDs from colliding. */
-export type EBAccountRef = { uid: string; stableId: string };
-
-/** Best-effort extraction of a stable identifier from Enable Banking's
- *  `account_id` object (shape varies by ASPSP — usually `{ iban }` or
- *  `{ other: { identification } }`). Falls back to the session-scoped uid
- *  if nothing usable is present. */
-function stableAccountId(accountId: unknown, fallbackUid: string): string {
-  if (accountId && typeof accountId === "object") {
-    const obj = accountId as Record<string, unknown>;
-    if (typeof obj.iban === "string" && obj.iban) return obj.iban;
-    const other = obj.other as Record<string, unknown> | undefined;
-    if (other && typeof other.identification === "string" && other.identification) {
-      return other.identification;
-    }
-  }
-  return fallbackUid;
-}
-
 /** Step 2 – Exchange the code from the callback for a session + account IDs */
 export async function exchangeCode(code: string): Promise<{
   sessionId: string;
-  accounts: EBAccountRef[];
+  accountIds: string[];
   institutionName: string;
   validUntil: string | null;
 }> {
@@ -149,15 +125,15 @@ export async function exchangeCode(code: string): Promise<{
     access?: { valid_until?: string };
   }>("POST", "/sessions", { code });
 
-  // `uid` is the UUID used in API paths (/accounts/{uid}/transactions)
-  // `account_id` is the bank account identifier object (IBAN etc.) — not for API calls
-  const accounts = (data.accounts ?? [])
-    .filter((a) => a.uid)
-    .map((a) => ({ uid: a.uid, stableId: stableAccountId(a.account_id, a.uid) }));
+  // `uid` is the UUID used in API paths (/accounts/{uid}/transactions). It's
+  // scoped to this consent session — Enable Banking issues a new one on every
+  // reconnect — so it's only used for fetching, never for dedup (see
+  // syntheticId below, which namespaces by institution name instead).
+  const accountIds = (data.accounts ?? []).map((a) => a.uid).filter(Boolean);
   const institutionName =
     data.accounts?.[0]?.account_servicer?.name ?? "Crédito Agrícola";
   const validUntil = data.access?.valid_until ?? null;
-  return { sessionId: data.session_id, accounts, institutionName, validUntil };
+  return { sessionId: data.session_id, accountIds, institutionName, validUntil };
 }
 
 // ── Transactions ──────────────────────────────────────────────────────────────
@@ -222,32 +198,33 @@ export type EBSession = {
   id: number;
   session_id: string;
   institution_name: string;
-  account_ids: string; // JSON-encoded EBAccountRef[] (or legacy string[] of uids)
+  account_ids: string; // JSON-encoded string[] of uids (a short-lived interim
+                        // version stored { uid, stableId } objects instead —
+                        // parse() below reads both)
   valid_until: string | null;
   last_fetched_at: string | null;
 };
 
 export type EBSessionParsed = Omit<EBSession, "account_ids"> & {
-  accounts: EBAccountRef[];
+  accountIds: string[];
 };
 
 function parse(row: EBSession): EBSessionParsed {
   const raw = JSON.parse(row.account_ids ?? "[]") as unknown[];
-  // Legacy rows stored a plain string[] of uids — treat uid as its own stableId.
-  const accounts = raw.map((item) =>
-    typeof item === "string" ? { uid: item, stableId: item } : (item as EBAccountRef)
+  const accountIds = raw.map((item) =>
+    typeof item === "string" ? item : (item as { uid: string }).uid
   );
-  return { ...row, accounts };
+  return { ...row, accountIds };
 }
 
 export async function saveEBSession(
   sessionId: string,
   institutionName: string,
-  accounts: EBAccountRef[],
+  accountIds: string[],
   validUntil: string | null,
 ): Promise<void> {
   const sql = getDb();
-  const ids = JSON.stringify(accounts);
+  const ids = JSON.stringify(accountIds);
   await sql`
     INSERT INTO enablebanking_sessions
       (session_id, institution_name, account_ids, valid_until)
@@ -299,10 +276,19 @@ export type StoredTransaction = {
 };
 
 /** Upsert a batch of raw transactions fetched from Enable Banking */
-/** Generate a stable synthetic ID when the ASPSP doesn't provide one */
-export function syntheticId(t: EBTransaction, accountUid: string): string {
+/** Generate a stable synthetic ID when the ASPSP doesn't provide one.
+ *
+ *  Namespaced by institution name rather than Enable Banking's account uid:
+ *  the uid is scoped to a single consent session and Enable Banking issues a
+ *  brand-new one on every reconnect (their account_id/IBAN field isn't
+ *  reliably present for every ASPSP), so keying on it made the "same"
+ *  historical transaction hash differently after every reconnect and get
+ *  re-imported as a duplicate. This app only ever links one account per
+ *  institution, so the institution name is a namespace that's actually
+ *  stable across reconnects. */
+export function syntheticId(t: EBTransaction, institutionName: string): string {
   const parts = [
-    accountUid,
+    institutionName,
     t.transaction_date ?? t.booking_date ?? "",
     t.booking_date ?? "",
     t.transaction_amount.amount,
@@ -311,12 +297,13 @@ export function syntheticId(t: EBTransaction, accountUid: string): string {
     t.creditor?.name ?? "",
     remittanceText(t),
   ];
-  // Simple stable hash — good enough for dedup within an account
+  // Simple stable hash — good enough for dedup within an institution
   let h = 0;
   for (const s of parts.join("|")) {
     h = ((h << 5) - h + s.charCodeAt(0)) | 0;
   }
-  return `synth-${accountUid.slice(0, 8)}-${(h >>> 0).toString(16)}`;
+  const slug = institutionName.toLowerCase().replace(/[^a-z0-9]+/g, "").slice(0, 8) || "acct";
+  return `synth-${slug}-${(h >>> 0).toString(16)}`;
 }
 
 export async function upsertBankTransactions(
@@ -339,7 +326,7 @@ export async function upsertBankTransactions(
     if (t.transaction_id) {
       txId = t.transaction_id;
     } else {
-      const base = syntheticId(t, accountUid);
+      const base = syntheticId(t, institutionName);
       txId = base;
       let counter = 2;
       while (batchIds.has(txId)) {
