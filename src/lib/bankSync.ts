@@ -85,10 +85,10 @@ export async function doFetch(opts?: { fullSync?: boolean }): Promise<FetchResul
 
     let sessionClosed = false;
 
-    for (const accountId of session.accountIds) {
+    for (const account of session.accounts) {
       const txns: EBTransaction[] = [];
       try {
-        const page = await getAccountTransactions(accountId, from, to);
+        const page = await getAccountTransactions(account.uid, from, to);
         txns.push(...page);
       } catch (err) {
         if (err instanceof EnableBankingSessionClosedError) {
@@ -98,14 +98,16 @@ export async function doFetch(opts?: { fullSync?: boolean }): Promise<FetchResul
           break;
         }
         const msg = err instanceof Error ? err.message : String(err);
-        console.error(`[doFetch] failed to fetch account ${accountId}:`, msg);
+        console.error(`[doFetch] failed to fetch account ${account.uid}:`, msg);
         errors.push(msg);
       }
 
       fetched += txns.length;
 
       try {
-        await upsertBankTransactions(txns, accountId, session.institution_name);
+        // Keyed by the account's stable identifier (IBAN), not the ephemeral
+        // per-session uid, so re-fetching after a reconnect dedupes correctly.
+        await upsertBankTransactions(txns, account.stableId, session.institution_name);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         console.error("[doFetch] upsert failed:", msg);

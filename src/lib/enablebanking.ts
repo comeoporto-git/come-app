@@ -112,10 +112,34 @@ export async function createAuthUrl(
   return data.url;
 }
 
+/** A reference to one bank account within a session.
+ *  `uid` is the ephemeral per-session ID used in API paths — Enable Banking
+ *  issues a NEW `uid` for the same physical account every time the user
+ *  reconnects. `stableId` is derived from the account's real identifier
+ *  (IBAN etc.), which stays the same across reconnects, so it's what we use
+ *  to key stored transactions and keep synthetic IDs from colliding. */
+export type EBAccountRef = { uid: string; stableId: string };
+
+/** Best-effort extraction of a stable identifier from Enable Banking's
+ *  `account_id` object (shape varies by ASPSP — usually `{ iban }` or
+ *  `{ other: { identification } }`). Falls back to the session-scoped uid
+ *  if nothing usable is present. */
+function stableAccountId(accountId: unknown, fallbackUid: string): string {
+  if (accountId && typeof accountId === "object") {
+    const obj = accountId as Record<string, unknown>;
+    if (typeof obj.iban === "string" && obj.iban) return obj.iban;
+    const other = obj.other as Record<string, unknown> | undefined;
+    if (other && typeof other.identification === "string" && other.identification) {
+      return other.identification;
+    }
+  }
+  return fallbackUid;
+}
+
 /** Step 2 – Exchange the code from the callback for a session + account IDs */
 export async function exchangeCode(code: string): Promise<{
   sessionId: string;
-  accountIds: string[];
+  accounts: EBAccountRef[];
   institutionName: string;
   validUntil: string | null;
 }> {
@@ -127,11 +151,13 @@ export async function exchangeCode(code: string): Promise<{
 
   // `uid` is the UUID used in API paths (/accounts/{uid}/transactions)
   // `account_id` is the bank account identifier object (IBAN etc.) — not for API calls
-  const accountIds = (data.accounts ?? []).map((a) => a.uid).filter(Boolean);
+  const accounts = (data.accounts ?? [])
+    .filter((a) => a.uid)
+    .map((a) => ({ uid: a.uid, stableId: stableAccountId(a.account_id, a.uid) }));
   const institutionName =
     data.accounts?.[0]?.account_servicer?.name ?? "Crédito Agrícola";
   const validUntil = data.access?.valid_until ?? null;
-  return { sessionId: data.session_id, accountIds, institutionName, validUntil };
+  return { sessionId: data.session_id, accounts, institutionName, validUntil };
 }
 
 // ── Transactions ──────────────────────────────────────────────────────────────
@@ -196,27 +222,32 @@ export type EBSession = {
   id: number;
   session_id: string;
   institution_name: string;
-  account_ids: string; // JSON-encoded string[]
+  account_ids: string; // JSON-encoded EBAccountRef[] (or legacy string[] of uids)
   valid_until: string | null;
   last_fetched_at: string | null;
 };
 
 export type EBSessionParsed = Omit<EBSession, "account_ids"> & {
-  accountIds: string[];
+  accounts: EBAccountRef[];
 };
 
 function parse(row: EBSession): EBSessionParsed {
-  return { ...row, accountIds: JSON.parse(row.account_ids ?? "[]") };
+  const raw = JSON.parse(row.account_ids ?? "[]") as unknown[];
+  // Legacy rows stored a plain string[] of uids — treat uid as its own stableId.
+  const accounts = raw.map((item) =>
+    typeof item === "string" ? { uid: item, stableId: item } : (item as EBAccountRef)
+  );
+  return { ...row, accounts };
 }
 
 export async function saveEBSession(
   sessionId: string,
   institutionName: string,
-  accountIds: string[],
+  accounts: EBAccountRef[],
   validUntil: string | null,
 ): Promise<void> {
   const sql = getDb();
-  const ids = JSON.stringify(accountIds);
+  const ids = JSON.stringify(accounts);
   await sql`
     INSERT INTO enablebanking_sessions
       (session_id, institution_name, account_ids, valid_until)
