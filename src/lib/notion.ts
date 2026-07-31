@@ -919,6 +919,7 @@ export async function getGuideExpenses(): Promise<Transaction[]> {
       .eq("transferencia_feita", false)
       .neq("status", "Archived")
       .or("type.is.null,type.neq.Earning")
+      .or("notion_id.is.null,notion_id.not.ilike.OUT - %")
       .or([
         "metodo_pagamento.eq.Pelo Guia",
         "metodo_pagamento.eq.Pelo Chef",
