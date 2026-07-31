@@ -918,6 +918,7 @@ export async function getGuideExpenses(): Promise<Transaction[]> {
       .select(`*, sales!transactions_sale_id_fkey(notion_id, guide_id, chef_id, driver_id)`)
       .eq("transferencia_feita", false)
       .neq("status", "Archived")
+      .or("type.is.null,type.neq.Earning")
       .or([
         "metodo_pagamento.eq.Pelo Guia",
         "metodo_pagamento.eq.Pelo Chef",
