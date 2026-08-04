@@ -1011,6 +1011,45 @@ export async function updateTransaction(
   await supabase.from("transactions").update(updates).eq("id", pageId);
 }
 
+export type PartnerBalance = {
+  name: string;
+  earnings: number;
+  expenses: number;
+  balance: number;
+};
+
+const PARTNERS = ["António", "Bernardo", "Manel"] as const;
+const PARTNER_SPLIT_DATE = "2025-10-01";
+
+export async function getPartnerBalances(): Promise<{ before: PartnerBalance[]; after: PartnerBalance[] }> {
+  const { data } = await supabase
+    .from("transactions")
+    .select("conta_pagamento, type, valor, data")
+    .in("conta_pagamento", PARTNERS as unknown as string[])
+    .or("status.is.null,status.neq.Archived");
+
+  const empty = (): Record<string, PartnerBalance> =>
+    Object.fromEntries(PARTNERS.map((name) => [name, { name, earnings: 0, expenses: 0, balance: 0 }]));
+
+  const before = empty();
+  const after = empty();
+
+  for (const row of data ?? []) {
+    const name = row.conta_pagamento as string | null;
+    if (!name || !(name in before)) continue;
+    const bucket = row.data && row.data < PARTNER_SPLIT_DATE ? before : after;
+    const valor = Number(row.valor) || 0;
+    if (row.type === "Earning") bucket[name].earnings += valor;
+    else if (row.type === "Expense") bucket[name].expenses += Math.abs(valor);
+    bucket[name].balance += valor;
+  }
+
+  return {
+    before: PARTNERS.map((n) => before[n]),
+    after: PARTNERS.map((n) => after[n]),
+  };
+}
+
 export async function verifyTransaction(pageId: string, verified: boolean): Promise<void> {
   await supabase.from("transactions").update({ validado_contabilidade: verified }).eq("id", pageId);
 }

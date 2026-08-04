@@ -48,6 +48,7 @@ const nav: { group: string | null; items: NavItem[] }[] = [
       { label: "Transferências", href: "/admin/transferencias" },
       { label: "Reconciliação", href: "/admin/reconciliation" },
       { label: "Em Falta", href: "/admin/em-falta" },
+      { label: "Sócios", href: "/admin/socios" },
     ],
   },
   {
