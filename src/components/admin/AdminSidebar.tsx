@@ -140,7 +140,10 @@ export function AdminSidebar({ userName, userEmail, userImage, fornecedores = []
       {/* Quick actions */}
       <div className="px-3 pb-3 flex gap-2">
         <button
-          onClick={() => setExpenseOpen(true)}
+          onClick={() => {
+            setMobileOpen(false);
+            setExpenseOpen(true);
+          }}
           className="flex-1 bg-white text-[#32373c] text-[13px] font-semibold py-2 rounded-xl hover:bg-white/90 active:scale-95 transition-all"
         >
           + Despesa
