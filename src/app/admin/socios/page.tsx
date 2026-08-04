@@ -9,6 +9,9 @@ export default async function SociosPage() {
 
   const { before, after } = await getPartnerBalances();
 
+  const OWNERSHIP_BEFORE: Record<string, number> = { "António": 50, "Bernardo": 50, "Manel": 0 };
+  const OWNERSHIP_AFTER: Record<string, number> = { "António": 40, "Bernardo": 40, "Manel": 20 };
+
   return (
     <div className="min-h-screen bg-[#667470] text-[#32373c]">
       <main className="max-w-4xl mx-auto px-4 py-8 space-y-6">
@@ -23,12 +26,14 @@ export default async function SociosPage() {
           title="Até 30 de Setembro de 2025"
           subtitle="Bernardo 50% · António 50%"
           balances={before}
+          ownership={OWNERSHIP_BEFORE}
         />
 
         <PartnerSection
           title="A partir de 1 de Outubro de 2025"
           subtitle="Bernardo 40% · António 40% · Manel 20%"
           balances={after}
+          ownership={OWNERSHIP_AFTER}
         />
       </main>
     </div>
@@ -39,10 +44,12 @@ function PartnerSection({
   title,
   subtitle,
   balances,
+  ownership,
 }: {
   title: string;
   subtitle: string;
   balances: PartnerBalance[];
+  ownership: Record<string, number>;
 }) {
   return (
     <section className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -52,18 +59,23 @@ function PartnerSection({
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-gray-50">
         {balances.map((p) => (
-          <PartnerCard key={p.name} balance={p} />
+          <PartnerCard key={p.name} balance={p} percentage={ownership[p.name] ?? 0} />
         ))}
       </div>
     </section>
   );
 }
 
-function PartnerCard({ balance }: { balance: PartnerBalance }) {
+function PartnerCard({ balance, percentage }: { balance: PartnerBalance; percentage: number }) {
   const { name, earnings, expenses, balance: net } = balance;
   return (
     <div className="px-5 py-4 space-y-3">
-      <p className="text-sm font-semibold text-[#32373c]">{name}</p>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm font-semibold text-[#32373c]">{name}</p>
+        <span className="text-xs bg-gray-100 text-gray-600 font-semibold px-2 py-0.5 rounded-full shrink-0">
+          {percentage}%
+        </span>
+      </div>
       <div className="space-y-1.5">
         <Row label="Faturação" value={earnings} color="text-emerald-600" />
         <Row label="Despesas" value={-expenses} color="text-red-500" />
