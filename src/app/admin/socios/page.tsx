@@ -70,17 +70,15 @@ function PartnerCard({ balance, percentage }: { balance: PartnerBalance; percent
   const { name, earnings, expenses, balance: net } = balance;
   return (
     <div className="px-5 py-4 space-y-3">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-sm font-semibold text-[#32373c]">{name}</p>
-        <span className="text-xs bg-gray-100 text-gray-600 font-semibold px-2 py-0.5 rounded-full shrink-0">
-          {percentage}%
-        </span>
-      </div>
+      <p className="text-sm font-semibold text-[#32373c]">{name}</p>
       <div className="space-y-1.5">
         <Row label="Faturação" value={earnings} color="text-emerald-600" />
         <Row label="Despesas" value={-expenses} color="text-red-500" />
-        <div className="pt-1.5 border-t border-gray-50">
-          <Row label="Saldo" value={net} color={net >= 0 ? "text-emerald-600" : "text-red-500"} bold />
+        <div className="pt-1.5 border-t border-gray-50 flex items-center justify-between gap-2">
+          <Row label="Saldo" value={net} color={net >= 0 ? "text-emerald-600" : "text-red-500"} bold className="flex-1" />
+          <span className="text-xs bg-gray-100 text-gray-600 font-semibold px-2 py-0.5 rounded-full shrink-0">
+            {percentage}%
+          </span>
         </div>
       </div>
     </div>
@@ -92,15 +90,17 @@ function Row({
   value,
   color,
   bold = false,
+  className = "",
 }: {
   label: string;
   value: number;
   color: string;
   bold?: boolean;
+  className?: string;
 }) {
   const sign = value > 0 ? "+" : value < 0 ? "-" : "";
   return (
-    <div className="flex items-center justify-between">
+    <div className={`flex items-center justify-between ${className}`}>
       <span className={`text-xs ${bold ? "font-semibold text-[#32373c]" : "text-gray-500"}`}>{label}</span>
       <span className={`text-sm ${bold ? "font-bold" : "font-medium"} ${color}`}>
         {sign}€{Math.abs(value).toFixed(2)}
