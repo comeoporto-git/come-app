@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react";
 import { editEarningAction, deleteEarningAction } from "@/actions/transactions";
-import type { Transaction } from "@/lib/notion";
+import { CONTA_PAGAMENTO_OPTIONS, type Transaction } from "@/lib/notion";
 import { useRouter } from "next/navigation";
 
 type FormState = {
@@ -241,13 +241,18 @@ export function EditEarningModal({
             {/* Conta de Pagamento */}
             <div>
               <label className="text-xs text-gray-500 mb-1 block">Conta de Pagamento</label>
-              <input
-                type="text"
+              <select
                 value={form.contaPagamento}
                 onChange={(e) => update("contaPagamento", e.target.value)}
                 className="input"
-                placeholder="Ex: COME, Bernardo…"
-              />
+              >
+                {!(CONTA_PAGAMENTO_OPTIONS as readonly string[]).includes(form.contaPagamento) && form.contaPagamento && (
+                  <option value={form.contaPagamento}>{form.contaPagamento}</option>
+                )}
+                {CONTA_PAGAMENTO_OPTIONS.map((opt) => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
+              </select>
             </div>
 
             {/* IVA */}
