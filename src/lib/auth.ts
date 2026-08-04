@@ -70,7 +70,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         } catch { /* never fail auth over a token cache update */ }
       }
 
-      const REFRESH_INTERVAL = 30 * 60 * 1000; // 30 minutes
+      const REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes — matches getTeamMemberByEmail's own cache revalidation window
       const now = Date.now();
       const shouldRefresh =
         user?.email || // always refresh on sign-in

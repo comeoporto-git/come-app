@@ -35,9 +35,12 @@ function formatDate(iso: string | null, startTime: string | null): string {
 
 // ── Shell (renders immediately, only needs auth cookie) ───────────────────────
 
+const ALLOWED_ROLES: ReadonlyArray<string> = ["Guide", "Super Guide", "Admin", "Chef", "Driver"];
+
 export default async function TourDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
   if (!session) redirect("/login");
+  if (!ALLOWED_ROLES.includes(session.user.role)) redirect("/unauthorized");
 
   const { id } = await params;
   const role = session.user.role;
