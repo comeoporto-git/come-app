@@ -74,6 +74,14 @@ export default async function AdminToursPage() {
                               🧭 {guideName}{tour.numGuests > 0 ? ` · ${tour.numGuests} pax` : ""}
                             </p>
                           )}
+                          {(tour.chefName || tour.driverName) && (
+                            <p className="text-xs opacity-50">
+                              {[
+                                tour.chefName ? `🧑‍🍳 ${tour.chefName}` : null,
+                                tour.driverName ? `🚗 ${tour.driverName}` : null,
+                              ].filter(Boolean).join("  ·  ")}
+                            </p>
+                          )}
                         </div>
                         <div className="flex flex-col items-end gap-2 shrink-0">
                           <span className="text-xs bg-[#7b8b87] text-white px-2 py-0.5 rounded-full font-semibold">

@@ -114,6 +114,14 @@ function TourCard({
             ) : tour.numGuests > 0 ? (
               <p className="text-xs text-gray-400">{tour.numGuests} pax</p>
             ) : null}
+            {(tour.chefName || tour.driverName) && (
+              <p className="text-xs text-gray-400">
+                {[
+                  tour.chefName ? `🧑‍🍳 ${tour.chefName}` : null,
+                  tour.driverName ? `🚗 ${tour.driverName}` : null,
+                ].filter(Boolean).join("  ·  ")}
+              </p>
+            )}
           </div>
           <div className="flex flex-col items-end gap-2 shrink-0">
             {ts && tour.serviceType && (
