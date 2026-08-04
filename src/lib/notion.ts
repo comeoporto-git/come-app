@@ -93,8 +93,6 @@ export type Transaction = {
   txType?: "Earning" | "Expense";
 };
 
-export const CONTA_PAGAMENTO_OPTIONS = ["COME", "António", "Manel", "Bernardo"] as const;
-
 export type Fornecedor = {
   id: string;
   name: string;

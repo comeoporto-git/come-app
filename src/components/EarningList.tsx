@@ -2,7 +2,8 @@
 
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { CONTA_PAGAMENTO_OPTIONS, type Transaction } from "@/lib/notion";
+import type { Transaction } from "@/lib/notion";
+import { CONTA_PAGAMENTO_OPTIONS } from "@/lib/constants";
 import { EditEarningModal } from "./EditEarningModal";
 import { createEarningAction } from "@/actions/transactions";
 
