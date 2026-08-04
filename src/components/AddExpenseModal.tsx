@@ -6,6 +6,7 @@ import { logExpenseAction, finishPendingExpenseAction, createFornecedorAction } 
 import type { Transaction, Fornecedor } from "@/lib/notion";
 import { normalizeImage } from "@/lib/image";
 import { useRouter } from "next/navigation";
+import { PARTNERS, ownershipForDate } from "@/lib/constants";
 
 type Mode = "chef-choose" | "admin-choose" | "honorarios" | "choose" | "scan" | "manual" | "review";
 
@@ -65,6 +66,7 @@ export function AddExpenseModal({
     : userRole === "Driver" ? "Pelo Driver"
     : "Pelo Guia";
   const [paymentMethod, setPaymentMethod] = useState<string>(defaultPaymentMethod);
+  const [socioPessoal, setSocioPessoal] = useState<string>("");
   const [honorariosMember, setHonorariosMember] = useState<string>("");
   const [needsInvoice, setNeedsInvoice] = useState(false);
   const [notPaidYet, setNotPaidYet] = useState(false);
@@ -248,6 +250,7 @@ export function AddExpenseModal({
           bankReference: "",
           invoiceImageUrl,
           precisaDeFatura: needsInvoice ? "Sim" : undefined,
+          socioPessoal: socioPessoal || null,
         });
         if (logResult?.error) throw new Error(logResult.error);
       }
@@ -586,6 +589,32 @@ export function AddExpenseModal({
                     <option value="Pelo Chef">Pelo Chef</option>
                     <option value="Pelo Driver">Pelo Driver</option>
                   </select>
+                </div>
+              )}
+
+              {/* Despesa pessoal de sócio — needs redistribution to the other partners */}
+              {isSuperGuide && (
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">Despesa Pessoal de Sócio</label>
+                  <select
+                    value={socioPessoal}
+                    onChange={(e) => setSocioPessoal(e.target.value)}
+                    className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
+                  >
+                    <option value="">— Não aplicável —</option>
+                    {PARTNERS.map((p) => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </select>
+                  {socioPessoal && (
+                    <p className="text-xs text-gray-400 mt-1">
+                      Precisa de transferir: {PARTNERS.filter((p) => p !== socioPessoal).map((p) => {
+                        const pct = ownershipForDate(form.date)[p] ?? 0;
+                        const amount = (pct / 100) * form.taxFree;
+                        return `${p} €${amount.toFixed(2)}`;
+                      }).join(" · ")}
+                    </p>
+                  )}
                 </div>
               )}
 

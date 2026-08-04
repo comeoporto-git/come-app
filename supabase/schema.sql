@@ -124,6 +124,8 @@ CREATE TABLE IF NOT EXISTS transactions (
   fatura_sem_saida_direta    TEXT,
   transferencia_feita        BOOLEAN DEFAULT FALSE,
   validado_contabilidade     BOOLEAN DEFAULT FALSE,
+  socio_pessoal              TEXT,
+  socio_transferencia_feita  BOOLEAN DEFAULT FALSE,
   id_banco                   TEXT,
   id_fatura                  TEXT,
   fatura_url                 TEXT,

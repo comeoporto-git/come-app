@@ -4,6 +4,7 @@ import { useState, useRef } from "react";
 import { editExpenseAction, deleteExpenseAction } from "@/actions/transactions";
 import type { Transaction, Fornecedor } from "@/lib/notion";
 import { useRouter } from "next/navigation";
+import { PARTNERS, ownershipForDate } from "@/lib/constants";
 
 type FormState = {
   supplier: string;
@@ -18,6 +19,7 @@ type FormState = {
   iva23: number;
   totalCost: number;
   paymentMethod: string;
+  socioPessoal: string;
 };
 
 export function EditExpenseModal({
@@ -59,6 +61,7 @@ export function EditExpenseModal({
     iva23: Math.abs(transaction.iva23),
     totalCost: Math.abs(transaction.totalCost),
     paymentMethod: transaction.paymentMethod,
+    socioPessoal: transaction.socioPessoal ?? "",
   });
 
   // Supplier combobox state
@@ -188,6 +191,7 @@ export function EditExpenseModal({
                : form.paymentMethod === "Pelo Driver" ? "Driver"
                : "Company",
         paymentMethod: form.paymentMethod,
+        socioPessoal: form.socioPessoal || null,
         ...(invoiceImageUrl ? { invoiceImageUrl } : {}),
       });
       router.refresh();
@@ -349,6 +353,28 @@ export function EditExpenseModal({
                   <option value="Pelo Chef">Pelo Chef</option>
                   <option value="Pelo Driver">Pelo Driver</option>
                 </select>
+              </div>
+            )}
+
+            {/* Despesa pessoal de sócio — needs redistribution to the other partners */}
+            {(userRole === "Admin" || userRole === "Super Guide") && (
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">Despesa Pessoal de Sócio</label>
+                <select value={form.socioPessoal} onChange={(e) => update("socioPessoal", e.target.value)} className="input">
+                  <option value="">— Não aplicável —</option>
+                  {PARTNERS.map((p) => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                </select>
+                {form.socioPessoal && (
+                  <p className="text-xs text-gray-400 mt-1">
+                    Precisa de transferir: {PARTNERS.filter((p) => p !== form.socioPessoal).map((p) => {
+                      const pct = ownershipForDate(form.date)[p] ?? 0;
+                      const amount = (pct / 100) * form.taxFree;
+                      return `${p} €${amount.toFixed(2)}`;
+                    }).join(" · ")}
+                  </p>
+                )}
               </div>
             )}
 
