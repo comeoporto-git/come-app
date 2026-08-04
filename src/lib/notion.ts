@@ -750,7 +750,8 @@ export async function getTransactionsNeedingInvoice(): Promise<Transaction[]> {
     .filter((t) =>
       t.precisaDeFatura !== "Não" &&
       (t.precisaDeFatura === "Sim" ||
-        ((t.status === "Pending Payment" || t.status === "Pending Receipt") &&
+        (!t.supplier.startsWith("IN -") &&
+          (t.status === "Pending Payment" || t.status === "Pending Receipt") &&
           !t.invoiceId && !t.invoiceImageUrl))
     );
 }
