@@ -1,15 +1,16 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { getFornecedores, getFornecedorStats } from "@/lib/notion";
+import { getFornecedores, getFornecedorStats, getTotalDespesas } from "@/lib/notion";
 import Link from "next/link";
 
 export default async function FornecedoresPage() {
   const session = await auth();
   if (!session || session.user.role !== "Admin") redirect("/");
 
-  const [fornecedores, stats] = await Promise.all([
+  const [fornecedores, stats, totalGeral] = await Promise.all([
     getFornecedores(),
     getFornecedorStats(),
+    getTotalDespesas(),
   ]);
 
   const sorted = [...fornecedores].sort((a, b) => {
@@ -17,8 +18,6 @@ export default async function FornecedoresPage() {
     const tb = stats.get(b.id)?.total ?? 0;
     return tb - ta;
   });
-
-  const totalGeral = sorted.reduce((sum, f) => sum + (stats.get(f.id)?.total ?? 0), 0);
 
   return (
     <div className="min-h-screen bg-[#667470] text-[#32373c]">
@@ -60,9 +59,9 @@ export default async function FornecedoresPage() {
                           {s.count} {s.count === 1 ? "transação" : "transações"}
                         </p>
                       </div>
-                      {s.total > 0 && (
+                      {s.count > 0 && (
                         <p className="text-sm font-semibold text-[#32373c] flex-shrink-0">
-                          {s.total.toFixed(2)} €
+                          {Math.abs(s.total).toFixed(2)} €
                         </p>
                       )}
                       <span className="text-gray-300 flex-shrink-0">→</span>

@@ -1108,6 +1108,14 @@ export async function getTransactionsByFornecedor(fornecedorId: string): Promise
   return (data ?? []).map(mapTransactionRow);
 }
 
+export async function getTotalDespesas(): Promise<number> {
+  const { data } = await supabase
+    .from("transactions")
+    .select("valor")
+    .eq("type", "Expense");
+  return (data ?? []).reduce((sum, row) => sum + Math.abs(row.valor ?? 0), 0);
+}
+
 export async function getFornecedorStats(): Promise<Map<string, { count: number; total: number }>> {
   const { data } = await supabase
     .from("transactions")
