@@ -109,6 +109,7 @@ export function EarningList({
                     </div>
                     <p className="text-xs text-emerald-600">{e.date ?? "—"}</p>
                     {e.invoiceId && <p className="text-xs text-emerald-600">{e.invoiceId}</p>}
+                    {e.contaPagamento && <p className="text-xs text-emerald-600">Conta: {e.contaPagamento}</p>}
                   </div>
                   <div className="text-right shrink-0">
                     <p className="text-sm font-bold text-emerald-700">+€{e.totalCost.toFixed(2)}</p>
