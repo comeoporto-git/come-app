@@ -150,7 +150,9 @@ function filterTours(tours: Tour[], query: string, teamMap?: Record<string, stri
       t.saleId.toLowerCase().includes(q) ||
       (t.serviceName ?? "").toLowerCase().includes(q) ||
       (t.clientName ?? "").toLowerCase().includes(q) ||
-      guideName.toLowerCase().includes(q)
+      guideName.toLowerCase().includes(q) ||
+      (t.chefName ?? "").toLowerCase().includes(q) ||
+      (t.driverName ?? "").toLowerCase().includes(q)
     );
   });
 }
