@@ -87,7 +87,7 @@ SCORING RULES:
 - Proposals outstanding: URGENT (score 1–2)
 - Never contacted (null days): priority 3
 
-Generate 10–15 actions total, mixing calls and emails. For each:
+Generate 10–15 actions total, mixing calls and emails. IMPORTANT: include at most ONE action per account this week — either a call OR an email for that account, never both. Pick whichever channel fits best:
 - Pick call if there's a phone number and it's a warm lead
 - Pick email for first contacts or when email is available
 - Write a short, personalised subject and opening script in Portuguese (or English if the company is clearly international)
@@ -131,8 +131,17 @@ Return ONLY a JSON array (no markdown fences):
     // Clear existing actions for this week before inserting
     await supabase.from("crm_weekly_actions").delete().eq("week_of", weekOf);
 
-    const toInsert = actions
-      .filter((a) => accounts.find((acc) => acc.id === a.account_id))
+    // Keep at most one action per account: the highest-priority (lowest number) one
+    const byAccount = new Map<string, (typeof actions)[number]>();
+    for (const a of actions) {
+      if (!accounts.find((acc) => acc.id === a.account_id)) continue;
+      const existing = byAccount.get(a.account_id);
+      if (!existing || a.priority < existing.priority) {
+        byAccount.set(a.account_id, a);
+      }
+    }
+
+    const toInsert = Array.from(byAccount.values())
       .map((a) => ({
         week_of: weekOf,
         account_id: a.account_id,
