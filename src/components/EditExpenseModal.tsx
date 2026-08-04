@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { editExpenseAction, deleteExpenseAction } from "@/actions/transactions";
+import { editExpenseAction, deleteExpenseAction, createFornecedorAction } from "@/actions/transactions";
 import type { Transaction, Fornecedor } from "@/lib/notion";
 import { useRouter } from "next/navigation";
 
@@ -23,7 +23,7 @@ type FormState = {
 export function EditExpenseModal({
   transaction,
   tourId,
-  fornecedores = [],
+  fornecedores: initialFornecedores = [],
   userRole = "Guide",
   onClose,
 }: {
@@ -34,6 +34,9 @@ export function EditExpenseModal({
   onClose: () => void;
 }) {
   const router = useRouter();
+  // Local fornecedor list (grows if user creates a new one)
+  const [fornecedores, setFornecedores] = useState<Fornecedor[]>(initialFornecedores);
+  const [creatingFornecedor, setCreatingFornecedor] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -67,6 +70,23 @@ export function EditExpenseModal({
   const filtered = query.length > 0
     ? fornecedores.filter((f) => f.name.toLowerCase().includes(query.toLowerCase()))
     : fornecedores;
+  const exactMatch = fornecedores.some((f) => f.name.toLowerCase() === query.toLowerCase());
+  const showCreateOption = query.trim().length > 1 && !exactMatch;
+
+  async function handleCreateFornecedor() {
+    const name = query.trim();
+    if (!name) return;
+    setCreatingFornecedor(true);
+    try {
+      const newF = await createFornecedorAction(name);
+      setFornecedores((prev) => [...prev, newF].sort((a, b) => a.name.localeCompare(b.name)));
+      update("supplier", newF.name);
+      setQuery(newF.name);
+      setShowList(false);
+    } finally {
+      setCreatingFornecedor(false);
+    }
+  }
 
   function update(field: keyof FormState, value: string | number) {
     setForm((f) => {
@@ -274,7 +294,7 @@ export function EditExpenseModal({
                   className="input pr-8"
                   autoComplete="off"
                 />
-                {showList && filtered.length > 0 && (
+                {showList && (filtered.length > 0 || showCreateOption) && (
                   <ul className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-40 overflow-y-auto">
                     {filtered.map((f) => (
                       <li key={f.id}>
@@ -287,6 +307,18 @@ export function EditExpenseModal({
                         </button>
                       </li>
                     ))}
+                    {showCreateOption && (
+                      <li>
+                        <button
+                          type="button"
+                          onMouseDown={handleCreateFornecedor}
+                          disabled={creatingFornecedor}
+                          className="w-full text-left px-3 py-2.5 text-sm text-[#667470] font-semibold hover:bg-[#667470]/10 border-t border-gray-100 first:border-t-0 last:rounded-b-xl disabled:opacity-50"
+                        >
+                          {creatingFornecedor ? "A criar…" : `+ Criar "${query.trim()}"`}
+                        </button>
+                      </li>
+                    )}
                   </ul>
                 )}
               </div>
