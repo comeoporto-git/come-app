@@ -374,6 +374,7 @@ export async function createEarningAction(
     reference: string;
     date: string;
     invoiceId: string;
+    contaPagamento?: string;
     taxFree: number;
     iva6: number;
     iva13: number;
@@ -392,6 +393,7 @@ export async function createEarningAction(
       fornecedorId:  null,
       date:          data.date,
       invoiceId:     data.invoiceId,
+      contaPagamento: data.contaPagamento,
       taxFree:       data.taxFree,
       iva6:          data.iva6,
       iva13:         data.iva13,

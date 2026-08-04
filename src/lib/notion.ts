@@ -971,7 +971,7 @@ export async function createTransaction(
     metodo_pagamento: data.paymentMethod  || null,
     status:           data.status         || null,
     type:             data.supplier?.startsWith("IN -") ? "Earning" : "Expense",
-    conta_pagamento:  "COME",
+    conta_pagamento:  data.contaPagamento || "COME",
     sale_id:          data.tourId         ?? null,
     fatura_url:       data.invoiceImageUrl ?? null,
     id_banco:         data.bankReference  || null,
