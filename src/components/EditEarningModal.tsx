@@ -2,7 +2,8 @@
 
 import { useState, useRef } from "react";
 import { editEarningAction, deleteEarningAction } from "@/actions/transactions";
-import { CONTA_PAGAMENTO_OPTIONS, type Transaction } from "@/lib/notion";
+import type { Transaction } from "@/lib/notion";
+import { CONTA_PAGAMENTO_OPTIONS } from "@/lib/constants";
 import { useRouter } from "next/navigation";
 
 type FormState = {
