@@ -401,7 +401,7 @@ export async function createEarningAction(
       totalCost:     data.totalCost,
       whoPaid:       "Company",
       paymentMethod: "COME",
-      status:        "Pending Payment",
+      status:        data.contaPagamento && data.contaPagamento !== "COME" ? "Paid" : "Pending Payment",
       tourId,
       bankReference: "",
       invoiceImageUrl: data.invoiceImageUrl,
