@@ -298,7 +298,7 @@ export function EditEarningModal({
               <label className="text-xs text-gray-500 mb-1 block">
                 {transaction.invoiceImageUrl ? "Substituir Fatura" : "Fatura (opcional)"}
               </label>
-              <input ref={cameraRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleImageChange} capture="environment" />
+              <input ref={cameraRef} type="file" accept="image/*" className="hidden" onChange={handleImageChange} capture="environment" />
               <input ref={fileRef}   type="file" accept="image/jpeg,image/png,image/webp,application/pdf" className="hidden" onChange={handleImageChange} />
               {imageDataUrl === "pdf" ? (
                 <div className="flex items-center gap-3 p-3 rounded-xl border border-gray-200 bg-gray-50">

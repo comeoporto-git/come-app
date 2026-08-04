@@ -474,7 +474,7 @@ export function AddExpenseModal({
                   <input
                     ref={cameraRef}
                     type="file"
-                    accept="image/jpeg,image/png,image/webp"
+                    accept="image/*"
                     className="hidden"
                     onChange={handleImageChange}
                     capture="environment"

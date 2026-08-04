@@ -244,7 +244,7 @@ export function InvoiceCollectionModal({
           {/* STEP: capture */}
           {step === "capture" && (
             <>
-              <input ref={cameraRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleImageChange} capture="environment" />
+              <input ref={cameraRef} type="file" accept="image/*" className="hidden" onChange={handleImageChange} capture="environment" />
               <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,application/pdf" className="hidden" onChange={handleImageChange} />
               <div className="grid grid-cols-2 gap-3">
                 <button
