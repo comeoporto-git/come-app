@@ -11,6 +11,7 @@ import {
   createFornecedor,
   updateFornecedor,
   markTransferenciaFeita,
+  setSocioTransferenciaFeita,
   setComprovativoUrl,
   getFornecedores,
   supabase,
@@ -180,6 +181,7 @@ export async function logExpenseAction(
     } else {
       revalidatePath("/admin");
     }
+    if (data.socioPessoal) revalidatePath("/admin/socios");
     if (role === "Guide" || role === "Chef" || role === "Driver") {
       notifyInvoiceAdded({
         guideName: session.user.name ?? session.user.email ?? "Guia",
@@ -273,6 +275,7 @@ export async function editExpenseAction(
     totalCost: number;
     whoPaid: string;
     paymentMethod: string;
+    socioPessoal?: string | null;
     invoiceImageUrl?: string;
   }
 ): Promise<void> {
@@ -297,9 +300,11 @@ export async function editExpenseAction(
     totalCost: data.totalCost,
     whoPaid: data.whoPaid,
     paymentMethod: data.paymentMethod,
+    socioPessoal: data.socioPessoal,
     ...(data.invoiceImageUrl ? { invoiceImageUrl: data.invoiceImageUrl } : {}),
   });
   revalidatePath(`/guide/tours/${tourId}`);
+  revalidatePath("/admin/socios");
 }
 
 export async function closeTourAction(tourId: string): Promise<void> {
@@ -349,6 +354,18 @@ export async function markTransferenciaFeitaAction(
   revalidatePath("/admin/em-falta");
   revalidatePath("/admin/transferencias");
   revalidatePath("/super-guide/transferencias");
+}
+
+export async function setSocioTransferenciaFeitaAction(
+  transactionId: string,
+  done: boolean,
+): Promise<void> {
+  const session = await requireAuth();
+  if (session.user.role !== "Admin" && session.user.role !== "Super Guide") {
+    throw new Error("Forbidden");
+  }
+  await setSocioTransferenciaFeita(transactionId, done);
+  revalidatePath("/admin/socios");
 }
 
 export async function deleteExpenseAction(

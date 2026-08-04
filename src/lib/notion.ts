@@ -6,6 +6,7 @@
 
 import { createClient } from "@supabase/supabase-js";
 import { unstable_cache } from "next/cache";
+import { PARTNERS, PARTNER_SPLIT_DATE } from "@/lib/constants";
 
 export const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -91,6 +92,8 @@ export type Transaction = {
   payeeIban?: string;
   contaPagamento?: string;
   txType?: "Earning" | "Expense";
+  socioPessoal?: string | null;
+  socioTransferenciaFeita?: boolean;
 };
 
 export type Fornecedor = {
@@ -179,6 +182,8 @@ function mapTransactionRow(row: any): Transaction {
     comprovantivoUrl:   row.comprovativo_url    ?? undefined,
     contaPagamento:     row.conta_pagamento     ?? undefined,
     txType:             (row.type as "Earning" | "Expense" | undefined) ?? undefined,
+    socioPessoal:            row.socio_pessoal ?? null,
+    socioTransferenciaFeita: row.socio_transferencia_feita ?? false,
   };
 }
 
@@ -977,6 +982,7 @@ export async function createTransaction(
     fatura_url:       data.invoiceImageUrl ?? null,
     id_banco:         data.bankReference  || null,
     precisa_fatura:   data.precisaDeFatura || null,
+    socio_pessoal:    data.socioPessoal   ?? null,
   }).select("id").single();
   if (error) throw new Error(`createTransaction: ${error.message}`);
   return row.id;
@@ -1009,6 +1015,7 @@ export async function updateTransaction(
   if (data.invoiceImageUrl)                 updates.fatura_url          = data.invoiceImageUrl;
   if (data.precisaDeFatura   !== undefined) updates.precisa_fatura      = data.precisaDeFatura || null;
   if (data.contaPagamento    !== undefined) updates.conta_pagamento     = data.contaPagamento || null;
+  if (data.socioPessoal      !== undefined) updates.socio_pessoal       = data.socioPessoal || null;
   await supabase.from("transactions").update(updates).eq("id", pageId);
 }
 
@@ -1018,9 +1025,6 @@ export type PartnerBalance = {
   expenses: number;
   balance: number;
 };
-
-const PARTNERS = ["António", "Bernardo", "Manel"] as const;
-const PARTNER_SPLIT_DATE = "2025-10-01";
 
 export async function getPartnerBalances(): Promise<{ before: PartnerBalance[]; after: PartnerBalance[] }> {
   const { data } = await supabase
@@ -1051,6 +1055,16 @@ export async function getPartnerBalances(): Promise<{ before: PartnerBalance[]; 
   };
 }
 
+export async function getSocioPersonalExpenses(): Promise<Transaction[]> {
+  const { data } = await supabase
+    .from("transactions")
+    .select(TX_SELECT)
+    .not("socio_pessoal", "is", null)
+    .or("status.is.null,status.neq.Archived")
+    .order("data", { ascending: false });
+  return (data ?? []).map(mapTransactionRow);
+}
+
 export async function verifyTransaction(pageId: string, verified: boolean): Promise<void> {
   await supabase.from("transactions").update({ validado_contabilidade: verified }).eq("id", pageId);
 }
@@ -1064,6 +1078,10 @@ export async function markTransferenciaFeita(pageId: string): Promise<void> {
     transferencia_feita: true,
     status: "Paid",
   }).eq("id", pageId);
+}
+
+export async function setSocioTransferenciaFeita(pageId: string, done: boolean): Promise<void> {
+  await supabase.from("transactions").update({ socio_transferencia_feita: done }).eq("id", pageId);
 }
 
 export async function setComprovativoUrl(pageId: string, url: string): Promise<void> {
