@@ -16,7 +16,7 @@ import {
   supabase,
 } from "@/lib/notion";
 import type { Transaction, Fornecedor } from "@/lib/notion";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { auth } from "@/lib/auth";
 import { notifyInvoiceAdded } from "@/lib/notifications";
 import { analyzeInvoice } from "@/actions/invoice";
@@ -81,7 +81,10 @@ export async function updateTourServiceInfoAction(
 
 export async function createFornecedorAction(name: string): Promise<Fornecedor> {
   await requireAuth();
-  return createFornecedor(name);
+  const fornecedor = await createFornecedor(name);
+  updateTag("fornecedores");
+  revalidatePath("/admin/fornecedores");
+  return fornecedor;
 }
 
 export async function updateFornecedorAction(
