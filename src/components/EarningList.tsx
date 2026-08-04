@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import type { Transaction } from "@/lib/notion";
+import { CONTA_PAGAMENTO_OPTIONS, type Transaction } from "@/lib/notion";
 import { EditEarningModal } from "./EditEarningModal";
 import { createEarningAction } from "@/actions/transactions";
 
@@ -180,8 +180,6 @@ function AddEarningModal({
   const [iva13,  setIva13]  = useState(0);
   const [iva23,  setIva23]  = useState(0);
   const [total,  setTotal]  = useState(0);
-  const [contaPagamento, setContaPagamento]             = useState("COME");
-  const [contaPagamentoCustom, setContaPagamentoCustom] = useState("");
   const [imageFile, setImageFile]       = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState("");
   const fileRef = useRef<HTMLInputElement | null>(null);
@@ -213,7 +211,6 @@ function AddEarningModal({
     fd.set("iva13",   String(iva13));
     fd.set("iva23",   String(iva23));
     fd.set("totalCost", String(total));
-    fd.set("contaPagamento", contaPagamento === "Outra" ? contaPagamentoCustom.trim() : contaPagamento);
     if (imageFile) fd.set("invoiceFile", imageFile);
     onSubmit(fd);
   }
@@ -250,23 +247,11 @@ function AddEarningModal({
 
             <div>
               <label className="text-xs text-gray-500 mb-1 block">Conta de Pagamento</label>
-              <select
-                value={contaPagamento}
-                onChange={(e) => setContaPagamento(e.target.value)}
-                className="input"
-              >
-                <option value="COME">COME</option>
-                <option value="Outra">Outra…</option>
+              <select name="contaPagamento" defaultValue="COME" className="input">
+                {CONTA_PAGAMENTO_OPTIONS.map((opt) => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
               </select>
-              {contaPagamento === "Outra" && (
-                <input
-                  type="text"
-                  value={contaPagamentoCustom}
-                  onChange={(e) => setContaPagamentoCustom(e.target.value)}
-                  className="input mt-2"
-                  placeholder="Nome da conta"
-                />
-              )}
             </div>
 
             {/* IVA */}
