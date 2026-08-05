@@ -941,6 +941,10 @@ export async function getGuideExpenses(): Promise<Transaction[]> {
     const memberById = Object.fromEntries((teamRows ?? []).map((m) => [m.id, m]));
     const ibanByName = Object.fromEntries((teamRows ?? []).map((m) => [m.name.toLowerCase(), m.iban ?? ""]));
 
+    const { data: fornecedorRows } = await supabase.from("fornecedores").select("id, name, iban");
+    const fornecedorById = Object.fromEntries((fornecedorRows ?? []).map((f) => [f.id, f]));
+    const ibanByFornecedorName = Object.fromEntries((fornecedorRows ?? []).map((f) => [f.name.toLowerCase(), f.iban ?? ""]));
+
     return data.map((row) => {
       const t = mapTransactionRow(row);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -948,7 +952,12 @@ export async function getGuideExpenses(): Promise<Transaction[]> {
       const tourName = sale?.notion_id ?? "";
 
       if (t.paymentMethod === "Honorários" || (t.status === "Pending Payment" && t.whoPaid === "Company")) {
-        return { ...t, tourName, paidByName: t.supplier, payeeIban: ibanByName[t.supplier.toLowerCase()] ?? "" };
+        const fornecedor = t.fornecedorId ? fornecedorById[t.fornecedorId] : undefined;
+        const payeeIban = fornecedor?.iban
+          || ibanByFornecedorName[t.supplier.toLowerCase()]
+          || ibanByName[t.supplier.toLowerCase()]
+          || "";
+        return { ...t, tourName, paidByName: t.supplier, payeeIban };
       }
       if (!sale) return { ...t, tourName };
       const memberId = t.paymentMethod === "Pelo Chef"   ? sale.chef_id
@@ -1092,7 +1101,7 @@ export async function setComprovativoUrl(pageId: string, url: string): Promise<v
 
 export const getFornecedores = unstable_cache(
   async (): Promise<Fornecedor[]> => {
-    const { data } = await supabase.from("fornecedores").select("id, name").order("name");
+    const { data } = await supabase.from("fornecedores").select("id, name, iban").order("name");
     return (data ?? []).filter((f) => f.name);
   },
   ["fornecedores"],
