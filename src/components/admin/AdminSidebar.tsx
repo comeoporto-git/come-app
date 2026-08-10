@@ -63,6 +63,8 @@ const nav: { group: string | null; items: NavItem[] }[] = [
       { label: "Fotos", href: "/admin/social/photos" },
       { label: "Copy", href: "/admin/social/posts" },
       { label: "Calendário", href: "/admin/social/calendar" },
+      { label: "Analytics", href: "/admin/social/analytics" },
+      { label: "Marca", href: "/admin/social/brand-brief" },
     ],
   },
   {

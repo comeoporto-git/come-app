@@ -196,6 +196,50 @@ export async function generateCaption(
   return (response.content[0] as { type: string; text: string }).text.trim();
 }
 
+// ── Performance analysis (Phase 4) ──────────────────────────────────────────
+
+export type PostPerformance = {
+  caption: string | null;
+  publishedAt: string | null;
+  impressions: number | null;
+  reach: number | null;
+  likes: number | null;
+  comments: number | null;
+  saves: number | null;
+};
+
+const ANALYSIS_SYSTEM_PROMPT = `You are a social media analyst for a Porto food-tours business. Given recent Instagram post performance data and the brand context, write a short analysis in European Portuguese: which type of content (subject, photo style, caption style) performs best, any patterns you notice, and 2-3 concrete, specific suggestions for future posts. Reference the actual data given rather than generic social media advice. Keep it to a few short paragraphs or a short bulleted list — no markdown headers.`;
+
+export async function analyzePerformance(posts: PostPerformance[], brandBrief: string): Promise<string> {
+  if (posts.length === 0) {
+    return "Ainda não há publicações com métricas suficientes para uma análise.";
+  }
+
+  const postsText = posts
+    .map((p, i) => {
+      const parts = [
+        `${i + 1}. Legenda: "${(p.caption ?? "(sem legenda)").slice(0, 140)}"`,
+        p.publishedAt ? `publicado em ${p.publishedAt.slice(0, 10)}` : null,
+        `impressões: ${p.impressions ?? "?"}`,
+        `alcance: ${p.reach ?? "?"}`,
+        `gostos: ${p.likes ?? "?"}`,
+        `comentários: ${p.comments ?? "?"}`,
+        `guardados: ${p.saves ?? "?"}`,
+      ].filter(Boolean);
+      return parts.join(", ");
+    })
+    .join("\n");
+
+  const response = await anthropic.messages.create({
+    model: MODEL,
+    max_tokens: 700,
+    system: `${ANALYSIS_SYSTEM_PROMPT}\n\nContexto da marca:\n${brandBrief}`,
+    messages: [{ role: "user", content: `Dados de publicações recentes:\n\n${postsText}\n\nEscreve a tua análise.` }],
+  });
+
+  return (response.content[0] as { type: string; text: string }).text.trim();
+}
+
 export async function refineCaption(
   currentCaption: string,
   commentThread: PostComment[],

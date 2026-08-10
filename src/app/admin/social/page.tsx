@@ -6,6 +6,7 @@ import { SocialBreadcrumb } from "@/components/social/SocialBreadcrumb";
 import { SyncButton } from "@/components/social/SyncButton";
 
 const DRIVE_CONNECTION_ID = "00000000-0000-0000-0000-000000000002";
+const IG_CONNECTION_ID = "00000000-0000-0000-0000-000000000003";
 
 export default async function SocialDashboardPage() {
   const session = await auth();
@@ -19,6 +20,8 @@ export default async function SocialDashboardPage() {
     { count: inReviewPostCount },
     { count: approvedPostCount },
     { count: scheduledPostCount },
+    { count: publishedPostCount },
+    { data: igConnection },
   ] = await Promise.all([
     supabase
       .from("social_drive_connection")
@@ -31,7 +34,11 @@ export default async function SocialDashboardPage() {
     supabase.from("social_posts").select("id", { count: "exact", head: true }).eq("status", "in_review"),
     supabase.from("social_posts").select("id", { count: "exact", head: true }).eq("status", "approved"),
     supabase.from("social_posts").select("id", { count: "exact", head: true }).eq("status", "scheduled"),
+    supabase.from("social_posts").select("id", { count: "exact", head: true }).eq("status", "published"),
+    supabase.from("social_ig_connection").select("page_access_token").eq("id", IG_CONNECTION_ID).maybeSingle(),
   ]);
+
+  const igConnected = Boolean(igConnection?.page_access_token);
 
   const connected = Boolean(connection?.folder_id);
 
@@ -112,11 +119,24 @@ export default async function SocialDashboardPage() {
               {(scheduledPostCount ?? 0) > 0 ? `${scheduledPostCount} agendada(s)` : "Sem publicações agendadas."}
             </p>
           </Link>
-          <div className="bg-white/10 rounded-2xl border border-white/10 p-5 opacity-50">
+          <Link
+            href="/admin/social/analytics"
+            className="bg-white/10 hover:bg-white/15 rounded-2xl border border-white/10 p-5 transition-colors"
+          >
             <p className="text-sm font-semibold text-white">Analytics</p>
-            <p className="text-xs text-white/60 mt-1">Em breve — métricas do Instagram e análise AI.</p>
-          </div>
+            <p className="text-xs text-white/60 mt-1">
+              {!igConnected
+                ? "Instagram ainda não ligado."
+                : (publishedPostCount ?? 0) > 0
+                  ? `${publishedPostCount} publicação(ões) com métricas`
+                  : "Instagram ligado — sem publicações ainda."}
+            </p>
+          </Link>
         </div>
+
+        <Link href="/admin/social/brand-brief" className="inline-block text-xs text-white/50 hover:text-white/80 transition-colors">
+          Editar Brand Brief →
+        </Link>
       </main>
     </div>
   );
