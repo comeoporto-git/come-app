@@ -58,6 +58,12 @@ const nav: { group: string | null; items: NavItem[] }[] = [
     ],
   },
   {
+    group: "Redes Sociais",
+    items: [
+      { label: "Fotos", href: "/admin/social/photos" },
+    ],
+  },
+  {
     group: "Equipa",
     items: [
       { label: "Toda a Equipa", href: "/admin/equipa" },

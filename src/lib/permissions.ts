@@ -84,6 +84,13 @@ export const FEATURES: Feature[] = [
     path: "/admin/permissoes",
     defaultRoles: ["Admin"],
   },
+  {
+    key: "social_media",
+    label: "Redes Sociais",
+    description: "Gerir fotos e publicações para redes sociais",
+    path: "/admin/social",
+    defaultRoles: ["Admin"],
+  },
 ];
 
 // ── DB helpers ────────────────────────────────────────────────────────────────
