@@ -1,9 +1,32 @@
+"use client";
+
+import { useState, useTransition } from "react";
 import { PhotoCard, type ReviewPhoto } from "@/components/social/PhotoCard";
+import { PhotoLightbox } from "@/components/social/PhotoLightbox";
+import { reviewPhoto } from "@/actions/social";
 
 const SUGGESTION_COUNT = 5;
 const SUGGESTION_MIN_SCORE = 60;
 
 export function PhotoReviewGrid({ photos, showSuggestions }: { photos: ReviewPhoto[]; showSuggestions: boolean }) {
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [, startTransition] = useTransition();
+
+  const openPhoto = photos.find((p) => p.id === openId) ?? null;
+
+  function handleReview(photoId: string, status: "approved" | "rejected" | "pending") {
+    startTransition(async () => {
+      await reviewPhoto(photoId, status);
+    });
+
+    // Advance immediately using the current list — don't wait on the
+    // mutation, since the photo may drop out of this tab's filtered list
+    // once the page revalidates (e.g. approving from the Pendentes tab).
+    const idx = photos.findIndex((p) => p.id === photoId);
+    const nextPhoto = photos[idx + 1] ?? photos[idx - 1] ?? null;
+    setOpenId(nextPhoto ? nextPhoto.id : null);
+  }
+
   if (photos.length === 0) {
     return (
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm py-16 text-center text-sm text-gray-400">
@@ -27,7 +50,7 @@ export function PhotoReviewGrid({ photos, showSuggestions }: { photos: ReviewPho
           </p>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
             {suggestions.map((photo) => (
-              <PhotoCard key={photo.id} photo={photo} highlighted />
+              <PhotoCard key={photo.id} photo={photo} highlighted onOpen={() => setOpenId(photo.id)} />
             ))}
           </div>
         </div>
@@ -39,10 +62,18 @@ export function PhotoReviewGrid({ photos, showSuggestions }: { photos: ReviewPho
         )}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           {rest.map((photo) => (
-            <PhotoCard key={photo.id} photo={photo} />
+            <PhotoCard key={photo.id} photo={photo} onOpen={() => setOpenId(photo.id)} />
           ))}
         </div>
       </div>
+
+      <PhotoLightbox
+        photos={photos}
+        photo={openPhoto}
+        onClose={() => setOpenId(null)}
+        onNavigate={setOpenId}
+        onReview={handleReview}
+      />
     </div>
   );
 }

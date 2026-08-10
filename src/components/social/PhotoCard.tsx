@@ -22,7 +22,15 @@ function scoreBadgeClass(score: number | null) {
   return "bg-gray-100 text-gray-500";
 }
 
-export function PhotoCard({ photo, highlighted = false }: { photo: ReviewPhoto; highlighted?: boolean }) {
+export function PhotoCard({
+  photo,
+  highlighted = false,
+  onOpen,
+}: {
+  photo: ReviewPhoto;
+  highlighted?: boolean;
+  onOpen?: () => void;
+}) {
   const [isPending, startTransition] = useTransition();
 
   function setStatus(status: "approved" | "rejected" | "pending") {
@@ -37,7 +45,7 @@ export function PhotoCard({ photo, highlighted = false }: { photo: ReviewPhoto; 
         highlighted ? "border-emerald-300 ring-1 ring-emerald-200" : "border-gray-100"
       } ${isPending ? "opacity-60" : ""}`}
     >
-      <div className="relative aspect-square bg-gray-50">
+      <div className="relative aspect-square bg-gray-50 cursor-pointer" onClick={onOpen}>
         <Image
           src={photo.blob_url}
           alt={photo.filename ?? ""}
