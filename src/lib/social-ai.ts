@@ -34,11 +34,14 @@ export async function getBrandBrief(): Promise<string> {
   const rules = rulesResult.data as BusinessRuleRow[] | null;
 
   const parts: string[] = [];
+  // Guidelines first and most prominent — this is where concrete formatting
+  // rules (structure, language, hashtags, CTA) tend to live, and it needs to
+  // read as instructions, not just background color.
+  if (brief?.guidelines) parts.push(`Diretrizes (regras concretas a seguir):\n${brief.guidelines}`);
   if (brief?.tone) parts.push(`Tom de voz: ${brief.tone}`);
   if (brief?.offerings) parts.push(`O que vendemos: ${brief.offerings}`);
   if (brief?.audience) parts.push(`Audiência: ${brief.audience}`);
   if (brief?.website_summary) parts.push(`Sobre o negócio: ${brief.website_summary}`);
-  if (brief?.guidelines) parts.push(`Diretrizes: ${brief.guidelines}`);
 
   if (rules && rules.length > 0) {
     const rulesText = rules
@@ -165,10 +168,18 @@ export async function getRecentApprovedPostsContext(limit = 8): Promise<string> 
   return `Exemplos de publicações anteriores aprovadas (usa o mesmo tom e tem em conta o feedback dado):\n\n${filtered.join("\n\n")}`;
 }
 
-const CAPTION_SYSTEM_PROMPT = `You are the social media copywriter for a Porto food-tours business. Write a single Instagram caption in European Portuguese for the given photo, matching the brand's tone. Keep it concise (2-4 sentences), end with 3-6 relevant hashtags, and make it feel authentic rather than generic marketing copy. Return ONLY the caption text — no explanation, no markdown fences, no surrounding quotes.`;
+const CAPTION_SYSTEM_PROMPT = `You are the social media copywriter for a Porto food-tours business. Write an Instagram caption for the given photo, matching the brand's tone and following the brand guidelines below EXACTLY.
+
+The "DIRETRIZES DA MARCA" section below is written by the business owner and is MANDATORY — it overrides every default in this paragraph whenever the two conflict (language(s) used, caption structure, length, hashtags, call-to-action, everything). Only fall back to these defaults for anything the brand guidelines don't cover:
+- Write in European Portuguese.
+- Keep it concise (2-4 sentences).
+- End with 3-6 relevant hashtags.
+- Make it feel authentic, not generic marketing copy.
+
+Return ONLY the caption text — no explanation, no markdown fences, no surrounding quotes.`;
 
 function buildCaptionSystemPrompt(brandBrief: string, pastPostsContext: string): string {
-  return `${CAPTION_SYSTEM_PROMPT}\n\nContexto da marca:\n${brandBrief}${pastPostsContext ? `\n\n${pastPostsContext}` : ""}`;
+  return `${CAPTION_SYSTEM_PROMPT}\n\n=== DIRETRIZES DA MARCA (segue estas à risca) ===\n${brandBrief}${pastPostsContext ? `\n\n${pastPostsContext}` : ""}`;
 }
 
 export async function generateCaption(
@@ -188,7 +199,7 @@ export async function generateCaption(
 
   const response = await anthropic.messages.create({
     model: MODEL,
-    max_tokens: 400,
+    max_tokens: 700, // bilingual / structured captions (per brand guidelines) run longer than a plain single-language caption
     system,
     messages: [{ role: "user", content: userContent }],
   });
@@ -253,7 +264,7 @@ export async function refineCaption(
 
   const response = await anthropic.messages.create({
     model: MODEL,
-    max_tokens: 400,
+    max_tokens: 700,
     system,
     messages: [
       {
