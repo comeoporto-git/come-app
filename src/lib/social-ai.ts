@@ -181,6 +181,8 @@ CONSISTENCY IS CRITICAL — captions are generated one at a time across many sep
 - Once you establish a structure (section order, whether each language block repeats the hook/CTA or shares one, hashtag count), reproduce that exact skeleton every time. Do not improvise a different layout from one caption to the next.
 - Do not treat the guidelines as inspiration to riff on — treat them as a fixed template to fill in with content specific to each photo.
 
+WHEN MULTIPLE LANGUAGES ARE REQUIRED, EVERY WORD OF THE MESSAGE MUST BE DUPLICATED IN EACH LANGUAGE BLOCK — never write a shared hook, opening line, or any other sentence before/outside the language-separated blocks. A sentence that appears only once, ahead of the language markers, only reaches the audience for whichever language block comes second — that is an incomplete caption, not a bilingual one. Each language block (hook, body, and call-to-action) must stand alone as a complete, self-contained version of the full message.
+
 Return ONLY the caption text — no explanation, no markdown fences, no surrounding quotes.`;
 
 function buildCaptionSystemPrompt(brandBrief: string, pastPostsContext: string): string {
@@ -214,12 +216,24 @@ function missingLanguages(caption: string, required: LanguageCheck[]): string[] 
   return required.filter((lang) => !lang.test.test(caption)).map((lang) => lang.name);
 }
 
+// Matches whatever marks the start of a language block: a flag emoji, or a
+// "---" divider line (the two options the brand guidelines themselves offer).
+const LANGUAGE_BLOCK_MARKER = /🇵🇹|🇬🇧|^\s*---\s*$/m;
+
+/** True if there's a real sentence sitting before the first language marker — i.e. a hook/intro that only exists in one language instead of being duplicated in every block. */
+function hasSharedIntroOutsideLanguageBlocks(caption: string, required: LanguageCheck[]): boolean {
+  if (required.length === 0) return false;
+  const markerIndex = caption.search(LANGUAGE_BLOCK_MARKER);
+  if (markerIndex <= 0) return false; // no marker, or caption already starts with one
+  return caption.slice(0, markerIndex).trim().length > 15;
+}
+
 type CaptionContent =
   | string
   | ({ type: "image"; source: { type: "base64"; media_type: ImagePayload["mediaType"]; data: string } } | { type: "text"; text: string })[];
 
-function withLanguageReminder(content: CaptionContent, missing: string[]): CaptionContent {
-  const reminder = `\n\nATENÇÃO: a tua resposta anterior não incluiu texto em ${missing.join(" e ")}. As diretrizes da marca exigem isto em TODAS as publicações, sem exceção. Reescreve a legenda incluindo obrigatoriamente ${missing.join(" e ")} desta vez.`;
+function withIssueReminder(content: CaptionContent, issues: string[]): CaptionContent {
+  const reminder = `\n\nATENÇÃO: a tua resposta anterior ${issues.join("; ")}. As diretrizes da marca exigem que TODO o texto — incluindo a frase de abertura/gancho — esteja completo e duplicado dentro de cada bloco de idioma, sem nenhuma frase partilhada fora deles. Reescreve a legenda do zero corrigindo isto.`;
   return typeof content === "string" ? content + reminder : [...content, { type: "text", text: reminder }];
 }
 
@@ -233,16 +247,21 @@ async function callCaptionModel(system: string, content: CaptionContent): Promis
   return (response.content[0] as { type: string; text: string }).text.trim();
 }
 
-/** Generates a caption, then verifies + retries once if a brand-required language is missing. */
+/** Generates a caption, then verifies + retries once if a brand-required language is missing or the message isn't fully duplicated in each language block. */
 async function generateWithLanguageCheck(system: string, content: CaptionContent, brandBrief: string): Promise<string> {
   const required = requiredLanguages(brandBrief);
   const caption = await callCaptionModel(system, content);
   if (required.length === 0) return caption;
 
   const missing = missingLanguages(caption, required);
-  if (missing.length === 0) return caption;
+  const hasLeak = hasSharedIntroOutsideLanguageBlocks(caption, required);
+  if (missing.length === 0 && !hasLeak) return caption;
 
-  return callCaptionModel(system, withLanguageReminder(content, missing));
+  const issues: string[] = [];
+  if (missing.length > 0) issues.push(`não incluiu texto em ${missing.join(" e ")}`);
+  if (hasLeak) issues.push("teve uma frase de abertura partilhada fora dos blocos de idioma, que por isso só existe numa língua");
+
+  return callCaptionModel(system, withIssueReminder(content, issues));
 }
 
 export async function generateCaption(
