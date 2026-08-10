@@ -5,8 +5,7 @@ import { supabase } from "@/lib/notion";
 import { SocialBreadcrumb } from "@/components/social/SocialBreadcrumb";
 import { PostReviewPanel, type PostComment } from "@/components/social/PostReviewPanel";
 import { PostPublishPanel } from "@/components/social/PostPublishPanel";
-import { CopyCaptionButton } from "@/components/social/CopyCaptionButton";
-import { RegenerateCaptionButton } from "@/components/social/RegenerateCaptionButton";
+import { PostCaptionEditor } from "@/components/social/PostCaptionEditor";
 
 type PostRow = {
   id: string;
@@ -88,18 +87,7 @@ export default async function SocialPostDetailPage({ params }: { params: Promise
               </a>
             )}
 
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Legenda atual</p>
-                <div className="flex items-center gap-2">
-                  <RegenerateCaptionButton postId={typedPost.id} />
-                  <CopyCaptionButton caption={typedPost.caption} />
-                </div>
-              </div>
-              <p className="text-sm text-[#32373c] whitespace-pre-wrap leading-relaxed">
-                {typedPost.caption ?? "Ainda sem legenda."}
-              </p>
-            </div>
+            <PostCaptionEditor key={typedPost.caption ?? ""} postId={typedPost.id} initialCaption={typedPost.caption} />
           </div>
 
           <div className="space-y-4">
