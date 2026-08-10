@@ -86,7 +86,7 @@ export async function promoteToPost(photoId: string): Promise<string | null> {
 
   const { data: photo } = await supabase
     .from("social_photos")
-    .select("id, blob_url, filename")
+    .select("id, blob_url, filename, category")
     .eq("id", photoId)
     .maybeSingle();
   if (!photo) return null;
@@ -96,11 +96,24 @@ export async function promoteToPost(photoId: string): Promise<string | null> {
 
   const { data: inserted } = await supabase
     .from("social_posts")
-    .insert({ photo_id: photoId, caption, status: "in_review" })
+    .insert({ photo_id: photoId, caption, status: "in_review", category: photo.category ?? null })
     .select("id")
     .single();
 
   return inserted?.id ?? null;
+}
+
+export async function setPhotoCategory(photoId: string, category: string | null): Promise<void> {
+  await requireAdmin();
+  await supabase.from("social_photos").update({ category }).eq("id", photoId);
+  revalidatePath("/admin/social/photos");
+}
+
+export async function setPostCategory(postId: string, category: string | null): Promise<void> {
+  await requireAdmin();
+  await supabase.from("social_posts").update({ category, updated_at: new Date().toISOString() }).eq("id", postId);
+  revalidatePath(`/admin/social/posts/${postId}`);
+  revalidatePath("/admin/social/posts");
 }
 
 /** Throws away the current caption and generates a fresh one from scratch — e.g. after editing the Brand Brief or Diretrizes. Unlike addPostComment, this ignores the existing caption entirely rather than revising it. */
@@ -271,6 +284,7 @@ export async function rescorePhoto(photoId: string): Promise<void> {
       ai_score: result.score,
       ai_score_reason: result.reason,
       ai_tags: result.tags,
+      category: result.category,
       ai_scored_at: new Date().toISOString(),
     })
     .eq("id", photoId);
