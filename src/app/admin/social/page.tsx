@@ -11,17 +11,25 @@ export default async function SocialDashboardPage() {
   const session = await auth();
   if (!session || session.user.role !== "Admin") redirect("/");
 
-  const [{ data: connection }, { count: pendingCount }, { count: approvedCount }, { count: rejectedCount }] =
-    await Promise.all([
-      supabase
-        .from("social_drive_connection")
-        .select("folder_id, folder_name, last_synced_at")
-        .eq("id", DRIVE_CONNECTION_ID)
-        .maybeSingle(),
-      supabase.from("social_photos").select("id", { count: "exact", head: true }).eq("review_status", "pending"),
-      supabase.from("social_photos").select("id", { count: "exact", head: true }).eq("review_status", "approved"),
-      supabase.from("social_photos").select("id", { count: "exact", head: true }).eq("review_status", "rejected"),
-    ]);
+  const [
+    { data: connection },
+    { count: pendingCount },
+    { count: approvedCount },
+    { count: rejectedCount },
+    { count: inReviewPostCount },
+    { count: approvedPostCount },
+  ] = await Promise.all([
+    supabase
+      .from("social_drive_connection")
+      .select("folder_id, folder_name, last_synced_at")
+      .eq("id", DRIVE_CONNECTION_ID)
+      .maybeSingle(),
+    supabase.from("social_photos").select("id", { count: "exact", head: true }).eq("review_status", "pending"),
+    supabase.from("social_photos").select("id", { count: "exact", head: true }).eq("review_status", "approved"),
+    supabase.from("social_photos").select("id", { count: "exact", head: true }).eq("review_status", "rejected"),
+    supabase.from("social_posts").select("id", { count: "exact", head: true }).eq("status", "in_review"),
+    supabase.from("social_posts").select("id", { count: "exact", head: true }).eq("status", "approved"),
+  ]);
 
   const connected = Boolean(connection?.folder_id);
 
@@ -81,16 +89,23 @@ export default async function SocialDashboardPage() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 opacity-50">
-          <div className="bg-white/10 rounded-2xl border border-white/10 p-5">
-            <p className="text-sm font-semibold text-white">Copy sugerida</p>
-            <p className="text-xs text-white/60 mt-1">Em breve — geração e revisão de legendas.</p>
-          </div>
-          <div className="bg-white/10 rounded-2xl border border-white/10 p-5">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <Link
+            href="/admin/social/posts"
+            className="bg-white/10 hover:bg-white/15 rounded-2xl border border-white/10 p-5 transition-colors"
+          >
+            <p className="text-sm font-semibold text-white">Copy Sugerida</p>
+            <p className="text-xs text-white/60 mt-1">
+              {(inReviewPostCount ?? 0) > 0
+                ? `${inReviewPostCount} por rever${(approvedPostCount ?? 0) > 0 ? ` · ${approvedPostCount} aprovada(s)` : ""}`
+                : "Fotos aprovadas ganham legenda automaticamente."}
+            </p>
+          </Link>
+          <div className="bg-white/10 rounded-2xl border border-white/10 p-5 opacity-50">
             <p className="text-sm font-semibold text-white">Calendário</p>
             <p className="text-xs text-white/60 mt-1">Em breve — publicações agendadas.</p>
           </div>
-          <div className="bg-white/10 rounded-2xl border border-white/10 p-5">
+          <div className="bg-white/10 rounded-2xl border border-white/10 p-5 opacity-50">
             <p className="text-sm font-semibold text-white">Analytics</p>
             <p className="text-xs text-white/60 mt-1">Em breve — métricas do Instagram e análise AI.</p>
           </div>
