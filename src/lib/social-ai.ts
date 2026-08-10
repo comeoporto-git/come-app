@@ -187,6 +187,64 @@ function buildCaptionSystemPrompt(brandBrief: string, pastPostsContext: string):
   return `${CAPTION_SYSTEM_PROMPT}\n\n=== DIRETRIZES DA MARCA (segue estas à risca) ===\n${brandBrief}${pastPostsContext ? `\n\n${pastPostsContext}` : ""}`;
 }
 
+// ── Language-coverage safety net ────────────────────────────────────────────
+// Prompt wording alone isn't 100% reliable for "always do X" rules — a
+// caption generation can silently drop a required language even with an
+// explicit instruction not to. This adds a cheap post-hoc check + one retry
+// specifically for that failure mode, since dropping a language the brand
+// requires in every post is high-stakes (half the audience gets nothing).
+
+type LanguageCheck = { name: string; test: RegExp };
+
+const LANGUAGE_CHECKS: LanguageCheck[] = [
+  { name: "português", test: /[ãõéêáàâóôíç]|\b(não|para|com|teu|tua|nossa|reserva|descobre)\b/i },
+  { name: "inglês", test: /\b(the|and|your|book|discover|experience|taste|with)\b/i },
+];
+
+/** Scans the brand context text itself for signals that every post must cover multiple languages. */
+function requiredLanguages(brandContext: string): LanguageCheck[] {
+  const text = brandContext.toLowerCase();
+  const mentionsBilingual = /bilingue|bilingual/.test(text);
+  const mentionsPt = /portugu[eê]s/.test(text);
+  const mentionsEn = /ingl[eê]s|english/.test(text);
+  return mentionsBilingual || (mentionsPt && mentionsEn) ? LANGUAGE_CHECKS : [];
+}
+
+function missingLanguages(caption: string, required: LanguageCheck[]): string[] {
+  return required.filter((lang) => !lang.test.test(caption)).map((lang) => lang.name);
+}
+
+type CaptionContent =
+  | string
+  | ({ type: "image"; source: { type: "base64"; media_type: ImagePayload["mediaType"]; data: string } } | { type: "text"; text: string })[];
+
+function withLanguageReminder(content: CaptionContent, missing: string[]): CaptionContent {
+  const reminder = `\n\nATENÇÃO: a tua resposta anterior não incluiu texto em ${missing.join(" e ")}. As diretrizes da marca exigem isto em TODAS as publicações, sem exceção. Reescreve a legenda incluindo obrigatoriamente ${missing.join(" e ")} desta vez.`;
+  return typeof content === "string" ? content + reminder : [...content, { type: "text", text: reminder }];
+}
+
+async function callCaptionModel(system: string, content: CaptionContent): Promise<string> {
+  const response = await anthropic.messages.create({
+    model: MODEL,
+    max_tokens: 700, // bilingual / structured captions (per brand guidelines) run longer than a plain single-language caption
+    system,
+    messages: [{ role: "user", content }],
+  });
+  return (response.content[0] as { type: string; text: string }).text.trim();
+}
+
+/** Generates a caption, then verifies + retries once if a brand-required language is missing. */
+async function generateWithLanguageCheck(system: string, content: CaptionContent, brandBrief: string): Promise<string> {
+  const required = requiredLanguages(brandBrief);
+  const caption = await callCaptionModel(system, content);
+  if (required.length === 0) return caption;
+
+  const missing = missingLanguages(caption, required);
+  if (missing.length === 0) return caption;
+
+  return callCaptionModel(system, withLanguageReminder(content, missing));
+}
+
 export async function generateCaption(
   photo: { blobUrl: string; filename: string | null },
   brandBrief: string,
@@ -195,21 +253,14 @@ export async function generateCaption(
   const system = buildCaptionSystemPrompt(brandBrief, pastPostsContext);
   const image = await fetchImageAsBase64(photo.blobUrl);
 
-  const userContent = image
+  const userContent: CaptionContent = image
     ? [
         { type: "image" as const, source: { type: "base64" as const, media_type: image.mediaType, data: image.data } },
         { type: "text" as const, text: "Escreve uma legenda para esta foto." },
       ]
     : `Ficheiro: ${photo.filename ?? "sem nome"}. Não foi possível carregar a imagem — escreve uma legenda genérica mas na voz da marca, adequada a uma foto de comida ou de um tour gastronómico no Porto.`;
 
-  const response = await anthropic.messages.create({
-    model: MODEL,
-    max_tokens: 700, // bilingual / structured captions (per brand guidelines) run longer than a plain single-language caption
-    system,
-    messages: [{ role: "user", content: userContent }],
-  });
-
-  return (response.content[0] as { type: string; text: string }).text.trim();
+  return generateWithLanguageCheck(system, userContent, brandBrief);
 }
 
 // ── Performance analysis (Phase 4) ──────────────────────────────────────────
@@ -267,17 +318,7 @@ export async function refineCaption(
     .map((c) => `${c.author_type === "owner" ? "Dono" : "AI"}: ${c.body}`)
     .join("\n");
 
-  const response = await anthropic.messages.create({
-    model: MODEL,
-    max_tokens: 700,
-    system,
-    messages: [
-      {
-        role: "user",
-        content: `Legenda atual:\n"${currentCaption}"\n\nConversa de revisão:\n${threadText}\n\nReescreve a legenda tendo em conta o feedback mais recente do dono. Devolve apenas a nova legenda.`,
-      },
-    ],
-  });
+  const content = `Legenda atual:\n"${currentCaption}"\n\nConversa de revisão:\n${threadText}\n\nReescreve a legenda tendo em conta o feedback mais recente do dono. Devolve apenas a nova legenda.`;
 
-  return (response.content[0] as { type: string; text: string }).text.trim();
+  return generateWithLanguageCheck(system, content, brandBrief);
 }
