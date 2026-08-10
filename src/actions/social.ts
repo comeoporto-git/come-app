@@ -136,6 +136,28 @@ export async function regenerateCaption(postId: string): Promise<void> {
   revalidatePath("/admin/social/posts");
 }
 
+/** Direct hand-edit of the caption text — no AI involved. Doesn't touch status, since editing wording on an already-scheduled/published post shouldn't silently pull it off the calendar. */
+export async function updatePostCaption(postId: string, caption: string): Promise<void> {
+  const session = await requireAdmin();
+  const trimmed = caption.trim();
+
+  await supabase
+    .from("social_posts")
+    .update({ caption: trimmed, updated_at: new Date().toISOString() })
+    .eq("id", postId);
+
+  await supabase.from("social_post_comments").insert({
+    post_id: postId,
+    author_type: "owner",
+    author_team_id: session.user.notionId,
+    body: "Editou a legenda manualmente.",
+    caption_snapshot: trimmed,
+  });
+
+  revalidatePath(`/admin/social/posts/${postId}`);
+  revalidatePath("/admin/social/posts");
+}
+
 /** Records the owner's feedback and asks AI to rewrite the caption accordingly. */
 export async function addPostComment(postId: string, body: string): Promise<void> {
   const session = await requireAdmin();
