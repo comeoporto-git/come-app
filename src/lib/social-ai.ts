@@ -183,6 +183,8 @@ CONSISTENCY IS CRITICAL — captions are generated one at a time across many sep
 
 WHEN MULTIPLE LANGUAGES ARE REQUIRED, EVERY WORD OF THE MESSAGE MUST BE DUPLICATED IN EACH LANGUAGE BLOCK — never write a shared hook, opening line, or any other sentence before/outside the language-separated blocks. A sentence that appears only once, ahead of the language markers, only reaches the audience for whichever language block comes second — that is an incomplete caption, not a bilingual one. Each language block (hook, body, and call-to-action) must stand alone as a complete, self-contained version of the full message.
 
+NEVER USE EMOJIS — no decorative symbols, no flag emojis, nothing — even if the brand guidelines below mention or suggest using them. This overrides the guidelines on this one point specifically. If the guidelines describe separating languages with flag emojis, use a plain "---" divider line on its own line instead (the guidelines' own non-emoji alternative).
+
 Return ONLY the caption text — no explanation, no markdown fences, no surrounding quotes.`;
 
 function buildCaptionSystemPrompt(brandBrief: string, pastPostsContext: string): string {
@@ -218,7 +220,17 @@ function missingLanguages(caption: string, required: LanguageCheck[]): string[] 
 
 // Matches whatever marks the start of a language block: a flag emoji, or a
 // "---" divider line (the two options the brand guidelines themselves offer).
+// Flags are still matched here even though emojis are now banned in the
+// output — this just needs to recognize a marker if one slips through.
 const LANGUAGE_BLOCK_MARKER = /🇵🇹|🇬🇧|^\s*---\s*$/m;
+
+// \p{Extended_Pictographic} covers most emoji; flag emojis are pairs of
+// Regional Indicator Symbols, a separate Unicode category.
+const EMOJI_PATTERN = /\p{Extended_Pictographic}|\p{Regional_Indicator}/u;
+
+function containsEmoji(text: string): boolean {
+  return EMOJI_PATTERN.test(text);
+}
 
 /** True if there's a real sentence sitting before the first language marker — i.e. a hook/intro that only exists in one language instead of being duplicated in every block. */
 function hasSharedIntroOutsideLanguageBlocks(caption: string, required: LanguageCheck[]): boolean {
@@ -233,7 +245,7 @@ type CaptionContent =
   | ({ type: "image"; source: { type: "base64"; media_type: ImagePayload["mediaType"]; data: string } } | { type: "text"; text: string })[];
 
 function withIssueReminder(content: CaptionContent, issues: string[]): CaptionContent {
-  const reminder = `\n\nATENÇÃO: a tua resposta anterior ${issues.join("; ")}. As diretrizes da marca exigem que TODO o texto — incluindo a frase de abertura/gancho — esteja completo e duplicado dentro de cada bloco de idioma, sem nenhuma frase partilhada fora deles. Reescreve a legenda do zero corrigindo isto.`;
+  const reminder = `\n\nATENÇÃO: a tua resposta anterior ${issues.join("; ")}. Reescreve a legenda do zero corrigindo isto, mantendo tudo o resto igual às instruções.`;
   return typeof content === "string" ? content + reminder : [...content, { type: "text", text: reminder }];
 }
 
@@ -247,19 +259,24 @@ async function callCaptionModel(system: string, content: CaptionContent): Promis
   return (response.content[0] as { type: string; text: string }).text.trim();
 }
 
-/** Generates a caption, then verifies + retries once if a brand-required language is missing or the message isn't fully duplicated in each language block. */
+/** Generates a caption, then verifies + retries once if a brand-required language is missing, the message isn't fully duplicated in each language block, or it used emojis (banned unconditionally regardless of what the guidelines say). */
 async function generateWithLanguageCheck(system: string, content: CaptionContent, brandBrief: string): Promise<string> {
   const required = requiredLanguages(brandBrief);
   const caption = await callCaptionModel(system, content);
-  if (required.length === 0) return caption;
-
-  const missing = missingLanguages(caption, required);
-  const hasLeak = hasSharedIntroOutsideLanguageBlocks(caption, required);
-  if (missing.length === 0 && !hasLeak) return caption;
 
   const issues: string[] = [];
-  if (missing.length > 0) issues.push(`não incluiu texto em ${missing.join(" e ")}`);
-  if (hasLeak) issues.push("teve uma frase de abertura partilhada fora dos blocos de idioma, que por isso só existe numa língua");
+  if (required.length > 0) {
+    const missing = missingLanguages(caption, required);
+    if (missing.length > 0) issues.push(`não incluiu texto em ${missing.join(" e ")}`);
+    if (hasSharedIntroOutsideLanguageBlocks(caption, required)) {
+      issues.push("teve uma frase de abertura partilhada fora dos blocos de idioma, que por isso só existe numa língua");
+    }
+  }
+  if (containsEmoji(caption)) {
+    issues.push("usou emojis — já não devem ser usados em nenhuma legenda, nem sequer bandeiras; usa a linha divisória \"---\" em vez de bandeiras");
+  }
+
+  if (issues.length === 0) return caption;
 
   return callCaptionModel(system, withIssueReminder(content, issues));
 }
