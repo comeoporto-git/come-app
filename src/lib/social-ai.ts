@@ -118,3 +118,106 @@ function extractJson(raw: string): string {
   if (start === -1 || end === -1 || end < start) return clean;
   return clean.slice(start, end + 1);
 }
+
+// ── Captions (Phase 2) ──────────────────────────────────────────────────────
+
+export type PostComment = { author_type: "owner" | "ai"; body: string; created_at: string };
+
+export async function getPostCommentThread(postId: string): Promise<PostComment[]> {
+  const { data } = await supabase
+    .from("social_post_comments")
+    .select("author_type, body, created_at")
+    .eq("post_id", postId)
+    .order("created_at", { ascending: true });
+  return (data ?? []) as PostComment[];
+}
+
+/**
+ * Recent approved/published captions + the owner feedback that shaped them,
+ * formatted as few-shot context. This is what makes the brand voice "learn"
+ * from past reviews without any fine-tuning — pure in-context retrieval.
+ */
+export async function getRecentApprovedPostsContext(limit = 8): Promise<string> {
+  const { data: posts } = await supabase
+    .from("social_posts")
+    .select("id, caption")
+    .in("status", ["approved", "scheduled", "published"])
+    .order("updated_at", { ascending: false })
+    .limit(limit);
+
+  if (!posts || posts.length === 0) return "";
+
+  const examples = await Promise.all(
+    (posts as { id: string; caption: string | null }[]).map(async (post) => {
+      if (!post.caption) return null;
+      const thread = await getPostCommentThread(post.id);
+      const ownerFeedback = thread
+        .filter((c) => c.author_type === "owner")
+        .map((c) => `  - ${c.body}`)
+        .join("\n");
+      return `Legenda: "${post.caption}"${ownerFeedback ? `\nFeedback do dono nesta publicação:\n${ownerFeedback}` : ""}`;
+    })
+  );
+
+  const filtered = examples.filter((e): e is string => e !== null);
+  if (filtered.length === 0) return "";
+
+  return `Exemplos de publicações anteriores aprovadas (usa o mesmo tom e tem em conta o feedback dado):\n\n${filtered.join("\n\n")}`;
+}
+
+const CAPTION_SYSTEM_PROMPT = `You are the social media copywriter for a Porto food-tours business. Write a single Instagram caption in European Portuguese for the given photo, matching the brand's tone. Keep it concise (2-4 sentences), end with 3-6 relevant hashtags, and make it feel authentic rather than generic marketing copy. Return ONLY the caption text — no explanation, no markdown fences, no surrounding quotes.`;
+
+function buildCaptionSystemPrompt(brandBrief: string, pastPostsContext: string): string {
+  return `${CAPTION_SYSTEM_PROMPT}\n\nContexto da marca:\n${brandBrief}${pastPostsContext ? `\n\n${pastPostsContext}` : ""}`;
+}
+
+export async function generateCaption(
+  photo: { blobUrl: string; filename: string | null },
+  brandBrief: string,
+  pastPostsContext: string
+): Promise<string> {
+  const system = buildCaptionSystemPrompt(brandBrief, pastPostsContext);
+  const image = await fetchImageAsBase64(photo.blobUrl);
+
+  const userContent = image
+    ? [
+        { type: "image" as const, source: { type: "base64" as const, media_type: image.mediaType, data: image.data } },
+        { type: "text" as const, text: "Escreve uma legenda para esta foto." },
+      ]
+    : `Ficheiro: ${photo.filename ?? "sem nome"}. Não foi possível carregar a imagem — escreve uma legenda genérica mas na voz da marca, adequada a uma foto de comida ou de um tour gastronómico no Porto.`;
+
+  const response = await anthropic.messages.create({
+    model: MODEL,
+    max_tokens: 400,
+    system,
+    messages: [{ role: "user", content: userContent }],
+  });
+
+  return (response.content[0] as { type: string; text: string }).text.trim();
+}
+
+export async function refineCaption(
+  currentCaption: string,
+  commentThread: PostComment[],
+  brandBrief: string,
+  pastPostsContext: string
+): Promise<string> {
+  const system = buildCaptionSystemPrompt(brandBrief, pastPostsContext);
+  const threadText = commentThread
+    .map((c) => `${c.author_type === "owner" ? "Dono" : "AI"}: ${c.body}`)
+    .join("\n");
+
+  const response = await anthropic.messages.create({
+    model: MODEL,
+    max_tokens: 400,
+    system,
+    messages: [
+      {
+        role: "user",
+        content: `Legenda atual:\n"${currentCaption}"\n\nConversa de revisão:\n${threadText}\n\nReescreve a legenda tendo em conta o feedback mais recente do dono. Devolve apenas a nova legenda.`,
+      },
+    ],
+  });
+
+  return (response.content[0] as { type: string; text: string }).text.trim();
+}
