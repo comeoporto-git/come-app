@@ -6,6 +6,7 @@ import { SocialBreadcrumb } from "@/components/social/SocialBreadcrumb";
 import { PostReviewPanel, type PostComment } from "@/components/social/PostReviewPanel";
 import { PostPublishPanel } from "@/components/social/PostPublishPanel";
 import { CopyCaptionButton } from "@/components/social/CopyCaptionButton";
+import { RegenerateCaptionButton } from "@/components/social/RegenerateCaptionButton";
 
 type PostRow = {
   id: string;
@@ -90,7 +91,10 @@ export default async function SocialPostDetailPage({ params }: { params: Promise
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Legenda atual</p>
-                <CopyCaptionButton caption={typedPost.caption} />
+                <div className="flex items-center gap-2">
+                  <RegenerateCaptionButton postId={typedPost.id} />
+                  <CopyCaptionButton caption={typedPost.caption} />
+                </div>
               </div>
               <p className="text-sm text-[#32373c] whitespace-pre-wrap leading-relaxed">
                 {typedPost.caption ?? "Ainda sem legenda."}

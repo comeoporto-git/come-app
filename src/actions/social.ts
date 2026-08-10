@@ -103,6 +103,39 @@ export async function promoteToPost(photoId: string): Promise<string | null> {
   return inserted?.id ?? null;
 }
 
+/** Throws away the current caption and generates a fresh one from scratch — e.g. after editing the Brand Brief or Diretrizes. Unlike addPostComment, this ignores the existing caption entirely rather than revising it. */
+export async function regenerateCaption(postId: string): Promise<void> {
+  await requireAdmin();
+
+  const { data: post } = await supabase.from("social_posts").select("photo_id").eq("id", postId).maybeSingle();
+  if (!post?.photo_id) return;
+
+  const { data: photo } = await supabase
+    .from("social_photos")
+    .select("blob_url, filename")
+    .eq("id", post.photo_id)
+    .maybeSingle();
+  if (!photo) return;
+
+  const [brandBrief, pastPostsContext] = await Promise.all([getBrandBrief(), getRecentApprovedPostsContext()]);
+  const caption = await generateCaption({ blobUrl: photo.blob_url, filename: photo.filename }, brandBrief, pastPostsContext);
+
+  await supabase
+    .from("social_posts")
+    .update({ caption, status: "in_review", updated_at: new Date().toISOString() })
+    .eq("id", postId);
+
+  await supabase.from("social_post_comments").insert({
+    post_id: postId,
+    author_type: "ai",
+    body: "Legenda gerada novamente do zero (Regenerar), não uma revisão do comentário anterior.",
+    caption_snapshot: caption,
+  });
+
+  revalidatePath(`/admin/social/posts/${postId}`);
+  revalidatePath("/admin/social/posts");
+}
+
 /** Records the owner's feedback and asks AI to rewrite the caption accordingly. */
 export async function addPostComment(postId: string, body: string): Promise<void> {
   const session = await requireAdmin();

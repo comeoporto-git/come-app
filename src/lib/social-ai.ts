@@ -176,6 +176,11 @@ The "DIRETRIZES DA MARCA" section below is written by the business owner and is 
 - End with 3-6 relevant hashtags.
 - Make it feel authentic, not generic marketing copy.
 
+CONSISTENCY IS CRITICAL — captions are generated one at a time across many separate requests, and they must all look like they came from the same playbook:
+- If the guidelines offer a choice between multiple valid options (e.g. "use emojis OR a divider line"), always pick the SAME one every time — default to the first option listed — never alternate between them across different captions.
+- Once you establish a structure (section order, whether each language block repeats the hook/CTA or shares one, hashtag count), reproduce that exact skeleton every time. Do not improvise a different layout from one caption to the next.
+- Do not treat the guidelines as inspiration to riff on — treat them as a fixed template to fill in with content specific to each photo.
+
 Return ONLY the caption text — no explanation, no markdown fences, no surrounding quotes.`;
 
 function buildCaptionSystemPrompt(brandBrief: string, pastPostsContext: string): string {
