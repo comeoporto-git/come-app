@@ -145,6 +145,56 @@ export async function setPostCopyStatus(postId: string, status: "in_review" | "a
   revalidatePath("/admin/social/posts");
 }
 
+/** scheduledForIso: local datetime-local input value (e.g. "2026-08-20T10:00"), stored as-is in UTC-naive form. */
+export async function schedulePost(postId: string, scheduledForIso: string): Promise<void> {
+  await requireAdmin();
+  const date = new Date(scheduledForIso);
+  if (Number.isNaN(date.getTime())) throw new Error("Data inválida");
+
+  await supabase
+    .from("social_posts")
+    .update({ status: "scheduled", scheduled_for: date.toISOString(), updated_at: new Date().toISOString() })
+    .eq("id", postId);
+
+  revalidatePath(`/admin/social/posts/${postId}`);
+  revalidatePath("/admin/social/posts");
+  revalidatePath("/admin/social/calendar");
+  revalidatePath("/admin/social");
+}
+
+/** Back out of a schedule — returns the post to "approved" so it can be rescheduled or left for later. */
+export async function unschedulePost(postId: string): Promise<void> {
+  await requireAdmin();
+  await supabase
+    .from("social_posts")
+    .update({ status: "approved", scheduled_for: null, updated_at: new Date().toISOString() })
+    .eq("id", postId);
+
+  revalidatePath(`/admin/social/posts/${postId}`);
+  revalidatePath("/admin/social/posts");
+  revalidatePath("/admin/social/calendar");
+  revalidatePath("/admin/social");
+}
+
+/** The app never auto-publishes — this just records that the owner posted manually and where. */
+export async function markPostPublished(postId: string, permalink: string): Promise<void> {
+  await requireAdmin();
+  await supabase
+    .from("social_posts")
+    .update({
+      status: "published",
+      published_at: new Date().toISOString(),
+      ig_permalink: permalink.trim() || null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", postId);
+
+  revalidatePath(`/admin/social/posts/${postId}`);
+  revalidatePath("/admin/social/posts");
+  revalidatePath("/admin/social/calendar");
+  revalidatePath("/admin/social");
+}
+
 export async function rescorePhoto(photoId: string): Promise<void> {
   await requireAdmin();
   const { data: photo } = await supabase

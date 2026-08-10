@@ -4,11 +4,15 @@ import Image from "next/image";
 import { supabase } from "@/lib/notion";
 import { SocialBreadcrumb } from "@/components/social/SocialBreadcrumb";
 import { PostReviewPanel, type PostComment } from "@/components/social/PostReviewPanel";
+import { PostPublishPanel } from "@/components/social/PostPublishPanel";
 
 type PostRow = {
   id: string;
   caption: string | null;
   status: string;
+  scheduled_for: string | null;
+  published_at: string | null;
+  ig_permalink: string | null;
   photo: { blob_url: string; filename: string | null; parent_folder_name: string | null } | null;
 };
 
@@ -30,7 +34,9 @@ export default async function SocialPostDetailPage({ params }: { params: Promise
   const [{ data: post }, { data: comments }] = await Promise.all([
     supabase
       .from("social_posts")
-      .select("id, caption, status, photo:social_photos(blob_url, filename, parent_folder_name)")
+      .select(
+        "id, caption, status, scheduled_for, published_at, ig_permalink, photo:social_photos(blob_url, filename, parent_folder_name)"
+      )
       .eq("id", id)
       .maybeSingle(),
     supabase
@@ -78,11 +84,20 @@ export default async function SocialPostDetailPage({ params }: { params: Promise
             </div>
           </div>
 
-          <PostReviewPanel
-            postId={typedPost.id}
-            status={typedPost.status}
-            comments={(comments ?? []) as PostComment[]}
-          />
+          <div className="space-y-4">
+            <PostPublishPanel
+              postId={typedPost.id}
+              status={typedPost.status}
+              scheduledFor={typedPost.scheduled_for}
+              publishedAt={typedPost.published_at}
+              igPermalink={typedPost.ig_permalink}
+            />
+            <PostReviewPanel
+              postId={typedPost.id}
+              status={typedPost.status}
+              comments={(comments ?? []) as PostComment[]}
+            />
+          </div>
         </div>
       </main>
     </div>
