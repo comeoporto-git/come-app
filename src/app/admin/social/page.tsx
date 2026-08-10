@@ -18,6 +18,7 @@ export default async function SocialDashboardPage() {
     { count: rejectedCount },
     { count: inReviewPostCount },
     { count: approvedPostCount },
+    { count: scheduledPostCount },
   ] = await Promise.all([
     supabase
       .from("social_drive_connection")
@@ -29,6 +30,7 @@ export default async function SocialDashboardPage() {
     supabase.from("social_photos").select("id", { count: "exact", head: true }).eq("review_status", "rejected"),
     supabase.from("social_posts").select("id", { count: "exact", head: true }).eq("status", "in_review"),
     supabase.from("social_posts").select("id", { count: "exact", head: true }).eq("status", "approved"),
+    supabase.from("social_posts").select("id", { count: "exact", head: true }).eq("status", "scheduled"),
   ]);
 
   const connected = Boolean(connection?.folder_id);
@@ -101,10 +103,15 @@ export default async function SocialDashboardPage() {
                 : "Fotos aprovadas ganham legenda automaticamente."}
             </p>
           </Link>
-          <div className="bg-white/10 rounded-2xl border border-white/10 p-5 opacity-50">
+          <Link
+            href="/admin/social/calendar"
+            className="bg-white/10 hover:bg-white/15 rounded-2xl border border-white/10 p-5 transition-colors"
+          >
             <p className="text-sm font-semibold text-white">Calendário</p>
-            <p className="text-xs text-white/60 mt-1">Em breve — publicações agendadas.</p>
-          </div>
+            <p className="text-xs text-white/60 mt-1">
+              {(scheduledPostCount ?? 0) > 0 ? `${scheduledPostCount} agendada(s)` : "Sem publicações agendadas."}
+            </p>
+          </Link>
           <div className="bg-white/10 rounded-2xl border border-white/10 p-5 opacity-50">
             <p className="text-sm font-semibold text-white">Analytics</p>
             <p className="text-xs text-white/60 mt-1">Em breve — métricas do Instagram e análise AI.</p>

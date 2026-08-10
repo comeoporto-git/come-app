@@ -62,6 +62,7 @@ const nav: { group: string | null; items: NavItem[] }[] = [
     items: [
       { label: "Fotos", href: "/admin/social/photos" },
       { label: "Copy", href: "/admin/social/posts" },
+      { label: "Calendário", href: "/admin/social/calendar" },
     ],
   },
   {
