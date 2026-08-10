@@ -5,6 +5,7 @@ import { supabase } from "@/lib/notion";
 import { SocialBreadcrumb } from "@/components/social/SocialBreadcrumb";
 import { InstagramConnectForm } from "@/components/social/InstagramConnectForm";
 import { InstagramSyncButton } from "@/components/social/InstagramSyncButton";
+import { InstagramReconnectButton } from "@/components/social/InstagramReconnectButton";
 import { AnalysisPanel } from "@/components/social/AnalysisPanel";
 
 const IG_CONNECTION_ID = "00000000-0000-0000-0000-000000000003";
@@ -37,7 +38,7 @@ export default async function SocialAnalyticsPage() {
 
   const { data: connection } = await supabase
     .from("social_ig_connection")
-    .select("ig_business_account_id, page_access_token")
+    .select("ig_business_account_id, fb_page_id, page_access_token")
     .eq("id", IG_CONNECTION_ID)
     .maybeSingle();
 
@@ -82,8 +83,14 @@ export default async function SocialAnalyticsPage() {
           <div>
             <h1 className="text-white font-bold text-lg">Analytics</h1>
             <p className="text-white/60 text-sm mt-0.5">{typedPosts.length} publicação(ões) publicada(s)</p>
+            <p className="text-[11px] text-white/30 mt-1">
+              IG Business Account: {connection?.ig_business_account_id} · Page: {connection?.fb_page_id}
+            </p>
           </div>
-          <InstagramSyncButton />
+          <div className="flex flex-col items-end gap-2">
+            <InstagramSyncButton />
+            <InstagramReconnectButton />
+          </div>
         </div>
 
         <AnalysisPanel initialSummary={latestAnalysis?.summary ?? null} />
