@@ -11,9 +11,14 @@ import {
   getBrandBrief,
   getRecentApprovedPostsContext,
   getPostCommentThread,
+  analyzePerformance,
+  type PostPerformance,
 } from "@/lib/social-ai";
+import { syncInstagramInsights, type IgSyncResult } from "@/lib/social-ig-sync";
 
 const DRIVE_CONNECTION_ID = "00000000-0000-0000-0000-000000000002";
+const BRAND_BRIEF_ID = "00000000-0000-0000-0000-000000000001";
+const IG_CONNECTION_ID = "00000000-0000-0000-0000-000000000003";
 
 async function requireAdmin() {
   const session = await auth();
@@ -223,4 +228,110 @@ export async function rescoreUnscoredNow(): Promise<number> {
   const scored = await scoreUnscoredPhotos(25);
   revalidatePath("/admin/social/photos");
   return scored;
+}
+
+// ── Brand brief (Phase 4) ────────────────────────────────────────────────────
+
+export async function saveBrandBrief(fields: {
+  tone: string;
+  offerings: string;
+  websiteSummary: string;
+  audience: string;
+  guidelines: string;
+}): Promise<void> {
+  const session = await requireAdmin();
+  await supabase
+    .from("social_brand_brief")
+    .update({
+      tone: fields.tone.trim() || null,
+      offerings: fields.offerings.trim() || null,
+      website_summary: fields.websiteSummary.trim() || null,
+      audience: fields.audience.trim() || null,
+      guidelines: fields.guidelines.trim() || null,
+      updated_by: session.user.notionId,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", BRAND_BRIEF_ID);
+
+  revalidatePath("/admin/social/brand-brief");
+}
+
+// ── Instagram analytics (Phase 4) ───────────────────────────────────────────
+
+export async function connectInstagram(fields: {
+  pageAccessToken: string;
+  igBusinessAccountId: string;
+  fbPageId: string;
+}): Promise<void> {
+  const session = await requireAdmin();
+  await supabase
+    .from("social_ig_connection")
+    .update({
+      page_access_token: fields.pageAccessToken.trim(),
+      ig_business_account_id: fields.igBusinessAccountId.trim(),
+      fb_page_id: fields.fbPageId.trim(),
+      connected_by_team_id: session.user.notionId,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", IG_CONNECTION_ID);
+
+  revalidatePath("/admin/social/analytics");
+}
+
+export async function disconnectInstagram(): Promise<void> {
+  await requireAdmin();
+  await supabase
+    .from("social_ig_connection")
+    .update({ page_access_token: null, ig_business_account_id: null, fb_page_id: null })
+    .eq("id", IG_CONNECTION_ID);
+
+  revalidatePath("/admin/social/analytics");
+}
+
+export async function syncInstagramNow(): Promise<IgSyncResult> {
+  await requireAdmin();
+  const result = await syncInstagramInsights();
+  revalidatePath("/admin/social/analytics");
+  return result;
+}
+
+export async function generateAnalysis(): Promise<string> {
+  await requireAdmin();
+
+  const { data: rows } = await supabase
+    .from("social_posts")
+    .select("caption, published_at, social_ig_insights(impressions, reach, likes, comments, saves, fetched_at)")
+    .eq("status", "published")
+    .order("published_at", { ascending: false })
+    .limit(30);
+
+  const posts: PostPerformance[] = ((rows ?? []) as unknown as {
+    caption: string | null;
+    published_at: string | null;
+    social_ig_insights: { impressions: number | null; reach: number | null; likes: number | null; comments: number | null; saves: number | null; fetched_at: string }[];
+  }[]).map((row) => {
+    // social_ig_insights holds one snapshot per sync — use the most recent.
+    const latest = [...row.social_ig_insights].sort((a, b) => b.fetched_at.localeCompare(a.fetched_at))[0];
+    return {
+      caption: row.caption,
+      publishedAt: row.published_at,
+      impressions: latest?.impressions ?? null,
+      reach: latest?.reach ?? null,
+      likes: latest?.likes ?? null,
+      comments: latest?.comments ?? null,
+      saves: latest?.saves ?? null,
+    };
+  });
+
+  const brandBrief = await getBrandBrief();
+  const summary = await analyzePerformance(posts, brandBrief);
+
+  await supabase.from("social_ai_analysis").insert({
+    period_start: posts.length > 0 ? posts[posts.length - 1].publishedAt?.slice(0, 10) : null,
+    period_end: posts.length > 0 ? posts[0].publishedAt?.slice(0, 10) : null,
+    summary,
+  });
+
+  revalidatePath("/admin/social/analytics");
+  return summary;
 }
