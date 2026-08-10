@@ -5,6 +5,7 @@ import { supabase } from "@/lib/notion";
 import { SocialBreadcrumb } from "@/components/social/SocialBreadcrumb";
 import { PostReviewPanel, type PostComment } from "@/components/social/PostReviewPanel";
 import { PostPublishPanel } from "@/components/social/PostPublishPanel";
+import { CopyCaptionButton } from "@/components/social/CopyCaptionButton";
 
 type PostRow = {
   id: string;
@@ -13,7 +14,7 @@ type PostRow = {
   scheduled_for: string | null;
   published_at: string | null;
   ig_permalink: string | null;
-  photo: { blob_url: string; filename: string | null; parent_folder_name: string | null } | null;
+  photo: { id: string; blob_url: string; filename: string | null; parent_folder_name: string | null } | null;
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -35,7 +36,7 @@ export default async function SocialPostDetailPage({ params }: { params: Promise
     supabase
       .from("social_posts")
       .select(
-        "id, caption, status, scheduled_for, published_at, ig_permalink, photo:social_photos(blob_url, filename, parent_folder_name)"
+        "id, caption, status, scheduled_for, published_at, ig_permalink, photo:social_photos(id, blob_url, filename, parent_folder_name)"
       )
       .eq("id", id)
       .maybeSingle(),
@@ -76,8 +77,21 @@ export default async function SocialPostDetailPage({ params }: { params: Promise
               </span>
             </div>
 
+            {typedPost.photo?.id && (
+              <a
+                href={`/api/social/photo/${typedPost.photo.id}`}
+                download
+                className="block text-center text-sm font-semibold bg-white/10 hover:bg-white/15 text-white py-2.5 rounded-xl transition-colors"
+              >
+                ⬇ Descarregar foto
+              </a>
+            )}
+
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Legenda atual</p>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Legenda atual</p>
+                <CopyCaptionButton caption={typedPost.caption} />
+              </div>
               <p className="text-sm text-[#32373c] whitespace-pre-wrap leading-relaxed">
                 {typedPost.caption ?? "Ainda sem legenda."}
               </p>
