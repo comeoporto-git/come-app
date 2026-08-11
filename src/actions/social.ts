@@ -75,6 +75,43 @@ export async function reviewPhoto(photoId: string, status: "approved" | "rejecte
   revalidatePath("/admin/social");
 }
 
+// Each approval runs a synchronous AI caption call — cap how many a single
+// bulk action processes so the request can't run long enough to time out.
+const BULK_REVIEW_LIMIT = 20;
+
+/** Same as reviewPhoto but for many photos at once — e.g. "approve all of category X" from a filtered Fotos view. */
+export async function bulkReviewPhotos(
+  photoIds: string[],
+  status: "approved" | "rejected"
+): Promise<{ processed: number; skipped: number }> {
+  const session = await requireAdmin();
+  const toProcess = photoIds.slice(0, BULK_REVIEW_LIMIT);
+  const skipped = photoIds.length - toProcess.length;
+
+  for (const photoId of toProcess) {
+    await supabase
+      .from("social_photos")
+      .update({
+        review_status: status,
+        reviewed_by: session.user.notionId,
+        reviewed_at: new Date().toISOString(),
+      })
+      .eq("id", photoId);
+
+    if (status === "approved") {
+      await promoteToPost(photoId).catch((err) => {
+        console.error(`[social] promoteToPost failed for photo ${photoId}:`, err);
+      });
+    }
+  }
+
+  revalidatePath("/admin/social/photos");
+  revalidatePath("/admin/social/posts");
+  revalidatePath("/admin/social");
+
+  return { processed: toProcess.length, skipped };
+}
+
 /** Idempotent: creates a draft post with an AI-generated caption for an approved photo, or returns the existing one. */
 export async function promoteToPost(photoId: string): Promise<string | null> {
   const { data: existing } = await supabase
@@ -114,6 +151,47 @@ export async function setPostCategory(postId: string, category: string | null): 
   await supabase.from("social_posts").update({ category, updated_at: new Date().toISOString() }).eq("id", postId);
   revalidatePath(`/admin/social/posts/${postId}`);
   revalidatePath("/admin/social/posts");
+}
+
+// Instagram carousels cap at 10 slides total (1 cover + up to 9 extra photos).
+const CAROUSEL_MAX_EXTRA = 9;
+
+/** Attaches an approved photo as an extra carousel slide after the cover photo. */
+export async function addPhotoToPost(postId: string, photoId: string): Promise<void> {
+  await requireAdmin();
+
+  const { data: post } = await supabase.from("social_posts").select("photo_id").eq("id", postId).maybeSingle();
+  if (!post || post.photo_id === photoId) return;
+
+  const { count } = await supabase
+    .from("social_post_extra_photos")
+    .select("id", { count: "exact", head: true })
+    .eq("post_id", postId);
+  if ((count ?? 0) >= CAROUSEL_MAX_EXTRA) throw new Error(`Máximo de ${CAROUSEL_MAX_EXTRA + 1} fotos por publicação.`);
+
+  await supabase
+    .from("social_post_extra_photos")
+    .upsert({ post_id: postId, photo_id: photoId, position: count ?? 0 }, { onConflict: "post_id,photo_id" });
+
+  revalidatePath(`/admin/social/posts/${postId}`);
+}
+
+/** Removes a slide from a carousel post (the cover photo can't be removed this way). */
+export async function removePhotoFromPost(postId: string, photoId: string): Promise<void> {
+  await requireAdmin();
+  await supabase.from("social_post_extra_photos").delete().eq("post_id", postId).eq("photo_id", photoId);
+  revalidatePath(`/admin/social/posts/${postId}`);
+}
+
+/** Persists the drag-and-drop order of a carousel's extra slides (cover photo stays first, outside this list). */
+export async function reorderPostExtraPhotos(postId: string, photoIds: string[]): Promise<void> {
+  await requireAdmin();
+  await Promise.all(
+    photoIds.map((photoId, position) =>
+      supabase.from("social_post_extra_photos").update({ position }).eq("post_id", postId).eq("photo_id", photoId)
+    )
+  );
+  revalidatePath(`/admin/social/posts/${postId}`);
 }
 
 /** Throws away the current caption and generates a fresh one from scratch — e.g. after editing the Brand Brief or Diretrizes. Unlike addPostComment, this ignores the existing caption entirely rather than revising it. */
@@ -233,6 +311,55 @@ export async function schedulePost(postId: string, scheduledForIso: string): Pro
   revalidatePath("/admin/social/posts");
   revalidatePath("/admin/social/calendar");
   revalidatePath("/admin/social");
+}
+
+function parseLocalDate(dateStr: string): Date {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Date(y, (m ?? 1) - 1, d ?? 1);
+}
+
+const BULK_SCHEDULE_DEFAULT_HOUR = 10;
+
+/** Spreads the given posts one-per-day starting from startDateStr ("YYYY-MM-DD"), skipping any day that already has a scheduled post so nothing gets double-booked. */
+export async function bulkSchedulePosts(postIds: string[], startDateStr: string): Promise<{ scheduled: number }> {
+  await requireAdmin();
+  if (postIds.length === 0) return { scheduled: 0 };
+
+  const { data: existing } = await supabase
+    .from("social_posts")
+    .select("scheduled_for")
+    .eq("status", "scheduled")
+    .not("scheduled_for", "is", null);
+  const takenDates = new Set(
+    (existing ?? []).map((p) => new Date(p.scheduled_for as string).toDateString())
+  );
+
+  const cursor = parseLocalDate(startDateStr);
+  let scheduled = 0;
+
+  for (const postId of postIds) {
+    while (takenDates.has(cursor.toDateString())) {
+      cursor.setDate(cursor.getDate() + 1);
+    }
+
+    const scheduledDate = new Date(cursor);
+    scheduledDate.setHours(BULK_SCHEDULE_DEFAULT_HOUR, 0, 0, 0);
+
+    await supabase
+      .from("social_posts")
+      .update({ status: "scheduled", scheduled_for: scheduledDate.toISOString(), updated_at: new Date().toISOString() })
+      .eq("id", postId);
+
+    takenDates.add(cursor.toDateString());
+    scheduled++;
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  revalidatePath("/admin/social/posts");
+  revalidatePath("/admin/social/calendar");
+  revalidatePath("/admin/social");
+
+  return { scheduled };
 }
 
 /** Back out of a schedule — returns the post to "approved" so it can be rescheduled or left for later. */

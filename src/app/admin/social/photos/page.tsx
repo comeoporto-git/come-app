@@ -6,6 +6,7 @@ import { SocialBreadcrumb } from "@/components/social/SocialBreadcrumb";
 import { PhotoReviewGrid } from "@/components/social/PhotoReviewGrid";
 import { SyncButton } from "@/components/social/SyncButton";
 import type { ReviewPhoto } from "@/components/social/PhotoCard";
+import { SOCIAL_CATEGORIES } from "@/lib/social-categories";
 
 const DRIVE_CONNECTION_ID = "00000000-0000-0000-0000-000000000002";
 const TABS = [
@@ -19,13 +20,14 @@ type TabKey = (typeof TABS)[number]["key"];
 export default async function SocialPhotosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; category?: string }>;
 }) {
   const session = await auth();
   if (!session || session.user.role !== "Admin") redirect("/");
 
   const params = await searchParams;
   const tab: TabKey = TABS.some((t) => t.key === params.tab) ? (params.tab as TabKey) : "pending";
+  const categoryFilter = params.category ?? "";
 
   const { data: connection } = await supabase
     .from("social_drive_connection")
@@ -56,16 +58,21 @@ export default async function SocialPhotosPage({
     );
   }
 
+  let photosQuery = supabase
+    .from("social_photos")
+    .select(
+      "id, filename, blob_url, parent_folder_name, review_status, ai_score, ai_score_reason, ai_tags, category, missing_since"
+    )
+    .eq("review_status", tab)
+    .order("ai_score", { ascending: false, nullsFirst: false });
+  if (categoryFilter) photosQuery = photosQuery.eq("category", categoryFilter);
+
   const [{ count: pendingCount }, { count: approvedCount }, { count: rejectedCount }, { data: photos }] =
     await Promise.all([
       supabase.from("social_photos").select("id", { count: "exact", head: true }).eq("review_status", "pending"),
       supabase.from("social_photos").select("id", { count: "exact", head: true }).eq("review_status", "approved"),
       supabase.from("social_photos").select("id", { count: "exact", head: true }).eq("review_status", "rejected"),
-      supabase
-        .from("social_photos")
-        .select("id, filename, blob_url, parent_folder_name, review_status, ai_score, ai_score_reason, ai_tags, category")
-        .eq("review_status", tab)
-        .order("ai_score", { ascending: false, nullsFirst: false }),
+      photosQuery,
     ]);
 
   const counts: Record<TabKey, number> = {
@@ -73,6 +80,9 @@ export default async function SocialPhotosPage({
     approved: approvedCount ?? 0,
     rejected: rejectedCount ?? 0,
   };
+
+  const tabHref = (t: TabKey) => `/admin/social/photos?tab=${t}${categoryFilter ? `&category=${categoryFilter}` : ""}`;
+  const categoryHref = (c: string) => `/admin/social/photos?tab=${tab}${c ? `&category=${c}` : ""}`;
 
   return (
     <div className="min-h-screen bg-[#667470] text-[#32373c]">
@@ -98,7 +108,7 @@ export default async function SocialPhotosPage({
           {TABS.map((t) => (
             <Link
               key={t.key}
-              href={`/admin/social/photos?tab=${t.key}`}
+              href={tabHref(t.key)}
               className={`text-xs font-medium px-3 py-1.5 rounded-full transition-colors ${
                 tab === t.key ? "bg-white text-[#32373c]" : "bg-white/10 text-white/60 hover:bg-white/15"
               }`}
@@ -114,7 +124,29 @@ export default async function SocialPhotosPage({
           </Link>
         </div>
 
-        <PhotoReviewGrid photos={(photos ?? []) as ReviewPhoto[]} showSuggestions={tab === "pending"} />
+        <div className="flex gap-2 flex-wrap">
+          <Link
+            href={categoryHref("")}
+            className={`text-[11px] font-medium px-2.5 py-1 rounded-full transition-colors ${
+              !categoryFilter ? "bg-white text-[#32373c]" : "bg-white/10 text-white/50 hover:bg-white/15"
+            }`}
+          >
+            Todas as categorias
+          </Link>
+          {SOCIAL_CATEGORIES.map((c) => (
+            <Link
+              key={c.slug}
+              href={categoryHref(c.slug)}
+              className={`text-[11px] font-medium px-2.5 py-1 rounded-full transition-colors ${
+                categoryFilter === c.slug ? "bg-white text-[#32373c]" : "bg-white/10 text-white/50 hover:bg-white/15"
+              }`}
+            >
+              {c.label}
+            </Link>
+          ))}
+        </div>
+
+        <PhotoReviewGrid photos={(photos ?? []) as ReviewPhoto[]} showSuggestions={tab === "pending" && !categoryFilter} />
       </main>
     </div>
   );

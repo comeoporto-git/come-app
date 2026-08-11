@@ -7,6 +7,7 @@ import { PostReviewPanel, type PostComment } from "@/components/social/PostRevie
 import { PostPublishPanel } from "@/components/social/PostPublishPanel";
 import { PostCaptionEditor } from "@/components/social/PostCaptionEditor";
 import { PostCategoryPicker } from "@/components/social/PostCategoryPicker";
+import { PostCarouselEditor, type CarouselPhoto } from "@/components/social/PostCarouselEditor";
 
 type PostRow = {
   id: string;
@@ -18,6 +19,8 @@ type PostRow = {
   ig_permalink: string | null;
   photo: { id: string; blob_url: string; filename: string | null; parent_folder_name: string | null } | null;
 };
+
+const CANDIDATE_PHOTO_LIMIT = 60;
 
 const STATUS_LABEL: Record<string, string> = {
   draft: "Rascunho",
@@ -34,7 +37,7 @@ export default async function SocialPostDetailPage({ params }: { params: Promise
 
   const { id } = await params;
 
-  const [{ data: post }, { data: comments }] = await Promise.all([
+  const [{ data: post }, { data: comments }, { data: extraRows }] = await Promise.all([
     supabase
       .from("social_posts")
       .select(
@@ -47,10 +50,30 @@ export default async function SocialPostDetailPage({ params }: { params: Promise
       .select("id, author_type, body, created_at")
       .eq("post_id", id)
       .order("created_at", { ascending: true }),
+    supabase
+      .from("social_post_extra_photos")
+      .select("position, photo:social_photos(id, blob_url, filename)")
+      .eq("post_id", id)
+      .order("position", { ascending: true }),
   ]);
 
   if (!post) notFound();
   const typedPost = post as unknown as PostRow;
+
+  const extraPhotos = ((extraRows ?? []) as unknown as { photo: CarouselPhoto | null }[])
+    .map((r) => r.photo)
+    .filter((p): p is CarouselPhoto => p !== null);
+
+  const usedIds = new Set(
+    [typedPost.photo?.id, ...extraPhotos.map((p) => p.id)].filter((id): id is string => Boolean(id))
+  );
+  const { data: candidateRows } = await supabase
+    .from("social_photos")
+    .select("id, blob_url, filename")
+    .eq("review_status", "approved")
+    .order("ai_score", { ascending: false, nullsFirst: false })
+    .limit(CANDIDATE_PHOTO_LIMIT);
+  const candidatePhotos = ((candidateRows ?? []) as CarouselPhoto[]).filter((p) => !usedIds.has(p.id));
 
   return (
     <div className="min-h-screen bg-[#667470] text-[#32373c]">
@@ -82,14 +105,33 @@ export default async function SocialPostDetailPage({ params }: { params: Promise
               </div>
             </div>
 
+            <PostCarouselEditor
+              key={[typedPost.photo?.id, ...extraPhotos.map((p) => p.id)].join(",")}
+              postId={typedPost.id}
+              extraPhotos={extraPhotos}
+              candidatePhotos={candidatePhotos}
+            />
+
             {typedPost.photo?.id && (
-              <a
-                href={`/api/social/photo/${typedPost.photo.id}`}
-                download
-                className="block text-center text-sm font-semibold bg-white/10 hover:bg-white/15 text-white py-2.5 rounded-xl transition-colors"
-              >
-                ⬇ Descarregar foto
-              </a>
+              <div className={extraPhotos.length > 0 ? "grid grid-cols-2 gap-2" : ""}>
+                <a
+                  href={`/api/social/photo/${typedPost.photo.id}`}
+                  download
+                  className="block text-center text-sm font-semibold bg-white/10 hover:bg-white/15 text-white py-2.5 rounded-xl transition-colors"
+                >
+                  ⬇ Descarregar {extraPhotos.length > 0 ? "capa" : "foto"}
+                </a>
+                {extraPhotos.map((photo, i) => (
+                  <a
+                    key={photo.id}
+                    href={`/api/social/photo/${photo.id}`}
+                    download
+                    className="block text-center text-sm font-semibold bg-white/10 hover:bg-white/15 text-white py-2.5 rounded-xl transition-colors"
+                  >
+                    ⬇ Foto {i + 2}
+                  </a>
+                ))}
+              </div>
             )}
 
             <PostCaptionEditor key={typedPost.caption ?? ""} postId={typedPost.id} initialCaption={typedPost.caption} />
