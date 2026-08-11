@@ -6,11 +6,13 @@ import { SocialBreadcrumb } from "@/components/social/SocialBreadcrumb";
 import { PostReviewPanel, type PostComment } from "@/components/social/PostReviewPanel";
 import { PostPublishPanel } from "@/components/social/PostPublishPanel";
 import { PostCaptionEditor } from "@/components/social/PostCaptionEditor";
+import { PostCategoryPicker } from "@/components/social/PostCategoryPicker";
 
 type PostRow = {
   id: string;
   caption: string | null;
   status: string;
+  category: string | null;
   scheduled_for: string | null;
   published_at: string | null;
   ig_permalink: string | null;
@@ -36,7 +38,7 @@ export default async function SocialPostDetailPage({ params }: { params: Promise
     supabase
       .from("social_posts")
       .select(
-        "id, caption, status, scheduled_for, published_at, ig_permalink, photo:social_photos(id, blob_url, filename, parent_folder_name)"
+        "id, caption, status, category, scheduled_for, published_at, ig_permalink, photo:social_photos(id, blob_url, filename, parent_folder_name)"
       )
       .eq("id", id)
       .maybeSingle(),
@@ -72,9 +74,12 @@ export default async function SocialPostDetailPage({ params }: { params: Promise
                 {typedPost.photo?.filename}
                 {typedPost.photo?.parent_folder_name && ` · ${typedPost.photo.parent_folder_name}`}
               </p>
-              <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-white/10 text-white/70">
-                {STATUS_LABEL[typedPost.status] ?? typedPost.status}
-              </span>
+              <div className="flex items-center gap-2">
+                <PostCategoryPicker postId={typedPost.id} category={typedPost.category} />
+                <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-white/10 text-white/70">
+                  {STATUS_LABEL[typedPost.status] ?? typedPost.status}
+                </span>
+              </div>
             </div>
 
             {typedPost.photo?.id && (

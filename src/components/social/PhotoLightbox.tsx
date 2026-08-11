@@ -3,6 +3,8 @@
 import { useEffect } from "react";
 import Image from "next/image";
 import type { ReviewPhoto } from "@/components/social/PhotoCard";
+import { CategorySelect } from "@/components/social/CategorySelect";
+import { setPhotoCategory } from "@/actions/social";
 
 function scoreBadgeClass(score: number | null) {
   if (score === null) return "bg-gray-100 text-gray-400";
@@ -121,6 +123,8 @@ export function PhotoLightbox({
               {photo.ai_score_reason && <p className="text-xs text-white/60">{photo.ai_score_reason}</p>}
             </div>
           )}
+
+          <CategorySelect value={photo.category} onChange={(category) => setPhotoCategory(photo.id, category)} />
 
           {photo.ai_tags && photo.ai_tags.length > 0 && (
             <div className="flex flex-wrap gap-1.5">

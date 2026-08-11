@@ -63,7 +63,7 @@ export default async function SocialPhotosPage({
       supabase.from("social_photos").select("id", { count: "exact", head: true }).eq("review_status", "rejected"),
       supabase
         .from("social_photos")
-        .select("id, filename, blob_url, parent_folder_name, review_status, ai_score, ai_score_reason, ai_tags")
+        .select("id, filename, blob_url, parent_folder_name, review_status, ai_score, ai_score_reason, ai_tags, category")
         .eq("review_status", tab)
         .order("ai_score", { ascending: false, nullsFirst: false }),
     ]);

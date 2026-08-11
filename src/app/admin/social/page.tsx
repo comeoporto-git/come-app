@@ -4,6 +4,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/notion";
 import { SocialBreadcrumb } from "@/components/social/SocialBreadcrumb";
 import { SyncButton } from "@/components/social/SyncButton";
+import { getCategorySuggestion, getCategoryBalance } from "@/lib/social-planning";
 
 const DRIVE_CONNECTION_ID = "00000000-0000-0000-0000-000000000002";
 const IG_CONNECTION_ID = "00000000-0000-0000-0000-000000000003";
@@ -41,6 +42,12 @@ export default async function SocialDashboardPage() {
   const igConnected = Boolean(igConnection?.page_access_token);
 
   const connected = Boolean(connection?.folder_id);
+
+  const [suggestion, categoryBalance] = connected
+    ? await Promise.all([getCategorySuggestion(), getCategoryBalance()])
+    : [null, []];
+
+  const maxBalanceCount = Math.max(1, ...categoryBalance.map((c) => c.approvedPhotos + c.drafts + c.scheduled + c.published));
 
   return (
     <div className="min-h-screen bg-[#667470] text-[#32373c]">
@@ -95,6 +102,50 @@ export default async function SocialDashboardPage() {
               <p className="text-2xl font-bold text-gray-400">{rejectedCount ?? 0}</p>
               <p className="text-xs text-gray-500 mt-1">Fotos rejeitadas</p>
             </Link>
+          </div>
+        )}
+
+        {connected && suggestion && (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
+            <div className="flex items-start justify-between gap-4 flex-wrap">
+              <div>
+                <p className="text-xs font-semibold text-[#667470] uppercase tracking-wide">Publicar a seguir</p>
+                <p className="text-lg font-bold text-[#32373c] mt-1">{suggestion.label}</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {suggestion.recentCount === 0
+                    ? "Ainda não publicaste nada nesta categoria recentemente."
+                    : `Só ${suggestion.recentCount} publicação(ões) recente(s) nesta categoria — a menos representada.`}
+                  {" "}
+                  {suggestion.readyToScheduleCount > 0
+                    ? `Tens ${suggestion.readyToScheduleCount} publicação(ões) pronta(s) a agendar.`
+                    : "Ainda sem copy pronta nesta categoria — aprova fotos dela em Fotos."}
+                </p>
+              </div>
+              <Link
+                href={`/admin/social/posts?category=${suggestion.category}`}
+                className="text-xs font-semibold bg-[#32373c] hover:bg-[#202427] text-white px-4 py-2 rounded-xl transition-colors shrink-0"
+              >
+                Ver categoria →
+              </Link>
+            </div>
+
+            <div className="space-y-1.5">
+              {categoryBalance.map((c) => {
+                const total = c.approvedPhotos + c.drafts + c.scheduled + c.published;
+                return (
+                  <div key={c.slug} className="flex items-center gap-2">
+                    <span className="text-[11px] text-gray-500 w-32 shrink-0 truncate">{c.label}</span>
+                    <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-[#667470] rounded-full"
+                        style={{ width: `${(total / maxBalanceCount) * 100}%` }}
+                      />
+                    </div>
+                    <span className="text-[11px] text-gray-400 w-6 text-right shrink-0">{total}</span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
 

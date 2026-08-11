@@ -2,7 +2,8 @@
 
 import { useTransition } from "react";
 import Image from "next/image";
-import { reviewPhoto } from "@/actions/social";
+import { reviewPhoto, setPhotoCategory } from "@/actions/social";
+import { CategorySelect } from "@/components/social/CategorySelect";
 
 export type ReviewPhoto = {
   id: string;
@@ -13,6 +14,7 @@ export type ReviewPhoto = {
   ai_score: number | null;
   ai_score_reason: string | null;
   ai_tags: string[] | null;
+  category: string | null;
 };
 
 function scoreBadgeClass(score: number | null) {
@@ -70,6 +72,12 @@ export function PhotoCard({
             <p className="text-[11px] text-gray-400 truncate">{photo.parent_folder_name}</p>
           )}
         </div>
+
+        <CategorySelect
+          value={photo.category}
+          onChange={(category) => setPhotoCategory(photo.id, category)}
+          className="w-full"
+        />
 
         {photo.ai_score_reason && (
           <p className="text-[11px] text-gray-500 line-clamp-2">{photo.ai_score_reason}</p>

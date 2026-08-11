@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { supabase } from "@/lib/notion";
+import { SOCIAL_CATEGORIES, isValidCategory, type SocialCategorySlug } from "@/lib/social-categories";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const MODEL = "claude-sonnet-4-6";
@@ -53,7 +54,7 @@ export async function getBrandBrief(): Promise<string> {
   return parts.length > 0 ? parts.join("\n\n") : "Sem informação de marca definida ainda.";
 }
 
-export type PhotoScore = { score: number; reason: string; tags: string[] };
+export type PhotoScore = { score: number; reason: string; tags: string[]; category: SocialCategorySlug | null };
 
 type ImagePayload = { data: string; mediaType: "image/jpeg" | "image/png" | "image/webp" };
 
@@ -71,17 +72,26 @@ async function fetchImageAsBase64(url: string): Promise<ImagePayload | null> {
   return { data: buf.toString("base64"), mediaType };
 }
 
+const CATEGORY_SLUGS_LIST = SOCIAL_CATEGORIES.map((c) => c.slug).join(" | ");
+
 const SCORE_SYSTEM_PROMPT = `You are a social media photo curator for a Porto food-tours business. Given a photo and the business's brand context, score how well it would work as an Instagram post: composition, lighting, subject appeal, and on-brand fit. This is an assistive ranking signal only — a human always makes the final approve/reject call, so be honest rather than generous.
 
+Also classify the photo's main subject into exactly one of these content categories: ${CATEGORY_SLUGS_LIST}. Use "tours" for guided walking/food tour moments, "cooking_classes" for hands-on cooking class scenes, "events" for private events/corporate gatherings, "chefs" for photos featuring a chef, "guides" for photos featuring a tour guide, "dishes" for plated food/close-ups of a dish, "decoration" for venue/table/ambience shots with no food or people as the focus, "wines" for wine/drinks-focused shots. If nothing fits well, use null.
+
 Return ONLY valid JSON, no markdown fences, no explanation:
-{"score": 0-100, "reason": "one short sentence in Portuguese explaining the score", "tags": ["tag1", "tag2"]}
+{"score": 0-100, "reason": "one short sentence in Portuguese explaining the score", "tags": ["tag1", "tag2"], "category": "one of the slugs above, or null"}
 
 Tags should be short lowercase labels such as "comida", "pessoas", "exterior", "interior", "grupo", "baixa-qualidade", "desfocada".`;
 
 export async function scorePhoto(photo: { blobUrl: string; filename: string | null }): Promise<PhotoScore> {
   const image = await fetchImageAsBase64(photo.blobUrl);
   if (!image) {
-    return { score: 0, reason: "Não foi possível analisar esta imagem (demasiado grande ou inacessível).", tags: [] };
+    return {
+      score: 0,
+      reason: "Não foi possível analisar esta imagem (demasiado grande ou inacessível).",
+      tags: [],
+      category: null,
+    };
   }
 
   const brandBrief = await getBrandBrief();
@@ -103,14 +113,15 @@ export async function scorePhoto(photo: { blobUrl: string; filename: string | nu
 
   const raw = (response.content[0] as { type: string; text: string }).text.trim();
   try {
-    const parsed = JSON.parse(extractJson(raw)) as { score: number; reason: string; tags: string[] };
+    const parsed = JSON.parse(extractJson(raw)) as { score: number; reason: string; tags: string[]; category: string | null };
     return {
       score: Math.max(0, Math.min(100, Math.round(parsed.score))),
       reason: parsed.reason ?? "",
       tags: Array.isArray(parsed.tags) ? parsed.tags : [],
+      category: isValidCategory(parsed.category) ? parsed.category : null,
     };
   } catch {
-    return { score: 50, reason: "Avaliação AI indisponível — pontuação neutra atribuída.", tags: [] };
+    return { score: 50, reason: "Avaliação AI indisponível — pontuação neutra atribuída.", tags: [], category: null };
   }
 }
 

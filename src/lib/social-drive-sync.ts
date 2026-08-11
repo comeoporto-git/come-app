@@ -135,6 +135,7 @@ export async function scoreUnscoredPhotos(limit: number): Promise<number> {
           ai_score: result.score,
           ai_score_reason: result.reason,
           ai_tags: result.tags,
+          category: result.category,
           ai_scored_at: new Date().toISOString(),
         })
         .eq("id", photo.id);

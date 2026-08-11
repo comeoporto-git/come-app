@@ -8,12 +8,19 @@ export default async function SocialCalendarPage() {
   const session = await auth();
   if (!session || session.user.role !== "Admin") redirect("/");
 
-  const { data } = await supabase
-    .from("social_posts")
-    .select("id, caption, scheduled_for, photo:social_photos(blob_url, filename)")
-    .eq("status", "scheduled")
-    .not("scheduled_for", "is", null)
-    .order("scheduled_for", { ascending: true });
+  const [{ data: scheduled }, { data: unscheduled }] = await Promise.all([
+    supabase
+      .from("social_posts")
+      .select("id, caption, category, scheduled_for, photo:social_photos(blob_url, filename)")
+      .eq("status", "scheduled")
+      .not("scheduled_for", "is", null)
+      .order("scheduled_for", { ascending: true }),
+    supabase
+      .from("social_posts")
+      .select("id, caption, category, scheduled_for, photo:social_photos(blob_url, filename)")
+      .eq("status", "approved")
+      .order("updated_at", { ascending: true }),
+  ]);
 
   return (
     <div className="min-h-screen bg-[#667470] text-[#32373c]">
@@ -21,9 +28,15 @@ export default async function SocialCalendarPage() {
       <main className="max-w-4xl mx-auto px-4 py-6 space-y-5">
         <div>
           <h1 className="text-white font-bold text-lg">Calendário</h1>
-          <p className="text-white/60 text-sm mt-0.5">Publicações agendadas.</p>
+          <p className="text-white/60 text-sm mt-0.5">
+            Publicações agendadas. Arrasta as aprovadas por agendar para um dia, ou arrasta uma publicação já agendada
+            para outro dia para a reagendar.
+          </p>
         </div>
-        <PostCalendar posts={(data ?? []) as unknown as CalendarPost[]} />
+        <PostCalendar
+          scheduledPosts={(scheduled ?? []) as unknown as CalendarPost[]}
+          unscheduledPosts={(unscheduled ?? []) as unknown as CalendarPost[]}
+        />
       </main>
     </div>
   );
