@@ -99,6 +99,7 @@ export async function syncDrivePhotos(
       .eq("id", DRIVE_CONNECTION_ID);
 
     const scored = await scoreUnscoredPhotos(SCORE_BATCH_LIMIT);
+    await reconcileMissingPhotos(tokenResult.token, row.folder_id);
 
     return { status: "ok", added, scanned: images.length, scored };
   } catch (err) {
@@ -108,6 +109,32 @@ export async function syncDrivePhotos(
       .update({ last_sync_error: message })
       .eq("id", DRIVE_CONNECTION_ID);
     return { status: "error", message };
+  }
+}
+
+type PhotoMissingCheckRow = { id: string; drive_file_id: string; missing_since: string | null };
+
+/**
+ * Full (non-incremental) crawl to detect photos whose Drive file no longer
+ * exists in the synced tree — deleted, or moved elsewhere. Flags them with
+ * missing_since rather than deleting the local record, since a caption or
+ * schedule may already be built on top of it; clears the flag again if a
+ * previously-missing file reappears on a later sync.
+ */
+async function reconcileMissingPhotos(token: string, folderId: string): Promise<void> {
+  const allImages = await listDriveImagesRecursive(token, folderId);
+  const liveIds = new Set(allImages.map((img) => img.id));
+
+  const { data } = await supabase.from("social_photos").select("id, drive_file_id, missing_since");
+  const rows = (data ?? []) as PhotoMissingCheckRow[];
+
+  for (const row of rows) {
+    const isLive = liveIds.has(row.drive_file_id);
+    if (!isLive && !row.missing_since) {
+      await supabase.from("social_photos").update({ missing_since: new Date().toISOString() }).eq("id", row.id);
+    } else if (isLive && row.missing_since) {
+      await supabase.from("social_photos").update({ missing_since: null }).eq("id", row.id);
+    }
   }
 }
 

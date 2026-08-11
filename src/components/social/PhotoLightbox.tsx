@@ -115,6 +115,12 @@ export function PhotoLightbox({
             )}
           </div>
 
+          {photo.missing_since && (
+            <p className="text-xs font-semibold text-red-300 bg-red-500/10 px-2 py-1 rounded-lg">
+              ⚠ Já não está no Drive — pode ter sido apagada ou movida.
+            </p>
+          )}
+
           {photo.ai_score !== null && (
             <div className="flex items-center gap-2">
               <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${scoreBadgeClass(photo.ai_score)}`}>

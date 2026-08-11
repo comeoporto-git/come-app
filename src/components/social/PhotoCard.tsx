@@ -15,6 +15,7 @@ export type ReviewPhoto = {
   ai_score_reason: string | null;
   ai_tags: string[] | null;
   category: string | null;
+  missing_since: string | null;
 };
 
 function scoreBadgeClass(score: number | null) {
@@ -28,10 +29,16 @@ export function PhotoCard({
   photo,
   highlighted = false,
   onOpen,
+  selectable = false,
+  selected = false,
+  onToggleSelect,
 }: {
   photo: ReviewPhoto;
   highlighted?: boolean;
   onOpen?: () => void;
+  selectable?: boolean;
+  selected?: boolean;
+  onToggleSelect?: () => void;
 }) {
   const [isPending, startTransition] = useTransition();
 
@@ -41,13 +48,21 @@ export function PhotoCard({
     });
   }
 
+  function handleImageClick() {
+    if (selectable) {
+      onToggleSelect?.();
+    } else {
+      onOpen?.();
+    }
+  }
+
   return (
     <div
       className={`bg-white rounded-2xl border shadow-sm overflow-hidden flex flex-col ${
-        highlighted ? "border-emerald-300 ring-1 ring-emerald-200" : "border-gray-100"
+        selected ? "border-[#667470] ring-2 ring-[#667470]/40" : highlighted ? "border-emerald-300 ring-1 ring-emerald-200" : "border-gray-100"
       } ${isPending ? "opacity-60" : ""}`}
     >
-      <div className="relative aspect-square bg-gray-50 cursor-pointer" onClick={onOpen}>
+      <div className="relative aspect-square bg-gray-50 cursor-pointer" onClick={handleImageClick}>
         <Image
           src={photo.blob_url}
           alt={photo.filename ?? ""}
@@ -55,12 +70,26 @@ export function PhotoCard({
           sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
           className="object-cover"
         />
+        {selectable && (
+          <span
+            className={`absolute top-2 left-2 w-5 h-5 rounded-md border-2 flex items-center justify-center text-[11px] font-bold transition-colors ${
+              selected ? "bg-[#667470] border-[#667470] text-white" : "bg-white/80 border-white text-transparent"
+            }`}
+          >
+            ✓
+          </span>
+        )}
         {photo.ai_score !== null && (
           <span
             title={photo.ai_score_reason ?? undefined}
             className={`absolute top-2 right-2 text-xs font-bold px-2 py-0.5 rounded-full shadow-sm ${scoreBadgeClass(photo.ai_score)}`}
           >
             {photo.ai_score}
+          </span>
+        )}
+        {photo.missing_since && (
+          <span className="absolute bottom-2 left-2 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700 shadow-sm">
+            ⚠ Já não está no Drive
           </span>
         )}
       </div>

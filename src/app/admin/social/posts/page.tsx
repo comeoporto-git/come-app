@@ -1,38 +1,10 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
 import { supabase } from "@/lib/notion";
 import { SocialBreadcrumb } from "@/components/social/SocialBreadcrumb";
-import { CategoryBadge } from "@/components/social/CategoryBadge";
 import { SOCIAL_CATEGORIES } from "@/lib/social-categories";
-
-type PostRow = {
-  id: string;
-  caption: string | null;
-  status: string;
-  category: string | null;
-  updated_at: string;
-  photo: { blob_url: string; filename: string | null } | null;
-};
-
-const STATUS_LABEL: Record<string, string> = {
-  draft: "Rascunho",
-  in_review: "Por rever",
-  approved: "Copy aprovada",
-  scheduled: "Agendada",
-  published: "Publicada",
-  archived: "Arquivada",
-};
-
-const STATUS_CLASS: Record<string, string> = {
-  draft: "bg-gray-100 text-gray-500",
-  in_review: "bg-amber-100 text-amber-700",
-  approved: "bg-emerald-100 text-emerald-700",
-  scheduled: "bg-blue-100 text-blue-700",
-  published: "bg-emerald-600 text-white",
-  archived: "bg-gray-100 text-gray-400",
-};
+import { PostsGrid, type PostRow } from "@/components/social/PostsGrid";
 
 export default async function SocialPostsPage({
   searchParams,
@@ -102,36 +74,7 @@ export default async function SocialPostsPage({
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {posts.map((post) => (
-              <Link
-                key={post.id}
-                href={`/admin/social/posts/${post.id}`}
-                className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col hover:shadow-md transition-shadow"
-              >
-                <div className="relative aspect-square bg-gray-50">
-                  {post.photo?.blob_url && (
-                    <Image
-                      src={post.photo.blob_url}
-                      alt={post.photo.filename ?? ""}
-                      fill
-                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                      className="object-cover"
-                    />
-                  )}
-                  <span
-                    className={`absolute top-2 right-2 text-[11px] font-semibold px-2 py-0.5 rounded-full shadow-sm ${STATUS_CLASS[post.status] ?? "bg-gray-100 text-gray-500"}`}
-                  >
-                    {STATUS_LABEL[post.status] ?? post.status}
-                  </span>
-                </div>
-                <div className="p-3 space-y-1.5">
-                  <CategoryBadge category={post.category} />
-                  <p className="text-xs text-gray-600 line-clamp-3">{post.caption ?? "Sem legenda ainda."}</p>
-                </div>
-              </Link>
-            ))}
-          </div>
+          <PostsGrid posts={posts} />
         )}
       </main>
     </div>
