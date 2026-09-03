@@ -930,6 +930,7 @@ export async function getGuideExpenses(): Promise<Transaction[]> {
         "metodo_pagamento.eq.Pelo Guia",
         "metodo_pagamento.eq.Pelo Chef",
         "metodo_pagamento.eq.Pelo Driver",
+        "metodo_pagamento.eq.Pago pelo Bernardo Providência",
         "metodo_pagamento.eq.Honorários",
         "status.eq.Pending Payment",
       ].join(","))
@@ -958,6 +959,9 @@ export async function getGuideExpenses(): Promise<Transaction[]> {
           || ibanByName[t.supplier.toLowerCase()]
           || "";
         return { ...t, tourName, paidByName: t.supplier, payeeIban };
+      }
+      if (t.paymentMethod === "Pago pelo Bernardo Providência") {
+        return { ...t, tourName, paidByName: "Bernardo Providência", payeeIban: ibanByName["bernardo providência"] ?? "" };
       }
       if (!sale) return { ...t, tourName };
       const memberId = t.paymentMethod === "Pelo Chef"   ? sale.chef_id

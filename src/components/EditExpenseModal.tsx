@@ -209,6 +209,7 @@ export function EditExpenseModal({
         whoPaid: form.paymentMethod === "Pelo Guia" ? "Guide"
                : form.paymentMethod === "Pelo Chef" ? "Chef"
                : form.paymentMethod === "Pelo Driver" ? "Driver"
+               : form.paymentMethod === "Pago pelo Bernardo Providência" ? "Bernardo"
                : "Company",
         paymentMethod: form.paymentMethod,
         socioPessoal: form.socioPessoal || null,
@@ -384,6 +385,7 @@ export function EditExpenseModal({
                   <option value="Pelo Guia">Pelo Guia</option>
                   <option value="Pelo Chef">Pelo Chef</option>
                   <option value="Pelo Driver">Pelo Driver</option>
+                  <option value="Pago pelo Bernardo Providência">Pago pelo Bernardo Providência</option>
                 </select>
               </div>
             )}
