@@ -36,6 +36,7 @@ export default async function PermissoesPage() {
               { role: "Accountant",  color: "bg-orange-100 text-orange-700", desc: "Portal de contabilidade" },
               { role: "Chef",        color: "bg-red-100 text-red-700",       desc: "Igual ao Guide" },
               { role: "Driver",      color: "bg-slate-100 text-slate-700",   desc: "Igual ao Guide" },
+              { role: "Logistics",   color: "bg-cyan-100 text-cyan-700",     desc: "Igual ao Guide" },
             ] as const).map(({ role, color, desc }) => (
               <div key={role} className="rounded-xl border border-gray-100 p-3">
                 <span className={`inline-block text-xs font-semibold px-2 py-0.5 rounded-full mb-2 ${color}`}>{role}</span>

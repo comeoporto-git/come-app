@@ -10,6 +10,7 @@ const ALL_ROLES: TeamMember["role"][] = [
   "Guide",
   "Chef",
   "Driver",
+  "Logistics",
   "Accountant",
 ];
 
@@ -19,6 +20,7 @@ const ROLE_COLORS: Record<TeamMember["role"], string> = {
   Guide:         "bg-green-100 text-green-700",
   Chef:          "bg-orange-100 text-orange-700",
   Driver:        "bg-slate-100 text-slate-700",
+  Logistics:     "bg-cyan-100 text-cyan-700",
   Accountant:    "bg-gray-100 text-gray-600",
 };
 

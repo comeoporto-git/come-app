@@ -74,11 +74,12 @@ export default async function AdminToursPage() {
                               🧭 {guideName}{tour.numGuests > 0 ? ` · ${tour.numGuests} pax` : ""}
                             </p>
                           )}
-                          {(tour.chefName || tour.driverName) && (
+                          {(tour.chefName || tour.driverName || tour.logisticsName) && (
                             <p className="text-xs opacity-50">
                               {[
                                 tour.chefName ? `🧑‍🍳 ${tour.chefName}` : null,
                                 tour.driverName ? `🚗 ${tour.driverName}` : null,
+                                tour.logisticsName ? `📦 ${tour.logisticsName}` : null,
                               ].filter(Boolean).join("  ·  ")}
                             </p>
                           )}
