@@ -360,11 +360,22 @@ export function EditExpenseModal({
                     </div>
                   );
                 })}
-                <div className="grid grid-cols-3 px-3 py-2 border-t border-gray-200 bg-gray-50">
-                  <span className="text-xs font-semibold text-gray-600">Total base</span>
-                  <span className="text-right text-sm font-semibold text-gray-800">€{(form.taxFree || 0).toFixed(2)}</span>
+                <div className="grid grid-cols-3 gap-1 items-center px-2 py-1.5 border-t border-gray-200 bg-gray-50">
+                  <span className="text-xs font-semibold text-gray-600 pl-1">Total base</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={form.taxFree || ""}
+                    onChange={(e) => update("taxFree", parseFloat(e.target.value) || 0)}
+                    className="input text-right text-sm py-1 px-2 font-semibold"
+                    placeholder="0.00"
+                  />
                   <span />
                 </div>
+                <p className="text-[11px] text-gray-400 px-3 pb-2 pt-1 bg-gray-50">
+                  Sem taxa (ex: seguros) — edita diretamente se a fatura não tiver IVA
+                </p>
               </div>
             </div>
 

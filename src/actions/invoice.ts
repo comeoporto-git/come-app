@@ -50,9 +50,10 @@ Rules:
 1. If a rate is not present in the document, set base and IVA for that rate to 0
 2. taxFree = base6 + base13 + base23
 3. totalCost = taxFree + iva6 + iva13 + iva23
-4. Return ONLY a JSON object with these exact keys, no markdown fences, no explanation
-5. If you cannot read a value clearly, use 0 for numbers and "" for strings
-6. For supplier: always prefer an exact match from the KNOWN SUPPLIERS list over raw receipt text`;
+4. Some documents (e.g. insurance premiums, "Imposto do Selo" receipts, and other IVA-exempt services under art. 9 CIVA) show NO 6%/13%/23% breakdown at all because they are exempt from IVA, not taxed at 0%. In that case set base6=base13=base23=0 AND iva6=iva13=iva23=0, but taxFree MUST still equal the full totalCost (the whole amount is "isento de IVA") — never leave taxFree at 0 for a non-zero invoice.
+5. Return ONLY a JSON object with these exact keys, no markdown fences, no explanation
+6. If you cannot read a value clearly, use 0 for numbers and "" for strings
+7. For supplier: always prefer an exact match from the KNOWN SUPPLIERS list over raw receipt text`;
 
 export async function analyzeInvoice(
   fileBase64: string,
