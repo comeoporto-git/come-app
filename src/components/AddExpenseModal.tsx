@@ -64,6 +64,7 @@ export function AddExpenseModal({
   // Default payment method based on who's logged in
   const defaultPaymentMethod = isSuperGuide ? "Cartão COME"
     : userRole === "Driver" ? "Pelo Driver"
+    : userRole === "Logistics" ? "Pelo Logistics"
     : "Pelo Guia";
   const [paymentMethod, setPaymentMethod] = useState<string>(defaultPaymentMethod);
   const [socioPessoal, setSocioPessoal] = useState<string>("");
@@ -240,6 +241,7 @@ export function AddExpenseModal({
           whoPaid: effectivePaymentMethod === "Pelo Guia" ? "Guide"
                  : effectivePaymentMethod === "Pelo Chef" ? "Chef"
                  : effectivePaymentMethod === "Pelo Driver" ? "Driver"
+                 : effectivePaymentMethod === "Pelo Logistics" ? "Logistics"
                  : effectivePaymentMethod === "Pago pelo Bernardo Providência" ? "Bernardo"
                  : "Company",
           paymentMethod: effectivePaymentMethod,
@@ -292,6 +294,7 @@ export function AddExpenseModal({
         whoPaid: effectivePaymentMethod === "Pelo Guia" ? "Guide"
                : effectivePaymentMethod === "Pelo Chef" ? "Chef"
                : effectivePaymentMethod === "Pelo Driver" ? "Driver"
+               : effectivePaymentMethod === "Pelo Logistics" ? "Logistics"
                : effectivePaymentMethod === "Pago pelo Bernardo Providência" ? "Bernardo"
                : "Company",
         paymentMethod: effectivePaymentMethod,
@@ -590,6 +593,7 @@ export function AddExpenseModal({
                     <option value="Pelo Guia">Pelo Guia</option>
                     <option value="Pelo Chef">Pelo Chef</option>
                     <option value="Pelo Driver">Pelo Driver</option>
+                    <option value="Pelo Logistics">Pelo Logistics</option>
                     <option value="Pago pelo Bernardo Providência">Pago pelo Bernardo Providência</option>
                   </select>
                 </div>

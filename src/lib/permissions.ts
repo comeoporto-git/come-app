@@ -1,8 +1,8 @@
 import { getDb } from "@/lib/db";
 
-export type Role = "Admin" | "Guide" | "Super Guide" | "Accountant" | "Chef" | "Driver";
+export type Role = "Admin" | "Guide" | "Super Guide" | "Accountant" | "Chef" | "Driver" | "Logistics";
 
-export const ALL_ROLES: Role[] = ["Admin", "Guide", "Super Guide", "Accountant", "Chef", "Driver"];
+export const ALL_ROLES: Role[] = ["Admin", "Guide", "Super Guide", "Accountant", "Chef", "Driver", "Logistics"];
 
 export type Feature = {
   key: string;
@@ -19,7 +19,7 @@ export const FEATURES: Feature[] = [
     label: "Guia de Tours",
     description: "Ver tours do dia e registar despesas",
     path: "/guide",
-    defaultRoles: ["Admin", "Guide", "Super Guide", "Chef", "Driver"],
+    defaultRoles: ["Admin", "Guide", "Super Guide", "Chef", "Driver", "Logistics"],
   },
   {
     key: "invoices",

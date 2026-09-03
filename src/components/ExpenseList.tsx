@@ -22,6 +22,7 @@ export function ExpenseList({
   guideName,
   chefName,
   driverName,
+  logisticsName,
   userRole = "Guide",
 }: {
   transactions: Transaction[];
@@ -31,6 +32,7 @@ export function ExpenseList({
   guideName?: string;
   chefName?: string;
   driverName?: string;
+  logisticsName?: string;
   userRole?: string;
 }) {
   const [pendingToFinish, setPendingToFinish] = useState<Transaction | null>(null);
@@ -73,6 +75,9 @@ export function ExpenseList({
                 {(tx.whoPaid === "Driver" && driverName) && (
                   <p className="text-xs font-medium text-[#667470]">Pago por: {driverName}</p>
                 )}
+                {(tx.whoPaid === "Logistics" && logisticsName) && (
+                  <p className="text-xs font-medium text-[#667470]">Pago por: {logisticsName}</p>
+                )}
                 {tx.whoPaid === "Bernardo" && (
                   <p className="text-xs font-medium text-[#667470]">Pago por: Bernardo Providência</p>
                 )}
@@ -80,7 +85,7 @@ export function ExpenseList({
               <div className="text-right shrink-0">
                 <p className="text-sm font-semibold text-gray-900">€{Math.abs(tx.totalCost).toFixed(2)}</p>
                 {(() => {
-                  const isGuideEtc = tx.whoPaid === "Guide" || tx.whoPaid === "Chef" || tx.whoPaid === "Driver" || tx.whoPaid === "Bernardo";
+                  const isGuideEtc = tx.whoPaid === "Guide" || tx.whoPaid === "Chef" || tx.whoPaid === "Driver" || tx.whoPaid === "Logistics" || tx.whoPaid === "Bernardo";
                   // "Pending Payment" with no receipt yet = receipt still needed first
                   const noReceipt = !tx.invoiceId && !tx.invoiceImageUrl;
                   const displayStatus = (tx.status === "Pending Payment" && noReceipt)

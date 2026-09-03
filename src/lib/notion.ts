@@ -22,7 +22,7 @@ export type TeamMember = {
   phone: string;
   nif: string;
   iban: string;
-  role: "Admin" | "Guide" | "Super Guide" | "Accountant" | "Chef" | "Driver";
+  role: "Admin" | "Guide" | "Super Guide" | "Accountant" | "Chef" | "Driver" | "Logistics";
 };
 
 export type Tour = {
@@ -47,6 +47,8 @@ export type Tour = {
   chefName: string;
   driverId: string | null;
   driverName: string;
+  logisticsId: string | null;
+  logisticsName: string;
   teamId: string | null;
   expensesClosed: boolean;
   serviceEquipa: string[];
@@ -145,6 +147,8 @@ function mapSaleRow(row: any): Tour {
     chefName:      row.chef?.name    ?? "",
     driverId:      row.driver_id     ?? null,
     driverName:    row.driver?.name  ?? "",
+    logisticsId:   row.logistics_id  ?? null,
+    logisticsName: row.logistics?.name ?? "",
     teamId:        row.guide_id      ?? null,
     expensesClosed: row.expenses_closed === "Closed",
     serviceEquipa: row.services?.equipa ?? [],
@@ -194,7 +198,8 @@ const SALE_SELECT = `
   services(name, type, equipa),
   guide:team!sales_guide_id_fkey(name),
   chef:team!sales_chef_id_fkey(name),
-  driver:team!sales_driver_id_fkey(name)
+  driver:team!sales_driver_id_fkey(name),
+  logistics:team!sales_logistics_id_fkey(name)
 `.trim();
 
 const TX_SELECT = `*, type, sales!transactions_sale_id_fkey(notion_id)`;
@@ -218,6 +223,7 @@ function getMissingStaffRoles(tour: Tour): string[] {
     if ((r.includes("guia") || r.includes("guide")) && !tour.guideId) missing.push(role);
     else if (r.includes("chef") && !tour.chefId) missing.push(role);
     else if ((r.includes("driver") || r.includes("condutor")) && !tour.driverId) missing.push(role);
+    else if (r.includes("logist") && !tour.logisticsId) missing.push(role);
   }
   return missing;
 }
@@ -558,11 +564,13 @@ export async function updateTourTeam(
   guideId: string | null,
   chefId: string | null,
   driverId: string | null,
+  logisticsId: string | null,
 ): Promise<void> {
   const { error } = await supabase.from("sales").update({
-    guide_id:  guideId  ?? null,
-    chef_id:   chefId   ?? null,
-    driver_id: driverId ?? null,
+    guide_id:     guideId      ?? null,
+    chef_id:      chefId       ?? null,
+    driver_id:    driverId     ?? null,
+    logistics_id: logisticsId  ?? null,
   }).eq("id", tourId);
   if (error) throw new Error(`updateTourTeam: ${error.message}`);
 }
@@ -573,7 +581,8 @@ const SALE_SELECT_WITH_PRICES = `
   services(name, type, equipa, pax_2_3, pax_4_6, pax_7_plus),
   guide:team!sales_guide_id_fkey(name),
   chef:team!sales_chef_id_fkey(name),
-  driver:team!sales_driver_id_fkey(name)
+  driver:team!sales_driver_id_fkey(name),
+  logistics:team!sales_logistics_id_fkey(name)
 `.trim();
 
 export async function getFinalisedSales(): Promise<FinalisedSale[]> {
@@ -921,7 +930,7 @@ export async function getAnalyticsTransactions(): Promise<Transaction[]> {
 export async function getGuideExpenses(): Promise<Transaction[]> {
   try {
     const { data } = await supabase.from("transactions")
-      .select(`*, sales!transactions_sale_id_fkey(notion_id, guide_id, chef_id, driver_id)`)
+      .select(`*, sales!transactions_sale_id_fkey(notion_id, guide_id, chef_id, driver_id, logistics_id)`)
       .eq("transferencia_feita", false)
       .neq("status", "Archived")
       .or("type.is.null,type.neq.Earning")
@@ -930,6 +939,7 @@ export async function getGuideExpenses(): Promise<Transaction[]> {
         "metodo_pagamento.eq.Pelo Guia",
         "metodo_pagamento.eq.Pelo Chef",
         "metodo_pagamento.eq.Pelo Driver",
+        "metodo_pagamento.eq.Pelo Logistics",
         "metodo_pagamento.eq.Pago pelo Bernardo Providência",
         "metodo_pagamento.eq.Honorários",
         "status.eq.Pending Payment",
@@ -964,8 +974,9 @@ export async function getGuideExpenses(): Promise<Transaction[]> {
         return { ...t, tourName, paidByName: "Bernardo Providência", payeeIban: ibanByName["bernardo providência"] ?? "" };
       }
       if (!sale) return { ...t, tourName };
-      const memberId = t.paymentMethod === "Pelo Chef"   ? sale.chef_id
-                     : t.paymentMethod === "Pelo Driver" ? sale.driver_id
+      const memberId = t.paymentMethod === "Pelo Chef"      ? sale.chef_id
+                     : t.paymentMethod === "Pelo Driver"    ? sale.driver_id
+                     : t.paymentMethod === "Pelo Logistics" ? sale.logistics_id
                      : sale.guide_id;
       const member = memberId ? memberById[memberId] : undefined;
       return { ...t, tourName, paidByName: member?.name ?? "", payeeIban: member?.iban ?? "" };
