@@ -104,7 +104,12 @@ export default async function AdminToursPage() {
 
         {/* Tabs: Próximas / Anteriores */}
         <section>
-          <TourTabs upcoming={upcoming} past={pastTours} teamMap={teamMap} />
+          <TourTabs
+            upcoming={upcoming}
+            past={pastTours}
+            teamMap={teamMap}
+            showFilters={session.user.role === "Admin"}
+          />
         </section>
       </main>
     </div>
