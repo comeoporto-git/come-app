@@ -43,11 +43,14 @@ export async function updateTeamMemberRoleAction(
 
 export async function adminUpdateTeamMemberContactAction(
   memberId: string,
-  data: { email: string; phone: string; iban: string },
+  data: { name: string; email: string; phone: string; iban: string },
 ): Promise<{ error?: string }> {
   const session = await auth();
   if (!session || session.user.role !== "Admin") {
     return { error: "Forbidden: apenas Admin pode editar membros" };
+  }
+  if (!data.name.trim()) {
+    return { error: "Nome é obrigatório" };
   }
   try {
     await adminUpdateTeamMemberContact(memberId, data);

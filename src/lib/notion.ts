@@ -272,9 +272,10 @@ export async function updateTeamMemberRole(
 
 export async function adminUpdateTeamMemberContact(
   memberId: string,
-  data: { email: string; phone: string; iban: string },
+  data: { name: string; email: string; phone: string; iban: string },
 ): Promise<void> {
   await supabase.from("team").update({
+    name:    data.name,
     email:   data.email || null,
     contact: data.phone || null,
     iban:    data.iban  || null,
