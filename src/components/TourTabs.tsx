@@ -141,10 +141,26 @@ function TourCard({
   );
 }
 
-function filterTours(tours: Tour[], query: string, teamMap?: Record<string, string>): Tour[] {
+type Filters = {
+  status: string;
+  team: string;
+  serviceType: string;
+};
+
+const EMPTY_FILTERS: Filters = { status: "", team: "", serviceType: "" };
+
+function filterTours(
+  tours: Tour[],
+  query: string,
+  filters: Filters,
+  teamMap?: Record<string, string>,
+): Tour[] {
   const q = query.trim().toLowerCase();
-  if (!q) return tours;
   return tours.filter((t) => {
+    if (filters.status && t.status !== filters.status) return false;
+    if (filters.team && (t.teamId ?? "") !== filters.team) return false;
+    if (filters.serviceType && t.serviceType !== filters.serviceType) return false;
+    if (!q) return true;
     const guideName = teamMap?.[t.teamId ?? ""] ?? "";
     return (
       t.saleId.toLowerCase().includes(q) ||
@@ -155,6 +171,22 @@ function filterTours(tours: Tour[], query: string, teamMap?: Record<string, stri
       (t.driverName ?? "").toLowerCase().includes(q)
     );
   });
+}
+
+function uniqueValues(tours: Tour[], key: "status" | "serviceType"): string[] {
+  const set = new Set<string>();
+  for (const t of tours) {
+    if (t[key]) set.add(t[key]);
+  }
+  return Array.from(set).sort((a, b) => a.localeCompare(b));
+}
+
+function uniqueTeamIds(tours: Tour[]): string[] {
+  const set = new Set<string>();
+  for (const t of tours) {
+    if (t.teamId) set.add(t.teamId);
+  }
+  return Array.from(set);
 }
 
 export function TourTabs({
@@ -170,12 +202,20 @@ export function TourTabs({
 }) {
   const [tab, setTab]       = useState<Tab>("upcoming");
   const [query, setQuery]   = useState("");
+  const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
 
-  const visibleUpcoming = filterTours(upcoming, query, teamMap);
-  const visiblePast     = filterTours(past,     query, teamMap);
+  const allTours = [...upcoming, ...past];
+  const statusOptions      = uniqueValues(allTours, "status");
+  const serviceTypeOptions = uniqueValues(allTours, "serviceType");
+  const teamIdOptions      = uniqueTeamIds(allTours);
+
+  const visibleUpcoming = filterTours(upcoming, query, filters, teamMap);
+  const visiblePast     = filterTours(past,     query, filters, teamMap);
 
   const duplicateUpcoming = getDuplicateDates(upcoming);
   const duplicatePast     = getDuplicateDates(past);
+
+  const hasActiveFilters = !!(filters.status || filters.team || filters.serviceType);
 
   return (
     <div className="space-y-4">
@@ -226,6 +266,51 @@ export function TourTabs({
             className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/70"
           >
             ✕
+          </button>
+        )}
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-wrap items-center gap-2">
+        <select
+          value={filters.status}
+          onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value }))}
+          className="bg-white/15 text-white text-sm rounded-xl px-3 py-2 focus:outline-none focus:bg-white/25 transition-colors [&>option]:text-[#32373c]"
+        >
+          <option value="">Status: Todos</option>
+          {statusOptions.map((s) => (
+            <option key={s} value={s}>{s}</option>
+          ))}
+        </select>
+
+        <select
+          value={filters.team}
+          onChange={(e) => setFilters((f) => ({ ...f, team: e.target.value }))}
+          className="bg-white/15 text-white text-sm rounded-xl px-3 py-2 focus:outline-none focus:bg-white/25 transition-colors [&>option]:text-[#32373c]"
+        >
+          <option value="">Equipa: Todas</option>
+          {teamIdOptions.map((id) => (
+            <option key={id} value={id}>{teamMap?.[id] ?? id}</option>
+          ))}
+        </select>
+
+        <select
+          value={filters.serviceType}
+          onChange={(e) => setFilters((f) => ({ ...f, serviceType: e.target.value }))}
+          className="bg-white/15 text-white text-sm rounded-xl px-3 py-2 focus:outline-none focus:bg-white/25 transition-colors [&>option]:text-[#32373c]"
+        >
+          <option value="">Tipo: Todos</option>
+          {serviceTypeOptions.map((t) => (
+            <option key={t} value={t}>{t}</option>
+          ))}
+        </select>
+
+        {hasActiveFilters && (
+          <button
+            onClick={() => setFilters(EMPTY_FILTERS)}
+            className="text-xs text-white/60 hover:text-white/90 underline"
+          >
+            Limpar filtros
           </button>
         )}
       </div>
