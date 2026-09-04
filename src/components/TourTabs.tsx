@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { Tour } from "@/lib/notion";
 
@@ -142,12 +142,12 @@ function TourCard({
 }
 
 type Filters = {
-  status: string;
-  team: string;
-  serviceType: string;
+  status: string[];
+  team: string[];
+  serviceType: string[];
 };
 
-const EMPTY_FILTERS: Filters = { status: "", team: "", serviceType: "" };
+const EMPTY_FILTERS: Filters = { status: [], team: [], serviceType: [] };
 
 function filterTours(
   tours: Tour[],
@@ -157,9 +157,9 @@ function filterTours(
 ): Tour[] {
   const q = query.trim().toLowerCase();
   return tours.filter((t) => {
-    if (filters.status && t.status !== filters.status) return false;
-    if (filters.team && (t.teamId ?? "") !== filters.team) return false;
-    if (filters.serviceType && t.serviceType !== filters.serviceType) return false;
+    if (filters.status.length && !filters.status.includes(t.status)) return false;
+    if (filters.team.length && !filters.team.includes(t.teamId ?? "")) return false;
+    if (filters.serviceType.length && !filters.serviceType.includes(t.serviceType)) return false;
     if (!q) return true;
     const guideName = teamMap?.[t.teamId ?? ""] ?? "";
     return (
@@ -189,6 +189,86 @@ function uniqueTeamIds(tours: Tour[]): string[] {
   return Array.from(set);
 }
 
+function MultiSelectDropdown({
+  label,
+  options,
+  selected,
+  onChange,
+}: {
+  label: string;
+  options: { value: string; label: string }[];
+  selected: string[];
+  onChange: (values: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [open]);
+
+  function toggle(value: string) {
+    onChange(
+      selected.includes(value)
+        ? selected.filter((v) => v !== value)
+        : [...selected, value],
+    );
+  }
+
+  const buttonText =
+    selected.length === 0
+      ? `${label}: Todos`
+      : selected.length === 1
+        ? `${label}: ${options.find((o) => o.value === selected[0])?.label ?? selected[0]}`
+        : `${label}: ${selected.length}`;
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className={`flex items-center gap-1.5 text-sm rounded-xl px-3 py-2 transition-colors ${
+          selected.length > 0
+            ? "bg-white text-[#32373c]"
+            : "bg-white/15 text-white hover:bg-white/25"
+        }`}
+      >
+        {buttonText}
+        <svg className="w-3 h-3 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </button>
+      {open && (
+        <div className="absolute z-10 mt-1 min-w-[10rem] bg-white text-[#32373c] rounded-xl shadow-lg border border-gray-100 py-1 max-h-64 overflow-y-auto">
+          {options.length === 0 ? (
+            <p className="px-3 py-1.5 text-sm text-gray-400">Sem opções</p>
+          ) : (
+            options.map((opt) => (
+              <label
+                key={opt.value}
+                className="flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-gray-50 cursor-pointer"
+              >
+                <input
+                  type="checkbox"
+                  checked={selected.includes(opt.value)}
+                  onChange={() => toggle(opt.value)}
+                  className="accent-[#32373c]"
+                />
+                {opt.label}
+              </label>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function TourTabs({
   upcoming,
   past,
@@ -215,7 +295,8 @@ export function TourTabs({
   const duplicateUpcoming = getDuplicateDates(upcoming);
   const duplicatePast     = getDuplicateDates(past);
 
-  const hasActiveFilters = !!(filters.status || filters.team || filters.serviceType);
+  const hasActiveFilters =
+    filters.status.length > 0 || filters.team.length > 0 || filters.serviceType.length > 0;
 
   return (
     <div className="space-y-4">
@@ -272,38 +353,26 @@ export function TourTabs({
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-2">
-        <select
-          value={filters.status}
-          onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value }))}
-          className="bg-white/15 text-white text-sm rounded-xl px-3 py-2 focus:outline-none focus:bg-white/25 transition-colors [&>option]:text-[#32373c]"
-        >
-          <option value="">Status: Todos</option>
-          {statusOptions.map((s) => (
-            <option key={s} value={s}>{s}</option>
-          ))}
-        </select>
+        <MultiSelectDropdown
+          label="Status"
+          options={statusOptions.map((s) => ({ value: s, label: s }))}
+          selected={filters.status}
+          onChange={(values) => setFilters((f) => ({ ...f, status: values }))}
+        />
 
-        <select
-          value={filters.team}
-          onChange={(e) => setFilters((f) => ({ ...f, team: e.target.value }))}
-          className="bg-white/15 text-white text-sm rounded-xl px-3 py-2 focus:outline-none focus:bg-white/25 transition-colors [&>option]:text-[#32373c]"
-        >
-          <option value="">Equipa: Todas</option>
-          {teamIdOptions.map((id) => (
-            <option key={id} value={id}>{teamMap?.[id] ?? id}</option>
-          ))}
-        </select>
+        <MultiSelectDropdown
+          label="Equipa"
+          options={teamIdOptions.map((id) => ({ value: id, label: teamMap?.[id] ?? id }))}
+          selected={filters.team}
+          onChange={(values) => setFilters((f) => ({ ...f, team: values }))}
+        />
 
-        <select
-          value={filters.serviceType}
-          onChange={(e) => setFilters((f) => ({ ...f, serviceType: e.target.value }))}
-          className="bg-white/15 text-white text-sm rounded-xl px-3 py-2 focus:outline-none focus:bg-white/25 transition-colors [&>option]:text-[#32373c]"
-        >
-          <option value="">Tipo: Todos</option>
-          {serviceTypeOptions.map((t) => (
-            <option key={t} value={t}>{t}</option>
-          ))}
-        </select>
+        <MultiSelectDropdown
+          label="Tipo"
+          options={serviceTypeOptions.map((t) => ({ value: t, label: t }))}
+          selected={filters.serviceType}
+          onChange={(values) => setFilters((f) => ({ ...f, serviceType: values }))}
+        />
 
         {hasActiveFilters && (
           <button
