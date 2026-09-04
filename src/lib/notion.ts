@@ -494,8 +494,7 @@ export async function getAllPastTours(): Promise<Tour[]> {
   const { data } = await supabase.from("sales")
     .select(SALE_SELECT)
     .lt("date", today0())
-    .order("date", { ascending: false })
-    .limit(50);
+    .order("date", { ascending: false });
   return (data ?? []).map(mapSaleRow);
 }
 
