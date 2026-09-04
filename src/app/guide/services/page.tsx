@@ -4,6 +4,8 @@ import {
   getPastToursForGuide,
   getToursForChef,
   getPastToursForChef,
+  getToursForDriver,
+  getPastToursForDriver,
   getAllUpcomingTours,
   getAllPastTours,
   getTeamMembers,
@@ -42,16 +44,19 @@ export default async function GuideDashboard() {
   const role = session.user.role;
   const isSuperGuide = role === "Super Guide";
   const isChef = role === "Chef";
+  const isDriver = role === "Driver";
   const email = session.user?.email ?? "";
   const currentNotionId = session.user?.notionId ?? "";
 
-  // Super Guide sees all tours; Chef sees chef-assigned; Guide sees own tours
+  // Super Guide sees all tours; Chef sees chef-assigned; Driver sees driver-assigned; Guide sees own tours
   const [tours, pastTours, teamMembers] = await Promise.all([
-    isSuperGuide ? getAllUpcomingTours()  :
-    isChef       ? getToursForChef(email) :
+    isSuperGuide ? getAllUpcomingTours()    :
+    isChef       ? getToursForChef(email)   :
+    isDriver     ? getToursForDriver(email) :
                    getToursForGuide(email),
-    isSuperGuide ? getAllPastTours()          :
-    isChef       ? getPastToursForChef(email) :
+    isSuperGuide ? getAllPastTours()            :
+    isChef       ? getPastToursForChef(email)   :
+    isDriver     ? getPastToursForDriver(email) :
                    getPastToursForGuide(email),
     isSuperGuide ? getTeamMembers() : Promise.resolve([]),
   ]);
