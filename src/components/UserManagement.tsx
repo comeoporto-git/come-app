@@ -77,6 +77,7 @@ function UserRow({
   const [contactError, setContactError] = useState<string | null>(null);
   const [savingContact, setSavingContact] = useState(false);
 
+  const [name, setName] = useState(member.name);
   const [email, setEmail] = useState(member.email);
   const [phone, setPhone] = useState(member.phone);
   const [iban, setIban] = useState(member.iban);
@@ -96,17 +97,18 @@ function UserRow({
   async function handleContactSave() {
     setSavingContact(true);
     setContactError(null);
-    const result = await adminUpdateTeamMemberContactAction(member.id, { email, phone, iban });
+    const result = await adminUpdateTeamMemberContactAction(member.id, { name, email, phone, iban });
     if (result.error) {
       setContactError(result.error);
     } else {
-      onUpdated({ id: member.id, email, phone, iban });
+      onUpdated({ id: member.id, name, email, phone, iban });
       setEditingContact(false);
     }
     setSavingContact(false);
   }
 
   function handleContactCancel() {
+    setName(member.name);
     setEmail(member.email);
     setPhone(member.phone);
     setIban(member.iban);
@@ -189,6 +191,13 @@ function UserRow({
       {/* Inline contact editor */}
       {editingContact && (
         <div className="mt-3 ml-12 flex flex-col gap-2">
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Nome"
+            className="text-xs border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#667470]/30 w-full"
+          />
           <input
             type="email"
             value={email}
