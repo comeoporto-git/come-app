@@ -274,11 +274,13 @@ export function TourTabs({
   past,
   teamMap,
   currentUserId,
+  showFilters = false,
 }: {
   upcoming: Tour[];
   past: Tour[];
   teamMap?: Record<string, string>;
   currentUserId?: string;
+  showFilters?: boolean;
 }) {
   const [tab, setTab]       = useState<Tab>("upcoming");
   const [query, setQuery]   = useState("");
@@ -289,8 +291,9 @@ export function TourTabs({
   const serviceTypeOptions = uniqueValues(allTours, "serviceType");
   const teamIdOptions      = uniqueTeamIds(allTours);
 
-  const visibleUpcoming = filterTours(upcoming, query, filters, teamMap);
-  const visiblePast     = filterTours(past,     query, filters, teamMap);
+  const activeFilters = showFilters ? filters : EMPTY_FILTERS;
+  const visibleUpcoming = filterTours(upcoming, query, activeFilters, teamMap);
+  const visiblePast     = filterTours(past,     query, activeFilters, teamMap);
 
   const duplicateUpcoming = getDuplicateDates(upcoming);
   const duplicatePast     = getDuplicateDates(past);
@@ -352,37 +355,39 @@ export function TourTabs({
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-2">
-        <MultiSelectDropdown
-          label="Status"
-          options={statusOptions.map((s) => ({ value: s, label: s }))}
-          selected={filters.status}
-          onChange={(values) => setFilters((f) => ({ ...f, status: values }))}
-        />
+      {showFilters && (
+        <div className="flex flex-wrap items-center gap-2">
+          <MultiSelectDropdown
+            label="Status"
+            options={statusOptions.map((s) => ({ value: s, label: s }))}
+            selected={filters.status}
+            onChange={(values) => setFilters((f) => ({ ...f, status: values }))}
+          />
 
-        <MultiSelectDropdown
-          label="Equipa"
-          options={teamIdOptions.map((id) => ({ value: id, label: teamMap?.[id] ?? id }))}
-          selected={filters.team}
-          onChange={(values) => setFilters((f) => ({ ...f, team: values }))}
-        />
+          <MultiSelectDropdown
+            label="Equipa"
+            options={teamIdOptions.map((id) => ({ value: id, label: teamMap?.[id] ?? id }))}
+            selected={filters.team}
+            onChange={(values) => setFilters((f) => ({ ...f, team: values }))}
+          />
 
-        <MultiSelectDropdown
-          label="Tipo"
-          options={serviceTypeOptions.map((t) => ({ value: t, label: t }))}
-          selected={filters.serviceType}
-          onChange={(values) => setFilters((f) => ({ ...f, serviceType: values }))}
-        />
+          <MultiSelectDropdown
+            label="Tipo"
+            options={serviceTypeOptions.map((t) => ({ value: t, label: t }))}
+            selected={filters.serviceType}
+            onChange={(values) => setFilters((f) => ({ ...f, serviceType: values }))}
+          />
 
-        {hasActiveFilters && (
-          <button
-            onClick={() => setFilters(EMPTY_FILTERS)}
-            className="text-xs text-white/60 hover:text-white/90 underline"
-          >
-            Limpar filtros
-          </button>
-        )}
-      </div>
+          {hasActiveFilters && (
+            <button
+              onClick={() => setFilters(EMPTY_FILTERS)}
+              className="text-xs text-white/60 hover:text-white/90 underline"
+            >
+              Limpar filtros
+            </button>
+          )}
+        </div>
+      )}
 
       {/* List */}
       {tab === "upcoming" ? (
