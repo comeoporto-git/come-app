@@ -26,6 +26,13 @@ function roleColor(role: string): string {
   return "bg-gray-50 text-gray-600 border-gray-100";
 }
 
+function statusColor(status: string): string {
+  if (status === "Confirmed") return "bg-emerald-100 text-emerald-700";
+  if (status === "Pending")   return "bg-amber-100 text-amber-600";
+  if (status === "Cancelled") return "bg-red-100 text-red-700";
+  return "bg-gray-100 text-gray-500";
+}
+
 function getMissingFields(tour: Tour): string[] {
   const missing: string[] = [];
   if (!tour.clientName)  missing.push("Cliente");
@@ -110,6 +117,11 @@ export default async function GestaoToursPage() {
                       <Link href={`/admin/crm/accounts/${t.client}`} className="text-xs font-medium text-[#32373c] hover:underline">
                         {t.clientName}
                       </Link>
+                    )}
+                    {t.status && (
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColor(t.status)}`}>
+                        {t.status}
+                      </span>
                     )}
                   </div>
                   <p className="text-xs text-gray-400 mt-0.5">{formatDateTime(t)}</p>
