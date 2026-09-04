@@ -458,6 +458,30 @@ export async function getPastToursForGuide(email: string): Promise<Tour[]> {
   return (data ?? []).map(mapSaleRow);
 }
 
+export async function getToursForDriver(email: string): Promise<Tour[]> {
+  const member = await getTeamMemberByEmail(email);
+  if (!member) return [];
+  const { data } = await supabase.from("sales")
+    .select(SALE_SELECT)
+    .eq("driver_id", member.id)
+    .gte("date", today0())
+    .or("expenses_closed.is.null,expenses_closed.neq.Closed")
+    .order("date");
+  return (data ?? []).map(mapSaleRow);
+}
+
+export async function getPastToursForDriver(email: string): Promise<Tour[]> {
+  const member = await getTeamMemberByEmail(email);
+  if (!member) return [];
+  const { data } = await supabase.from("sales")
+    .select(SALE_SELECT)
+    .eq("driver_id", member.id)
+    .lt("date", today0())
+    .order("date", { ascending: false })
+    .limit(30);
+  return (data ?? []).map(mapSaleRow);
+}
+
 export async function getToursForChef(email: string): Promise<Tour[]> {
   const member = await getTeamMemberByEmail(email);
   if (!member) return [];
