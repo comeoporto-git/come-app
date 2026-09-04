@@ -99,6 +99,7 @@ async function TourPageContent({
   backHref: string;
 }) {
   const isChef = role === "Chef";
+  const isDriver = role === "Driver";
   const canEditTeam = role === "Super Guide" || role === "Admin";
   const canSeeFinancials = role === "Super Guide" || role === "Admin";
 
@@ -119,6 +120,7 @@ async function TourPageContent({
   // Derive chefMember/guideMember from the already-fetched team list — no extra Notion call needed
   const chefMember   = isChef ? (teamMembers.find((m) => m.email === email) ?? null) : null;
   const guideMember  = role === "Guide" ? (teamMembers.find((m) => m.email === email) ?? null) : null;
+  const driverMember = isDriver ? (teamMembers.find((m) => m.email === email) ?? null) : null;
 
   if (!tour) notFound();
 
@@ -321,6 +323,7 @@ async function TourPageContent({
                     userRole={role}
                     chefName={chefMember?.name}
                     guideName={guideMember?.name}
+                    driverName={driverMember?.name}
                     tourTeam={[
                       tour.guideName ? { name: tour.guideName, role: "Guia" } : null,
                       tour.chefName  ? { name: tour.chefName,  role: "Chef" } : null,

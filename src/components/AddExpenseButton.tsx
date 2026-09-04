@@ -10,6 +10,7 @@ export function AddExpenseButton({
   userRole,
   chefName,
   guideName,
+  driverName,
   tourTeam = [],
 }: {
   tourId: string;
@@ -17,6 +18,7 @@ export function AddExpenseButton({
   userRole: string;
   chefName?: string;
   guideName?: string;
+  driverName?: string;
   tourTeam?: { name: string; role: string }[];
 }) {
   const [open, setOpen] = useState(false);
@@ -35,6 +37,7 @@ export function AddExpenseButton({
           userRole={userRole}
           chefName={chefName}
           guideName={guideName}
+          driverName={driverName}
           tourTeam={tourTeam}
           onClose={() => setOpen(false)}
         />
