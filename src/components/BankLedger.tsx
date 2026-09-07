@@ -240,6 +240,9 @@ function LedgerRow({
             {m.invoiceId ? ` · Fatura ${m.invoiceId}` : ""}
             {m.tourName ? ` · ${m.tourName}` : ""}
           </p>
+          {m.paidByName && (
+            <p className="text-[10px] text-gray-400 truncate">Pago por: {m.paidByName}</p>
+          )}
           {(m.iva6 > 0 || m.iva13 > 0 || m.iva23 > 0) && (
             <div className="flex gap-x-2 text-[10px] text-gray-400">
               {m.iva6  > 0 && <span>IVA 6% {fmtEur(m.iva6)}</span>}

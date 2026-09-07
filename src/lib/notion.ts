@@ -197,7 +197,7 @@ const SALE_SELECT = `
   driver:team!sales_driver_id_fkey(name)
 `.trim();
 
-const TX_SELECT = `*, type, sales!transactions_sale_id_fkey(notion_id)`;
+const TX_SELECT = `*, type, sales!transactions_sale_id_fkey(notion_id, guide_id, chef_id, driver_id)`;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -821,7 +821,8 @@ export async function getMatchedTransactions(): Promise<Transaction[]> {
 
 export async function getMatchedTransactionMap(): Promise<Record<string, Transaction[]>> {
   try {
-    const map: Record<string, Transaction[]> = {};
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rows: any[] = [];
     let from = 0;
     const PAGE = 100;
     while (true) {
@@ -833,15 +834,36 @@ export async function getMatchedTransactionMap(): Promise<Record<string, Transac
         .order("id",   { ascending: true })
         .range(from, from + PAGE - 1);
       if (!data?.length) break;
-      for (const row of data) {
-        const tx = mapTransactionRow(row);
-        if (tx.bankReference && tx.status !== "Unmatched Bank Entry") {
-          if (!map[tx.bankReference]) map[tx.bankReference] = [];
-          map[tx.bankReference].push(tx);
-        }
-      }
+      rows.push(...data);
       if (data.length < PAGE) break;
       from += PAGE;
+    }
+    if (!rows.length) return {};
+
+    const { data: teamRows } = await supabase.from("team").select("id, name");
+    const memberById = Object.fromEntries((teamRows ?? []).map((m) => [m.id, m.name]));
+
+    const map: Record<string, Transaction[]> = {};
+    for (const row of rows) {
+      const tx = mapTransactionRow(row);
+      if (!tx.bankReference || tx.status === "Unmatched Bank Entry") continue;
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const sale = (row as any).sales;
+      let paidByName: string | undefined;
+      if (tx.paymentMethod === "Honorários") {
+        paidByName = tx.supplier;
+      } else if (sale) {
+        const memberId = tx.whoPaid === "Chef"   ? sale.chef_id
+                       : tx.whoPaid === "Driver" ? sale.driver_id
+                       : tx.whoPaid === "Guide"  ? sale.guide_id
+                       : null;
+        paidByName = memberId ? memberById[memberId] : undefined;
+      }
+      if (!paidByName && tx.whoPaid === "Company") paidByName = "Empresa";
+
+      if (!map[tx.bankReference]) map[tx.bankReference] = [];
+      map[tx.bankReference].push({ ...tx, paidByName });
     }
     return map;
   } catch (err) {
