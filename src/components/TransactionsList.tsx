@@ -393,7 +393,7 @@ export function TransactionsList({
                           title={fileNameFromUrl(tx.comprovantivoUrl)}
                           className="flex items-center gap-1 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-full font-medium hover:bg-emerald-100 transition-colors max-w-[140px] truncate"
                         >
-                          📄 <span className="truncate">{fileNameFromUrl(tx.comprovantivoUrl)}</span>
+                          📄 <span className="truncate">{tx.paidByName || displayName}</span>
                         </a>
                       )}
                     </div>
