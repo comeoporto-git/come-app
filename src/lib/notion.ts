@@ -870,7 +870,13 @@ export async function getMatchedTransactionMap(): Promise<Record<string, Transac
                        : null;
         paidByName = memberId ? memberById[memberId] : undefined;
       }
-      if (!paidByName && tx.whoPaid === "Company") paidByName = "Empresa";
+      // Legacy rows: pago_por sometimes already holds a company alias or a free-text
+      // person name (e.g. "COME", "Bernardo Providência") instead of the Guide/Chef/
+      // Driver/Company enum — fall back to showing it verbatim.
+      if (!paidByName) {
+        if (tx.whoPaid === "Company" || tx.whoPaid === "COME") paidByName = "Empresa";
+        else if (tx.whoPaid && !["Guide", "Chef", "Driver"].includes(tx.whoPaid)) paidByName = tx.whoPaid;
+      }
 
       if (!map[tx.bankReference]) map[tx.bankReference] = [];
       map[tx.bankReference].push({ ...tx, paidByName });
