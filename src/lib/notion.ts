@@ -861,9 +861,9 @@ export async function getMatchedTransactionMap(): Promise<Record<string, Transac
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const sale = (row as any).sales;
       let paidByName: string | undefined;
-      if (tx.paymentMethod === "Honorários") {
-        paidByName = tx.supplier;
-      } else if (sale) {
+      // Note: "Honorários" (fee paid to a guide/chef/driver) is always pago_por=Company —
+      // the company pays the fee, so it resolves to "Empresa" below like any other Company row.
+      if (sale) {
         const memberId = tx.whoPaid === "Chef"   ? sale.chef_id
                        : tx.whoPaid === "Driver" ? sale.driver_id
                        : tx.whoPaid === "Guide"  ? sale.guide_id
