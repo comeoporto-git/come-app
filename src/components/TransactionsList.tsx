@@ -251,6 +251,7 @@ export function TransactionsList({
           !t.supplier.toLowerCase().includes(q) &&
           !t.invoiceId.toLowerCase().includes(q) &&
           !(t.tourName ?? "").toLowerCase().includes(q) &&
+          !(t.paidByName ?? "").toLowerCase().includes(q) &&
           !fileNameFromUrl(t.comprovantivoUrl).toLowerCase().includes(q) &&
           !fileNameFromUrl(t.invoiceImageUrl).toLowerCase().includes(q) &&
           !(t.transferDate ?? "").includes(q)
