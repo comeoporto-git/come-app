@@ -41,19 +41,21 @@ export function SocioPersonalExpenseList({ expenses }: { expenses: Transaction[]
 
 // Amount each partner still owes each other partner, netted out per pair
 // (a partner can both owe and be owed by the same person, since expenses
-// paid personally by different partners are mixed together).
+// for different partners' personal use are mixed together). The partner
+// whose personal expense it was (socioPessoal) is the one who owes the
+// others their share back.
 function computePendingTransfers(expenses: Transaction[]): { from: string; to: string; amount: number }[] {
-  const owedTo: Record<string, number> = {}; // key `${ower}->${payer}`
+  const owedTo: Record<string, number> = {}; // key `${beneficiary}->${owed partner}`
 
   for (const e of expenses) {
     if (e.socioTransferenciaFeita) continue;
-    const payer = e.socioPessoal;
-    if (!payer) continue;
+    const beneficiary = e.socioPessoal;
+    if (!beneficiary) continue;
     const ownership = ownershipForDate(e.date);
     for (const p of PARTNERS) {
-      if (p === payer) continue;
+      if (p === beneficiary) continue;
       const amount = ((ownership[p] ?? 0) / 100) * e.taxFree;
-      const key = `${p}->${payer}`;
+      const key = `${beneficiary}->${p}`;
       owedTo[key] = (owedTo[key] ?? 0) + amount;
     }
   }
