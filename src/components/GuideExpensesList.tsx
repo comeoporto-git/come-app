@@ -4,6 +4,7 @@ import { useState, useRef } from "react";
 import Link from "next/link";
 import type { Transaction, Fornecedor } from "@/lib/notion";
 import { uploadComprovantivoAction, markTransferenciaFeitaAction } from "@/actions/transactions";
+import { analyzeComprovativo } from "@/actions/invoice";
 import { useRouter } from "next/navigation";
 import { EditExpenseModal } from "./EditExpenseModal";
 
@@ -29,7 +30,23 @@ function GuideExpenseRow({ expense, fornecedores }: { expense: Transaction; forn
       const res = await fetch("/api/upload", { method: "POST", body: fd });
       if (!res.ok) throw new Error("Upload failed");
       const { url } = await res.json();
-      await uploadComprovantivoAction(expense.id, url);
+
+      let transferDate: string | undefined;
+      try {
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (ev) => resolve((ev.target?.result as string).split(",")[1]);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+        const mediaType = file.type as "image/jpeg" | "image/png" | "image/webp" | "application/pdf";
+        const scanned = await analyzeComprovativo(base64, mediaType);
+        if (scanned.transferDate) transferDate = scanned.transferDate;
+      } catch (err) {
+        console.error("[GuideExpensesList] comprovativo date scan failed:", err);
+      }
+
+      await uploadComprovantivoAction(expense.id, url, transferDate);
       setLocalComprovantivoUrl(url);
       router.refresh();
     } catch {

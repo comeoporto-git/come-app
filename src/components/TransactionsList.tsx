@@ -252,7 +252,8 @@ export function TransactionsList({
           !t.invoiceId.toLowerCase().includes(q) &&
           !(t.tourName ?? "").toLowerCase().includes(q) &&
           !fileNameFromUrl(t.comprovantivoUrl).toLowerCase().includes(q) &&
-          !fileNameFromUrl(t.invoiceImageUrl).toLowerCase().includes(q)
+          !fileNameFromUrl(t.invoiceImageUrl).toLowerCase().includes(q) &&
+          !(t.transferDate ?? "").includes(q)
         ) return false;
       }
       return true;
@@ -393,7 +394,7 @@ export function TransactionsList({
                           title={fileNameFromUrl(tx.comprovantivoUrl)}
                           className="flex items-center gap-1 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-full font-medium hover:bg-emerald-100 transition-colors max-w-[140px] truncate"
                         >
-                          📄 <span className="truncate">{tx.paidByName || displayName}</span>
+                          📄 <span className="truncate">{tx.paidByName || displayName}{tx.transferDate ? ` · ${tx.transferDate}` : ""}</span>
                         </a>
                       )}
                     </div>

@@ -90,6 +90,7 @@ export type Transaction = {
   precisaDeFatura?: "Sim" | "Não" | "Sim tratado" | "AI Scan Falhou" | "";
   transferenciaFeita?: boolean;
   comprovantivoUrl?: string;
+  transferDate?: string;
   paidByName?: string;
   payeeIban?: string;
   contaPagamento?: string;
@@ -184,6 +185,7 @@ function mapTransactionRow(row: any): Transaction {
     precisaDeFatura:    (row.precisa_fatura ?? "") as Transaction["precisaDeFatura"],
     transferenciaFeita: row.transferencia_feita ?? false,
     comprovantivoUrl:   row.comprovativo_url    ?? undefined,
+    transferDate:       row.data_transferencia ? String(row.data_transferencia).split("T")[0] : undefined,
     contaPagamento:     row.conta_pagamento     ?? undefined,
     txType:             (row.type as "Earning" | "Expense" | undefined) ?? undefined,
     socioPessoal:            row.socio_pessoal ?? null,
@@ -1196,8 +1198,10 @@ export async function setSocioTransferenciaFeita(pageId: string, done: boolean):
   await supabase.from("transactions").update({ socio_transferencia_feita: done }).eq("id", pageId);
 }
 
-export async function setComprovativoUrl(pageId: string, url: string): Promise<void> {
-  await supabase.from("transactions").update({ comprovativo_url: url }).eq("id", pageId);
+export async function setComprovativoUrl(pageId: string, url: string, transferDate?: string): Promise<void> {
+  const updates: { comprovativo_url: string; data_transferencia?: string } = { comprovativo_url: url };
+  if (transferDate) updates.data_transferencia = transferDate;
+  await supabase.from("transactions").update(updates).eq("id", pageId);
 }
 
 // ── Fornecedores ──────────────────────────────────────────────────────────────
