@@ -337,13 +337,15 @@ export async function verifyTransactionAction(
 export async function uploadComprovantivoAction(
   transactionId: string,
   fileUrl: string,
+  transferDate?: string,
 ): Promise<void> {
   const session = await requireAuth();
   if (session.user.role !== "Admin" && session.user.role !== "Super Guide") {
     throw new Error("Forbidden");
   }
-  await setComprovativoUrl(transactionId, fileUrl);
+  await setComprovativoUrl(transactionId, fileUrl, transferDate);
   revalidatePath("/admin/em-falta");
+  revalidatePath("/admin/transacoes");
 }
 
 export async function markTransferenciaFeitaAction(

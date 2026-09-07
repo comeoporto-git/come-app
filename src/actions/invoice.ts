@@ -131,6 +131,48 @@ function extractJson(raw: string): string {
   return clean.slice(start, end + 1);
 }
 
+const COMPROVATIVO_SYSTEM_PROMPT = `You are a Portuguese bank transfer receipt (comprovativo de transferência) parser. Your ONLY job is to extract the transfer date and return valid JSON.
+
+Look for the date the transfer/operation was executed — labels like "Data da Operação", "Data de Execução", "Data de Registo" or "Data Valor". Prefer "Data da Operação" when more than one date is present.
+
+Return ONLY a JSON object: {"transferDate": "yyyy-mm-dd"}. No markdown fences, no explanation. If no date can be read, return {"transferDate": ""}.`;
+
+export type ComprovativoData = {
+  /** ISO yyyy-mm-dd, or "" if not found */
+  transferDate: string;
+};
+
+/** Extracts the transfer date printed on a bank transfer proof (comprovativo) file. */
+export async function analyzeComprovativo(
+  fileBase64: string,
+  mediaType: "image/jpeg" | "image/png" | "image/webp" | "image/gif" | "application/pdf",
+): Promise<ComprovativoData> {
+  const contentBlock = mediaType === "application/pdf"
+    ? { type: "document" as const, source: { type: "base64" as const, media_type: "application/pdf" as const, data: fileBase64 } }
+    : { type: "image" as const, source: { type: "base64" as const, media_type: mediaType, data: fileBase64 } };
+
+  const response = await anthropic.messages.create({
+    model: "claude-sonnet-4-6",
+    max_tokens: 256,
+    system: COMPROVATIVO_SYSTEM_PROMPT,
+    messages: [{
+      role: "user",
+      content: [
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        contentBlock as any,
+        { type: "text", text: "Extract the transfer date from this bank transfer receipt and return only JSON." },
+      ],
+    }],
+  });
+
+  const raw = (response.content[0] as { type: string; text: string }).text.trim();
+  try {
+    return JSON.parse(extractJson(raw)) as ComprovativoData;
+  } catch {
+    return { transferDate: "" };
+  }
+}
+
 /**
  * Called when the guide corrects AI output.
  * Saves the full correction + any supplier name mapping learned.
