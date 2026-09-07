@@ -774,7 +774,61 @@ export async function getAllTransactionsAdmin(from: string, to: string): Promise
     .gte("data", from)
     .lte("data", to)
     .order("data", { ascending: false });
-  return (data ?? []).map(mapTransactionRow);
+  if (!data?.length) return [];
+
+  const resolvePaidByName = await buildPaidByNameResolver();
+  return data.map((row) => {
+    const t = mapTransactionRow(row);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const paidByName = resolvePaidByName(t, (row as any).sales as SaleRef);
+    return paidByName ? { ...t, paidByName } : t;
+  });
+}
+
+type SaleRef = { chef_id?: string | null; driver_id?: string | null; guide_id?: string | null } | null;
+
+/** Builds a resolver that maps a transaction's `whoPaid` field to the name of the
+ *  person the money was actually paid/transferred to — a team member (resolved via
+ *  the sale's guide/chef/driver), "Empresa" for company-paid rows, or the free-text
+ *  legacy value resolved against the team roster where unambiguous. */
+async function buildPaidByNameResolver(): Promise<
+  (tx: Transaction, sale: SaleRef) => string | undefined
+> {
+  const { data: teamRows } = await supabase.from("team").select("id, name");
+  const memberById = Object.fromEntries((teamRows ?? []).map((m) => [m.id, m.name]));
+
+  const memberByFullName  = new Map<string, string>();
+  const memberByFirstName = new Map<string, string>();
+  const firstNameCounts   = new Map<string, number>();
+  for (const m of teamRows ?? []) {
+    const lower = m.name.toLowerCase();
+    memberByFullName.set(lower, m.name);
+    const first = lower.split(" ")[0];
+    firstNameCounts.set(first, (firstNameCounts.get(first) ?? 0) + 1);
+    memberByFirstName.set(first, m.name);
+  }
+
+  return (tx: Transaction, sale: SaleRef) => {
+    let paidByName: string | undefined;
+    if (sale) {
+      const memberId = tx.whoPaid === "Chef"   ? sale.chef_id
+                     : tx.whoPaid === "Driver" ? sale.driver_id
+                     : tx.whoPaid === "Guide"  ? sale.guide_id
+                     : null;
+      paidByName = memberId ? memberById[memberId] : undefined;
+    }
+    if (!paidByName) {
+      if (tx.whoPaid === "Company" || tx.whoPaid === "COME") paidByName = "Empresa";
+      else if (tx.whoPaid && !["Guide", "Chef", "Driver"].includes(tx.whoPaid)) {
+        const lower = tx.whoPaid.toLowerCase().trim();
+        const first = lower.split(" ")[0];
+        paidByName = memberByFullName.get(lower)
+          ?? (firstNameCounts.get(first) === 1 ? memberByFirstName.get(first) : undefined)
+          ?? tx.whoPaid;
+      }
+    }
+    return paidByName;
+  };
 }
 
 export async function getTransactionsNeedingInvoice(): Promise<Transaction[]> {
@@ -850,53 +904,16 @@ export async function getMatchedTransactionMap(): Promise<Record<string, Transac
     }
     if (!rows.length) return {};
 
-    const { data: teamRows } = await supabase.from("team").select("id, name");
-    const memberById = Object.fromEntries((teamRows ?? []).map((m) => [m.id, m.name]));
-
-    // For resolving legacy free-text pago_por values (below) against the team roster
-    const memberByFullName  = new Map<string, string>();
-    const memberByFirstName = new Map<string, string>();
-    const firstNameCounts   = new Map<string, number>();
-    for (const m of teamRows ?? []) {
-      const lower = m.name.toLowerCase();
-      memberByFullName.set(lower, m.name);
-      const first = lower.split(" ")[0];
-      firstNameCounts.set(first, (firstNameCounts.get(first) ?? 0) + 1);
-      memberByFirstName.set(first, m.name);
-    }
+    // Note: "Honorários" (fee paid to a guide/chef/driver) is always pago_por=Company —
+    // the company pays the fee, so it resolves to "Empresa" like any other Company row.
+    const resolvePaidByName = await buildPaidByNameResolver();
 
     const map: Record<string, Transaction[]> = {};
     for (const row of rows) {
       const tx = mapTransactionRow(row);
       if (!tx.bankReference || tx.status === "Unmatched Bank Entry") continue;
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const sale = (row as any).sales;
-      let paidByName: string | undefined;
-      // Note: "Honorários" (fee paid to a guide/chef/driver) is always pago_por=Company —
-      // the company pays the fee, so it resolves to "Empresa" below like any other Company row.
-      if (sale) {
-        const memberId = tx.whoPaid === "Chef"   ? sale.chef_id
-                       : tx.whoPaid === "Driver" ? sale.driver_id
-                       : tx.whoPaid === "Guide"  ? sale.guide_id
-                       : null;
-        paidByName = memberId ? memberById[memberId] : undefined;
-      }
-      // Legacy rows: pago_por sometimes already holds a company alias or a free-text
-      // person name (e.g. "COME", "Bernardo Providência", or just "Bernardo") instead
-      // of the Guide/Chef/Driver/Company enum — resolve it against the team roster,
-      // falling back to showing it verbatim only when no unambiguous match exists.
-      if (!paidByName) {
-        if (tx.whoPaid === "Company" || tx.whoPaid === "COME") paidByName = "Empresa";
-        else if (tx.whoPaid && !["Guide", "Chef", "Driver"].includes(tx.whoPaid)) {
-          const lower = tx.whoPaid.toLowerCase().trim();
-          const first = lower.split(" ")[0];
-          paidByName = memberByFullName.get(lower)
-            ?? (firstNameCounts.get(first) === 1 ? memberByFirstName.get(first) : undefined)
-            ?? tx.whoPaid;
-        }
-      }
-
+      const paidByName = resolvePaidByName(tx, row.sales as SaleRef);
       if (!map[tx.bankReference]) map[tx.bankReference] = [];
       map[tx.bankReference].push({ ...tx, paidByName });
     }
