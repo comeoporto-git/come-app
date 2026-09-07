@@ -30,6 +30,17 @@ function firstOfYear(year = new Date().getFullYear()) {
   return `${year}-01-01`;
 }
 
+function fileNameFromUrl(url?: string): string {
+  if (!url) return "";
+  try {
+    const clean = url.split("?")[0];
+    const parts = clean.split("/");
+    return decodeURIComponent(parts[parts.length - 1] || "");
+  } catch {
+    return "";
+  }
+}
+
 function lastOfYear(year: number) {
   return `${year}-12-31`;
 }
@@ -239,7 +250,9 @@ export function TransactionsList({
         if (
           !t.supplier.toLowerCase().includes(q) &&
           !t.invoiceId.toLowerCase().includes(q) &&
-          !(t.tourName ?? "").toLowerCase().includes(q)
+          !(t.tourName ?? "").toLowerCase().includes(q) &&
+          !fileNameFromUrl(t.comprovantivoUrl).toLowerCase().includes(q) &&
+          !fileNameFromUrl(t.invoiceImageUrl).toLowerCase().includes(q)
         ) return false;
       }
       return true;
@@ -269,7 +282,7 @@ export function TransactionsList({
       {/* Search */}
       <input
         type="search"
-        placeholder="Pesquisar fornecedor, fatura, serviço…"
+        placeholder="Pesquisar fornecedor, fatura, serviço, ficheiro…"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         className="w-full bg-white rounded-xl border border-transparent px-4 py-2.5 text-sm text-[#32373c] placeholder-gray-400 focus:outline-none focus:border-[#667470]/40"
@@ -370,6 +383,18 @@ export function TransactionsList({
                       )}
                       {tx.invoiceId && (
                         <span className="text-xs text-gray-400">Fatura: {tx.invoiceId}</span>
+                      )}
+                      {tx.comprovantivoUrl && (
+                        <a
+                          href={tx.comprovantivoUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          title={fileNameFromUrl(tx.comprovantivoUrl)}
+                          className="flex items-center gap-1 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-full font-medium hover:bg-emerald-100 transition-colors max-w-[140px] truncate"
+                        >
+                          📄 <span className="truncate">{fileNameFromUrl(tx.comprovantivoUrl)}</span>
+                        </a>
                       )}
                     </div>
                   </div>
