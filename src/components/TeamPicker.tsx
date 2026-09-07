@@ -15,6 +15,9 @@ export function TeamPicker({
   driverId,
   driverName,
   driverPhone,
+  logisticsId,
+  logisticsName,
+  logisticsPhone,
   teamMembers,
 }: {
   tourId: string;
@@ -27,14 +30,18 @@ export function TeamPicker({
   driverId: string | null;
   driverName: string;
   driverPhone?: string;
+  logisticsId: string | null;
+  logisticsName: string;
+  logisticsPhone?: string;
   teamMembers: TeamMember[];
 }) {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedGuide, setSelectedGuide]   = useState(guideId  ?? "");
-  const [selectedChef, setSelectedChef]     = useState(chefId   ?? "");
-  const [selectedDriver, setSelectedDriver] = useState(driverId ?? "");
+  const [selectedGuide, setSelectedGuide]         = useState(guideId      ?? "");
+  const [selectedChef, setSelectedChef]           = useState(chefId       ?? "");
+  const [selectedDriver, setSelectedDriver]       = useState(driverId     ?? "");
+  const [selectedLogistics, setSelectedLogistics] = useState(logisticsId  ?? "");
 
   async function handleSave() {
     setSaving(true);
@@ -42,9 +49,10 @@ export function TeamPicker({
     try {
       const result = await updateTourTeamAction(
         tourId,
-        selectedGuide  || null,
-        selectedChef   || null,
-        selectedDriver || null,
+        selectedGuide      || null,
+        selectedChef       || null,
+        selectedDriver     || null,
+        selectedLogistics  || null,
       );
       if (result.error) {
         setError(result.error);
@@ -59,9 +67,10 @@ export function TeamPicker({
   }
 
   function handleCancel() {
-    setSelectedGuide(guideId   ?? "");
-    setSelectedChef(chefId     ?? "");
-    setSelectedDriver(driverId ?? "");
+    setSelectedGuide(guideId          ?? "");
+    setSelectedChef(chefId            ?? "");
+    setSelectedDriver(driverId        ?? "");
+    setSelectedLogistics(logisticsId  ?? "");
     setEditing(false);
   }
 
@@ -72,9 +81,10 @@ export function TeamPicker({
   if (!editing) {
     return (
       <div className="space-y-3">
-        <TeamRow label="Guia"   value={guideName  || "—"} phone={guidePhone} />
-        <TeamRow label="Chef"   value={chefName   || "—"} phone={chefPhone} />
-        <TeamRow label="Driver" value={driverName || "—"} phone={driverPhone} />
+        <TeamRow label="Guia"       value={guideName      || "—"} phone={guidePhone} />
+        <TeamRow label="Chef"       value={chefName       || "—"} phone={chefPhone} />
+        <TeamRow label="Driver"     value={driverName     || "—"} phone={driverPhone} />
+        <TeamRow label="Logistics"  value={logisticsName  || "—"} phone={logisticsPhone} />
         <button
           onClick={() => setEditing(true)}
           className="mt-1 text-xs text-[#667470] font-semibold hover:underline"
@@ -103,6 +113,12 @@ export function TeamPicker({
         label="Driver"
         value={selectedDriver}
         onChange={setSelectedDriver}
+        members={teamMembers}
+      />
+      <TeamSelect
+        label="Logistics"
+        value={selectedLogistics}
+        onChange={setSelectedLogistics}
         members={teamMembers}
       />
       {error && (

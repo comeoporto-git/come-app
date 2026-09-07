@@ -114,11 +114,12 @@ function TourCard({
             ) : tour.numGuests > 0 ? (
               <p className="text-xs text-gray-400">{tour.numGuests} pax</p>
             ) : null}
-            {(tour.chefName || tour.driverName) && (
+            {(tour.chefName || tour.driverName || tour.logisticsName) && (
               <p className="text-xs text-gray-400">
                 {[
                   tour.chefName ? `🧑‍🍳 ${tour.chefName}` : null,
                   tour.driverName ? `🚗 ${tour.driverName}` : null,
+                  tour.logisticsName ? `📦 ${tour.logisticsName}` : null,
                 ].filter(Boolean).join("  ·  ")}
               </p>
             )}
@@ -168,7 +169,8 @@ function filterTours(
       (t.clientName ?? "").toLowerCase().includes(q) ||
       guideName.toLowerCase().includes(q) ||
       (t.chefName ?? "").toLowerCase().includes(q) ||
-      (t.driverName ?? "").toLowerCase().includes(q)
+      (t.driverName ?? "").toLowerCase().includes(q) ||
+      (t.logisticsName ?? "").toLowerCase().includes(q)
     );
   });
 }

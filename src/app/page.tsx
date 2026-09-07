@@ -9,6 +9,7 @@ export default async function RootPage() {
   if (role === "Guide")  redirect("/guide");
   if (role === "Chef")   redirect("/guide");
   if (role === "Driver") redirect("/guide");
+  if (role === "Logistics") redirect("/guide");
   if (role === "Super Guide") redirect("/super-guide");
   if (role === "Accountant") redirect("/admin/reconciliation");
   if (role === "Admin") redirect("/admin");

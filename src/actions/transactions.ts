@@ -33,13 +33,14 @@ export async function updateTourTeamAction(
   guideId: string | null,
   chefId: string | null,
   driverId: string | null,
+  logisticsId: string | null,
 ): Promise<{ error?: string }> {
   const session = await requireAuth();
   if (session.user.role !== "Super Guide" && session.user.role !== "Admin") {
     return { error: "Forbidden: apenas Super Guide ou Admin podem editar a equipa" };
   }
   try {
-    await updateTourTeam(tourId, guideId, chefId, driverId);
+    await updateTourTeam(tourId, guideId, chefId, driverId, logisticsId);
     revalidatePath(`/guide/tours/${tourId}`);
     return {};
   } catch (err) {
@@ -171,7 +172,8 @@ export async function logExpenseAction(
       role !== "Admin" &&
       role !== "Super Guide" &&
       role !== "Chef" &&
-      role !== "Driver"
+      role !== "Driver" &&
+      role !== "Logistics"
     ) {
       return { error: "Forbidden" };
     }
@@ -182,7 +184,7 @@ export async function logExpenseAction(
       revalidatePath("/admin");
     }
     if (data.socioPessoal) revalidatePath("/admin/socios");
-    if (role === "Guide" || role === "Chef" || role === "Driver") {
+    if (role === "Guide" || role === "Chef" || role === "Driver" || role === "Logistics") {
       notifyInvoiceAdded({
         guideName: session.user.name ?? session.user.email ?? "Guia",
         supplier: data.supplier,
@@ -222,7 +224,8 @@ export async function finishPendingExpenseAction(
       role !== "Admin" &&
       role !== "Super Guide" &&
       role !== "Chef" &&
-      role !== "Driver"
+      role !== "Driver" &&
+      role !== "Logistics"
     ) {
       return { error: "Forbidden" };
     }
@@ -243,7 +246,7 @@ export async function finishPendingExpenseAction(
       ...(invoiceImageUrl ? { invoiceImageUrl } : {}),
     });
     revalidatePath(`/guide/tours/${tourId}`);
-    if (supplier && (role === "Guide" || role === "Chef" || role === "Driver")) {
+    if (supplier && (role === "Guide" || role === "Chef" || role === "Driver" || role === "Logistics")) {
       notifyInvoiceAdded({
         guideName: session.user.name ?? session.user.email ?? "Guia",
         supplier,

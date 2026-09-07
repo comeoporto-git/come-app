@@ -35,7 +35,7 @@ function formatDate(iso: string | null, startTime: string | null): string {
 
 // ── Shell (renders immediately, only needs auth cookie) ───────────────────────
 
-const ALLOWED_ROLES: ReadonlyArray<string> = ["Guide", "Super Guide", "Admin", "Chef", "Driver"];
+const ALLOWED_ROLES: ReadonlyArray<string> = ["Guide", "Super Guide", "Admin", "Chef", "Driver", "Logistics"];
 
 export default async function TourDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -248,6 +248,9 @@ async function TourPageContent({
                     driverId={tour.driverId}
                     driverName={tour.driverName}
                     driverPhone={teamMembers.find(m => m.id === tour.driverId)?.phone}
+                    logisticsId={tour.logisticsId}
+                    logisticsName={tour.logisticsName}
+                    logisticsPhone={teamMembers.find(m => m.id === tour.logisticsId)?.phone}
                     teamMembers={teamMembers}
                   />
                 ) : (
@@ -266,6 +269,11 @@ async function TourPageContent({
                       label="Driver"
                       name={tour.driverName || "—"}
                       phone={teamMembers.find(m => m.id === tour.driverId)?.phone}
+                    />
+                    <TeamMemberField
+                      label="Logistics"
+                      name={tour.logisticsName || "—"}
+                      phone={teamMembers.find(m => m.id === tour.logisticsId)?.phone}
                     />
                   </div>
                 )}
@@ -328,11 +336,12 @@ async function TourPageContent({
                       tour.guideName ? { name: tour.guideName, role: "Guia" } : null,
                       tour.chefName  ? { name: tour.chefName,  role: "Chef" } : null,
                       tour.driverName ? { name: tour.driverName, role: "Motorista" } : null,
+                      tour.logisticsName ? { name: tour.logisticsName, role: "Logistics" } : null,
                     ].filter(Boolean) as { name: string; role: string }[]}
                   />
                 )}
               </div>
-              <ExpenseList transactions={transactions} tourId={id} isClosed={isClosed} fornecedores={fornecedores} guideName={tour.guideName} chefName={tour.chefName} driverName={tour.driverName} userRole={role} />
+              <ExpenseList transactions={transactions} tourId={id} isClosed={isClosed} fornecedores={fornecedores} guideName={tour.guideName} chefName={tour.chefName} driverName={tour.driverName} logisticsName={tour.logisticsName} userRole={role} />
             </section>
 
             {/* Close Tour — only admins */}

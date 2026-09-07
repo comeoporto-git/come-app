@@ -86,6 +86,7 @@ CREATE TABLE IF NOT EXISTS sales (
   guide_id          UUID REFERENCES team(id),
   chef_id           UUID REFERENCES team(id),
   driver_id         UUID REFERENCES team(id),
+  logistics_id      UUID REFERENCES team(id),
   created_at        TIMESTAMPTZ DEFAULT NOW()
 );
 
