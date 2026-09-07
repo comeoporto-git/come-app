@@ -10,7 +10,14 @@ async function authorizeContacts() {
   "use server";
   // prompt:consent forces Google to show the scope screen and return a
   // fresh token that includes contacts.readonly even for returning users.
-  await signIn("google", { redirectTo: "/admin/crm/google-contacts" }, { prompt: "consent" });
+  // scope is passed explicitly here since the base login flow only requests
+  // openid/email/profile (contacts.readonly is a sensitive scope requiring
+  // Google verification, so it's only requested for admins who need it).
+  await signIn(
+    "google",
+    { redirectTo: "/admin/crm/google-contacts" },
+    { prompt: "consent", scope: "openid email profile https://www.googleapis.com/auth/contacts.readonly" }
+  );
 }
 
 export default async function GoogleContactsPage({
