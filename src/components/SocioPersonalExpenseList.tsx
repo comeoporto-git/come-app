@@ -9,6 +9,13 @@ import { PARTNERS, ownershipForDate } from "@/lib/constants";
 export function SocioPersonalExpenseList({ expenses }: { expenses: Transaction[] }) {
   if (expenses.length === 0) return null;
 
+  const totalsToTransfer = PARTNERS.map((name) => ({
+    name,
+    amount: expenses
+      .filter((e) => !e.socioTransferenciaFeita && e.socioPessoal !== name)
+      .reduce((sum, e) => sum + ((ownershipForDate(e.date)[name] ?? 0) / 100) * e.taxFree, 0),
+  })).filter((t) => t.amount > 0.005);
+
   return (
     <section className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
       <div className="px-5 py-3.5 border-b border-gray-50">
@@ -16,6 +23,16 @@ export function SocioPersonalExpenseList({ expenses }: { expenses: Transaction[]
         <p className="text-xs text-gray-400 mt-0.5">
           Despesas pagas com o cartão da empresa para uso pessoal de um sócio
         </p>
+        {totalsToTransfer.length > 0 && (
+          <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2.5">
+            {totalsToTransfer.map((t) => (
+              <span key={t.name} className="text-xs text-gray-500">
+                <span className="font-medium text-gray-600">{t.name}</span> a transferir:{" "}
+                <span className="font-semibold text-[#32373c]">€{t.amount.toFixed(2)}</span>
+              </span>
+            ))}
+          </div>
+        )}
       </div>
       <ul className="divide-y divide-gray-50">
         {expenses.map((e) => (
