@@ -853,6 +853,18 @@ export async function getMatchedTransactionMap(): Promise<Record<string, Transac
     const { data: teamRows } = await supabase.from("team").select("id, name");
     const memberById = Object.fromEntries((teamRows ?? []).map((m) => [m.id, m.name]));
 
+    // For resolving legacy free-text pago_por values (below) against the team roster
+    const memberByFullName  = new Map<string, string>();
+    const memberByFirstName = new Map<string, string>();
+    const firstNameCounts   = new Map<string, number>();
+    for (const m of teamRows ?? []) {
+      const lower = m.name.toLowerCase();
+      memberByFullName.set(lower, m.name);
+      const first = lower.split(" ")[0];
+      firstNameCounts.set(first, (firstNameCounts.get(first) ?? 0) + 1);
+      memberByFirstName.set(first, m.name);
+    }
+
     const map: Record<string, Transaction[]> = {};
     for (const row of rows) {
       const tx = mapTransactionRow(row);
@@ -871,11 +883,18 @@ export async function getMatchedTransactionMap(): Promise<Record<string, Transac
         paidByName = memberId ? memberById[memberId] : undefined;
       }
       // Legacy rows: pago_por sometimes already holds a company alias or a free-text
-      // person name (e.g. "COME", "Bernardo Providência") instead of the Guide/Chef/
-      // Driver/Company enum — fall back to showing it verbatim.
+      // person name (e.g. "COME", "Bernardo Providência", or just "Bernardo") instead
+      // of the Guide/Chef/Driver/Company enum — resolve it against the team roster,
+      // falling back to showing it verbatim only when no unambiguous match exists.
       if (!paidByName) {
         if (tx.whoPaid === "Company" || tx.whoPaid === "COME") paidByName = "Empresa";
-        else if (tx.whoPaid && !["Guide", "Chef", "Driver"].includes(tx.whoPaid)) paidByName = tx.whoPaid;
+        else if (tx.whoPaid && !["Guide", "Chef", "Driver"].includes(tx.whoPaid)) {
+          const lower = tx.whoPaid.toLowerCase().trim();
+          const first = lower.split(" ")[0];
+          paidByName = memberByFullName.get(lower)
+            ?? (firstNameCounts.get(first) === 1 ? memberByFirstName.get(first) : undefined)
+            ?? tx.whoPaid;
+        }
       }
 
       if (!map[tx.bankReference]) map[tx.bankReference] = [];
