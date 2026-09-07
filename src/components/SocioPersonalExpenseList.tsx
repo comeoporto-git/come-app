@@ -9,12 +9,7 @@ import { PARTNERS, ownershipForDate } from "@/lib/constants";
 export function SocioPersonalExpenseList({ expenses }: { expenses: Transaction[] }) {
   if (expenses.length === 0) return null;
 
-  const totalsToTransfer = PARTNERS.map((name) => ({
-    name,
-    amount: expenses
-      .filter((e) => !e.socioTransferenciaFeita && e.socioPessoal !== name)
-      .reduce((sum, e) => sum + ((ownershipForDate(e.date)[name] ?? 0) / 100) * e.taxFree, 0),
-  })).filter((t) => t.amount > 0.005);
+  const transfers = computePendingTransfers(expenses);
 
   return (
     <section className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -23,11 +18,12 @@ export function SocioPersonalExpenseList({ expenses }: { expenses: Transaction[]
         <p className="text-xs text-gray-400 mt-0.5">
           Despesas pagas com o cartão da empresa para uso pessoal de um sócio
         </p>
-        {totalsToTransfer.length > 0 && (
+        {transfers.length > 0 && (
           <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2.5">
-            {totalsToTransfer.map((t) => (
-              <span key={t.name} className="text-xs text-gray-500">
-                <span className="font-medium text-gray-600">{t.name}</span> a transferir:{" "}
+            {transfers.map((t) => (
+              <span key={`${t.from}-${t.to}`} className="text-xs text-gray-500">
+                <span className="font-medium text-gray-600">{t.from}</span> deve a{" "}
+                <span className="font-medium text-gray-600">{t.to}</span>:{" "}
                 <span className="font-semibold text-[#32373c]">€{t.amount.toFixed(2)}</span>
               </span>
             ))}
@@ -41,6 +37,37 @@ export function SocioPersonalExpenseList({ expenses }: { expenses: Transaction[]
       </ul>
     </section>
   );
+}
+
+// Amount each partner still owes each other partner, netted out per pair
+// (a partner can both owe and be owed by the same person, since expenses
+// paid personally by different partners are mixed together).
+function computePendingTransfers(expenses: Transaction[]): { from: string; to: string; amount: number }[] {
+  const owedTo: Record<string, number> = {}; // key `${ower}->${payer}`
+
+  for (const e of expenses) {
+    if (e.socioTransferenciaFeita) continue;
+    const payer = e.socioPessoal;
+    if (!payer) continue;
+    const ownership = ownershipForDate(e.date);
+    for (const p of PARTNERS) {
+      if (p === payer) continue;
+      const amount = ((ownership[p] ?? 0) / 100) * e.taxFree;
+      const key = `${p}->${payer}`;
+      owedTo[key] = (owedTo[key] ?? 0) + amount;
+    }
+  }
+
+  const transfers: { from: string; to: string; amount: number }[] = [];
+  for (let i = 0; i < PARTNERS.length; i++) {
+    for (let j = i + 1; j < PARTNERS.length; j++) {
+      const [a, b] = [PARTNERS[i], PARTNERS[j]];
+      const net = (owedTo[`${a}->${b}`] ?? 0) - (owedTo[`${b}->${a}`] ?? 0);
+      if (net > 0.005) transfers.push({ from: a, to: b, amount: net });
+      else if (net < -0.005) transfers.push({ from: b, to: a, amount: -net });
+    }
+  }
+  return transfers;
 }
 
 function SocioExpenseRow({ expense }: { expense: Transaction }) {
