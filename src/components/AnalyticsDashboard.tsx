@@ -589,9 +589,13 @@ export function AnalyticsDashboard({
       }
     }
 
+    // Only services that have actually happened — excludes not-yet-realised statuses
+    // (Confirmed/Pending) in addition to the past-date + non-cancelled filtering above
+    const realizedTours = pastCompleted.filter((t) => t.status !== "Confirmed" && t.status !== "Pending");
+
     // Profit by service — revenue & cost of transactions linked to each tour, grouped by service name
     const serviceProfitMap: Record<string, { services: number; revenue: number; cost: number }> = {};
-    for (const t of pastCompleted) {
+    for (const t of realizedTours) {
       if (!t.id) continue;
       const name = t.serviceName || t.type || "Outro";
       if (!serviceProfitMap[name]) serviceProfitMap[name] = { services: 0, revenue: 0, cost: 0 };
@@ -613,7 +617,7 @@ export function AnalyticsDashboard({
       "Bernardo": { services: 0, revenue: 0, cost: 0 },
       "Outros Guias": { services: 0, revenue: 0, cost: 0 },
     };
-    for (const t of pastCompleted) {
+    for (const t of realizedTours) {
       if (!t.id || !t.guideName) continue;
       const group = isBernardoGuide(t.guideName) ? "Bernardo" : "Outros Guias";
       guideGroupsRaw[group].services++;
