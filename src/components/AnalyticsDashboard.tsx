@@ -25,6 +25,11 @@ function isTourFuture(t: Tour) {
 function isBernardoGuide(name: string) {
   return name.toLowerCase().includes("bernardo");
 }
+
+type ServiceTourDetail = {
+  id: string; date: string | null; clientName: string; guideName: string;
+  numGuests: number; status: string; revenue: number; cost: number; profit: number;
+};
 function monthKey(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 }
@@ -258,22 +263,62 @@ function StackedVBars({ data, max, barHeight = 88, formatValue }: {
   );
 }
 
-function ProfitRow({ label, services, revenue, cost, profit, margin }: {
+function ProfitRow({ label, services, revenue, cost, profit, margin, tours }: {
   label: string; services?: number; revenue: number; cost: number; profit: number; margin: number;
+  tours?: ServiceTourDetail[];
 }) {
+  const [open, setOpen] = useState(false);
+  const expandable = !!tours && tours.length > 0;
   return (
-    <div className="py-2.5 border-b border-gray-50 last:border-0 space-y-1.5">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-sm font-medium text-[#32373c] truncate">
-          {label}{services != null && <span className="text-gray-400 font-normal"> · {services} serviços</span>}
-        </span>
-        <span className={`text-sm font-bold shrink-0 ${profit >= 0 ? "text-emerald-600" : "text-red-500"}`}>{fmtEur(profit)}</span>
-      </div>
-      <div className="flex items-center gap-3 text-xs text-gray-400">
-        <span>Receita <span className="text-gray-600 font-medium">{fmtEur(revenue)}</span></span>
-        <span>Custo <span className="text-gray-600 font-medium">{fmtEur(cost)}</span></span>
-        <span className={`ml-auto font-semibold ${profit >= 0 ? "text-emerald-600" : "text-red-500"}`}>{fmt(margin, 0)}% margem</span>
-      </div>
+    <div className="border-b border-gray-50 last:border-0">
+      <button
+        type="button"
+        onClick={() => expandable && setOpen((v) => !v)}
+        className={`w-full text-left py-2.5 space-y-1.5 ${expandable ? "cursor-pointer" : "cursor-default"}`}
+      >
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-sm font-medium text-[#32373c] truncate flex items-center gap-1.5">
+            {expandable && (
+              <svg
+                className={`w-2.5 h-2.5 text-gray-300 shrink-0 transition-transform ${open ? "rotate-90" : ""}`}
+                viewBox="0 0 16 16" fill="currentColor"
+              >
+                <path d="M6 4l4 4-4 4V4z" />
+              </svg>
+            )}
+            <span className="truncate">
+              {label}{services != null && <span className="text-gray-400 font-normal"> · {services} serviços</span>}
+            </span>
+          </span>
+          <span className={`text-sm font-bold shrink-0 ${profit >= 0 ? "text-emerald-600" : "text-red-500"}`}>{fmtEur(profit)}</span>
+        </div>
+        <div className="flex items-center gap-3 text-xs text-gray-400">
+          <span>Receita <span className="text-gray-600 font-medium">{fmtEur(revenue)}</span></span>
+          <span>Custo <span className="text-gray-600 font-medium">{fmtEur(cost)}</span></span>
+          <span className={`ml-auto font-semibold ${profit >= 0 ? "text-emerald-600" : "text-red-500"}`}>{fmt(margin, 0)}% margem</span>
+        </div>
+      </button>
+      {open && expandable && (
+        <div className="pb-3 pl-4 space-y-1.5">
+          {tours!.map((t) => (
+            <div key={t.id} className="flex items-center justify-between gap-3 bg-gray-50 rounded-lg px-2.5 py-1.5 text-xs">
+              <div className="min-w-0">
+                <p className="text-gray-700 font-medium truncate">
+                  {t.date ? new Date(t.date).toLocaleDateString("pt-PT", { day: "2-digit", month: "short", year: "numeric" }) : "Sem data"}
+                  {t.clientName && <span className="text-gray-400 font-normal"> · {t.clientName}</span>}
+                </p>
+                <p className="text-gray-400 truncate">
+                  {t.guideName || "Sem guia"} · {t.numGuests} pax · {t.status}
+                </p>
+              </div>
+              <div className="text-right shrink-0">
+                <p className={`font-semibold ${t.profit >= 0 ? "text-emerald-600" : "text-red-500"}`}>{fmtEur(t.profit)}</p>
+                <p className="text-gray-400">{fmtEur(t.revenue)} − {fmtEur(t.cost)}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -594,18 +639,26 @@ export function AnalyticsDashboard({
     const realizedTours = pastCompleted.filter((t) => t.status !== "Confirmed" && t.status !== "Pending");
 
     // Profit by service — revenue & cost of transactions linked to each tour, grouped by service name
-    const serviceProfitMap: Record<string, { services: number; revenue: number; cost: number }> = {};
+    const serviceProfitMap: Record<string, { services: number; revenue: number; cost: number; tours: ServiceTourDetail[] }> = {};
     for (const t of realizedTours) {
       if (!t.id) continue;
       const name = t.serviceName || t.type || "Outro";
-      if (!serviceProfitMap[name]) serviceProfitMap[name] = { services: 0, revenue: 0, cost: 0 };
+      if (!serviceProfitMap[name]) serviceProfitMap[name] = { services: 0, revenue: 0, cost: 0, tours: [] };
+      const revenue = tourRevMap[t.id] ?? 0;
+      const cost    = tourCostMap[t.id] ?? 0;
       serviceProfitMap[name].services++;
-      serviceProfitMap[name].revenue += tourRevMap[t.id] ?? 0;
-      serviceProfitMap[name].cost    += tourCostMap[t.id] ?? 0;
+      serviceProfitMap[name].revenue += revenue;
+      serviceProfitMap[name].cost    += cost;
+      serviceProfitMap[name].tours.push({
+        id: t.id, date: t.date, clientName: t.clientName, guideName: t.guideName,
+        numGuests: t.numGuests, status: t.status || "Sem estado",
+        revenue, cost, profit: revenue - cost,
+      });
     }
     const serviceProfit = Object.entries(serviceProfitMap)
       .map(([name, d]) => ({
         name, ...d,
+        tours:   [...d.tours].sort((a, b) => (b.date ?? "").localeCompare(a.date ?? "")),
         profit:  d.revenue - d.cost,
         margin:  d.revenue > 0 ? ((d.revenue - d.cost) / d.revenue) * 100 : 0,
       }))
@@ -1088,6 +1141,7 @@ export function AnalyticsDashboard({
                     cost={s.cost}
                     profit={s.profit}
                     margin={s.margin}
+                    tours={s.tours}
                   />
                 ))}
               </div>
