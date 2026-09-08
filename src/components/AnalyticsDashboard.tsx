@@ -4,6 +4,10 @@ import { useState, useMemo } from "react";
 import Link from "next/link";
 import { AnalyticsDateRangePicker, type DateRange } from "@/components/AnalyticsDateRangePicker";
 import type { Tour, Transaction } from "@/lib/notion";
+import {
+  buildMonthlySeries, buildYoYSeries, buildMoMSeries, summarizeAll,
+  type DatedAmount, type GrowthPoint,
+} from "@/lib/financials";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -266,6 +270,79 @@ function StackedVBars({ data, max, barHeight = 88, formatValue }: {
   );
 }
 
+function fmtPct(v: number | null, decimals = 1) {
+  if (v === null) return "—";
+  const sign = v > 0 ? "+" : "";
+  return `${sign}${fmt(v * 100, decimals)}%`;
+}
+
+/** LineTrend — dependency-free SVG line chart for capped growth-% series.
+ *  `min`/`max` are fraction values (e.g. -1 / 3 = -100% / +300%) matching each
+ *  point's `capped` field. A dashed line marks 0%. X labels are thinned so
+ *  they stay readable with 40+ months of data on a phone screen. */
+function LineTrend({ series, min, max, capNote }: {
+  series: { label: string; color: string; points: GrowthPoint[] }[];
+  min: number; max: number; capNote?: string;
+}) {
+  const categories = series[0]?.points.map((p) => ({ key: p.key, label: p.label })) ?? [];
+  const n = categories.length;
+  if (n === 0) return <EmptyState />;
+
+  const H = 100, stepX = 10, W = Math.max(n * stepX, stepX);
+  const yFor = (v: number) => H - ((v - min) / (max - min)) * H;
+  const zeroY = yFor(0);
+  const labelEvery = Math.max(1, Math.ceil(n / 6));
+
+  return (
+    <div>
+      <div className="relative">
+        {/* y-axis labels */}
+        <div className="absolute -left-1 top-0 h-full flex flex-col justify-between text-[9px] text-gray-300 -translate-x-full pr-1.5">
+          <span>{fmtPct(max, 0)}</span>
+          <span>0%</span>
+          <span>{fmtPct(min, 0)}</span>
+        </div>
+        <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="w-full" style={{ height: 140 }}>
+          <line x1={0} y1={zeroY} x2={W} y2={zeroY} stroke="#E5E7EB" strokeWidth={0.6} strokeDasharray="2,2" />
+          {series.map(({ label, color, points }) => {
+            let d = "";
+            let drawing = false;
+            points.forEach((p, i) => {
+              const x = i * stepX + stepX / 2;
+              if (p.capped === null) { drawing = false; return; }
+              const y = yFor(p.capped);
+              d += `${drawing ? "L" : "M"}${x},${y} `;
+              drawing = true;
+            });
+            return <path key={label} d={d} fill="none" stroke={color} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" />;
+          })}
+        </svg>
+        <div className="flex text-[9px] text-gray-300 mt-1" style={{ marginLeft: 0 }}>
+          {categories.map(({ key, label }, i) => (
+            <span key={key} className="text-center" style={{ width: `${100 / n}%` }}>
+              {/* label is "jan 2025" etc. (year-inclusive, from financials.ts) — shorten to "jan/25" so
+                  it stays readable when several years of monthly data are on screen at once. */}
+              {i % labelEvery === 0 ? label.replace(/ (\d{2})\d{2}$/, "/$1") : ""}
+            </span>
+          ))}
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs mt-3">
+        {series.map(({ label, color, points }) => {
+          const latest = [...points].reverse().find((p) => p.value !== null);
+          return (
+            <span key={label} className="flex items-center gap-1.5 text-gray-500">
+              <span className="inline-block w-3 h-2.5 rounded-sm" style={{ backgroundColor: color }} />
+              {label} <span className="font-semibold text-gray-700">{fmtPct(latest?.value ?? null)}</span>
+            </span>
+          );
+        })}
+      </div>
+      {capNote && <p className="text-[11px] text-gray-300 mt-2">{capNote}</p>}
+    </div>
+  );
+}
+
 function IvaToggle({ value, onChange }: { value: "com" | "sem"; onChange: (v: "com" | "sem") => void }) {
   return (
     <div className="inline-flex rounded-lg bg-white/10 p-0.5 text-xs font-semibold shrink-0">
@@ -400,6 +477,7 @@ export function AnalyticsDashboard({
   });
   const [category, setCategory] = useState<Category>("resumo");
   const [ivaMode, setIvaMode] = useState<"com" | "sem">("com");
+  const [profitTypeFilter, setProfitTypeFilter] = useState<string>("all");
 
   // ── By year (always full history) ──────────────────────────────────────────
   const yearlyData = useMemo(() => {
@@ -622,13 +700,15 @@ export function AnalyticsDashboard({
       isEarning(t) && (!t.tourId || !cancelledTourIds.has(t.tourId));
     const expenses      = txns.filter((t) => !isEarning(t));
     const earnings      = txns.filter(isBillableEarning);
-    const totalExpenses = expenses.reduce((s, t) => s + t.totalCost, 0);
+    // totalCost is signed (negative for expenses) — abs() here, same as
+    // finCostMap/tourCostMap below, so totals/margin come out positive.
+    const totalExpenses = expenses.reduce((s, t) => s + Math.abs(t.totalCost), 0);
     const totalEarnings = earnings.reduce((s, t) => s + t.totalCost, 0);
     const expPerTour    = pastCompleted.length > 0 ? totalExpenses / pastCompleted.length : 0;
     const byMethod: Record<string, number> = {};
     for (const t of expenses) {
       const m = t.paymentMethod || "Outro";
-      byMethod[m] = (byMethod[m] ?? 0) + t.totalCost;
+      byMethod[m] = (byMethod[m] ?? 0) + Math.abs(t.totalCost);
     }
     const topMethods = Object.entries(byMethod).sort((a, b) => b[1] - a[1]);
     const maxMethod  = Math.max(...topMethods.map(([, v]) => v), 1);
@@ -697,12 +777,13 @@ export function AnalyticsDashboard({
 
     // Profit by service — revenue & cost of transactions linked to each tour, grouped by service name
     const serviceProfitMap: Record<string, {
-      services: number; revenue: number; cost: number; revenueNet: number; costNet: number; tours: ServiceTourDetail[];
+      type: string; services: number; revenue: number; cost: number; revenueNet: number; costNet: number; tours: ServiceTourDetail[];
     }> = {};
     for (const t of realizedTours) {
       if (!t.id) continue;
       const name = t.serviceName || t.type || "Outro";
-      if (!serviceProfitMap[name]) serviceProfitMap[name] = { services: 0, revenue: 0, cost: 0, revenueNet: 0, costNet: 0, tours: [] };
+      const svcType = t.serviceType || "Outro";
+      if (!serviceProfitMap[name]) serviceProfitMap[name] = { type: svcType, services: 0, revenue: 0, cost: 0, revenueNet: 0, costNet: 0, tours: [] };
       const revenue    = tourRevMap[t.id]    ?? 0;
       const cost       = tourCostMap[t.id]   ?? 0;
       const revenueNet = tourRevMapNet[t.id] ?? 0;
@@ -789,6 +870,48 @@ export function AnalyticsDashboard({
       rangeLbl,
     };
   }, [allTours, allTransactions, teamMap, clientNameMap, dateRange]);
+
+  // ── Trends (YTD/PY/YoY%/MTD/PM/MoM%) — always full history, independent of
+  // the date-range picker, mirroring yearlyData above. Uses the same
+  // earning/expense classification as `a` so both sections agree. ──────────
+  const trends = useMemo(() => {
+    const cancelledTourIds = new Set(
+      allTours.filter(isCancelled).map((t) => t.id).filter((id): id is string => !!id)
+    );
+    const isEarning = (t: Transaction) => t.supplier.startsWith("IN -") || t.txType === "Earning";
+    const isBillableEarning = (t: Transaction) =>
+      isEarning(t) && (!t.tourId || !cancelledTourIds.has(t.tourId));
+
+    const earningsEntries: DatedAmount[] = [];
+    const expenseEntries: DatedAmount[] = [];
+    for (const t of allTransactions) {
+      if (!t.date) continue;
+      if (isBillableEarning(t)) {
+        earningsEntries.push({ date: t.date, amount: t.totalCost });
+      } else if (!isEarning(t)) {
+        expenseEntries.push({ date: t.date, amount: Math.abs(t.totalCost) });
+      }
+    }
+
+    const monthly = buildMonthlySeries(earningsEntries, expenseEntries);
+    const summary = summarizeAll(earningsEntries, expenseEntries);
+    const yoy = {
+      income:   buildYoYSeries(monthly, "income"),
+      expenses: buildYoYSeries(monthly, "expenses"),
+      net:      buildYoYSeries(monthly, "net"),
+    };
+    const mom = {
+      income:   buildMoMSeries(monthly, "income"),
+      expenses: buildMoMSeries(monthly, "expenses"),
+      net:      buildMoMSeries(monthly, "net"),
+    };
+    return { monthly, summary, yoy, mom };
+  }, [allTours, allTransactions]);
+
+  const profitTypes = [...new Set(a.serviceProfit.map((s) => s.type))].sort((x, y) => x.localeCompare(y, "pt-PT"));
+  const filteredServiceProfit = profitTypeFilter === "all"
+    ? a.serviceProfit
+    : a.serviceProfit.filter((s) => s.type === profitTypeFilter);
 
   const periodLabel = (() => {
     const { start, end } = dateRange;
@@ -1150,6 +1273,59 @@ export function AnalyticsDashboard({
             </SectionCard>
           </div>
 
+          <SectionCard title="Tendências (YTD vs. Ano Anterior)" sub="Todo o histórico · independente do período selecionado acima">
+            <div className="grid sm:grid-cols-3 gap-3 mb-5">
+              {[
+                { label: "Receita YTD",              value: trends.summary.income.ytd,   yoy: trends.summary.income.yoy },
+                { label: "Despesas YTD",              value: trends.summary.expenses.ytd, yoy: trends.summary.expenses.yoy },
+                { label: "Resultado Líquido YTD",     value: trends.summary.net.ytd,      yoy: trends.summary.net.yoy },
+              ].map((k) => (
+                <div key={k.label} className="bg-gray-50 rounded-xl p-3.5">
+                  <p className="text-xs text-gray-400">{k.label}</p>
+                  <p className="text-xl font-bold text-[#32373c] mt-0.5">{fmtEur(k.value)}</p>
+                  <p className={`text-xs font-semibold mt-1 ${
+                    k.yoy === null ? "text-gray-300" : k.yoy >= 0 ? "text-emerald-600" : "text-red-500"
+                  }`}>
+                    {k.yoy === null ? "sem termo de comparação" : `${fmtPct(k.yoy)} vs. ano anterior`}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            {trends.monthly.length === 0 ? (
+              <EmptyState message="Sem histórico suficiente para calcular tendências" />
+            ) : (
+              <div className="space-y-6">
+                <div>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Crescimento homólogo (YoY %) por mês</p>
+                  <LineTrend
+                    min={-1}
+                    max={3}
+                    series={[
+                      { label: "Receita",            color: "#34d399", points: trends.yoy.income },
+                      { label: "Despesas",           color: "#fb923c", points: trends.yoy.expenses },
+                      { label: "Resultado líquido",  color: "#667470", points: trends.yoy.net },
+                    ]}
+                    capNote="Valores além de ±300% são limitados para legibilidade — alguns meses de baixo volume produzem oscilações extremas."
+                  />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Crescimento mensal (MoM %)</p>
+                  <LineTrend
+                    min={-1}
+                    max={2}
+                    series={[
+                      { label: "Receita",            color: "#34d399", points: trends.mom.income },
+                      { label: "Despesas",           color: "#fb923c", points: trends.mom.expenses },
+                      { label: "Resultado líquido",  color: "#667470", points: trends.mom.net },
+                    ]}
+                    capNote="Valores além de ±200% são limitados para legibilidade."
+                  />
+                </div>
+              </div>
+            )}
+          </SectionCard>
+
           {a.monthlyFinancials.length > 0 && (
             <>
               <SectionCard title="Faturação Por Mês" sub={periodLabel}>
@@ -1210,7 +1386,35 @@ export function AnalyticsDashboard({
               <EmptyState message="Sem receita ou custos ligados a serviços neste período" />
             ) : (
               <div>
-                {a.serviceProfit.map((s) => (
+                {profitTypes.length > 1 && (
+                  <div className="flex flex-wrap gap-1.5 mb-3">
+                    <button
+                      type="button"
+                      onClick={() => setProfitTypeFilter("all")}
+                      className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${
+                        profitTypeFilter === "all" ? "bg-[#667470] text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                      }`}
+                    >
+                      Todos
+                    </button>
+                    {profitTypes.map((t) => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => setProfitTypeFilter(t)}
+                        className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${
+                          profitTypeFilter === t ? "bg-[#667470] text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                        }`}
+                      >
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {filteredServiceProfit.length === 0 ? (
+                  <EmptyState message="Sem serviços deste tipo neste período" />
+                ) : (
+                filteredServiceProfit.map((s) => (
                   <ProfitRow
                     key={s.name}
                     label={s.name}
@@ -1220,7 +1424,8 @@ export function AnalyticsDashboard({
                     net={{ revenue: s.revenueNet, cost: s.costNet, profit: s.profitNet, margin: s.marginNet }}
                     tours={s.tours}
                   />
-                ))}
+                ))
+                )}
               </div>
             )}
           </SectionCard>
