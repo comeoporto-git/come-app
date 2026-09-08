@@ -337,6 +337,7 @@ function ProfitRow({ label, services, ivaMode, gross, net, tours }: {
             const tRevenue = ivaMode === "com" ? t.revenue : t.revenueNet;
             const tCost    = ivaMode === "com" ? t.cost    : t.costNet;
             const tProfit  = ivaMode === "com" ? t.profit  : t.profitNet;
+            const tMargin  = tRevenue > 0 ? (tProfit / tRevenue) * 100 : 0;
             return (
               <Link
                 key={t.id}
@@ -356,7 +357,10 @@ function ProfitRow({ label, services, ivaMode, gross, net, tours }: {
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
                   <div className="text-right">
-                    <p className={`font-semibold ${tProfit >= 0 ? "text-emerald-600" : "text-red-500"}`}>{fmtEur(tProfit)}</p>
+                    <p className={`font-semibold ${tProfit >= 0 ? "text-emerald-600" : "text-red-500"}`}>
+                      {fmtEur(tProfit)}
+                      {tRevenue > 0 && <span className="font-normal"> · {fmt(tMargin, 0)}%</span>}
+                    </p>
                     <p className="text-gray-400">{fmtEur(tRevenue)} − {fmtEur(tCost)}</p>
                   </div>
                   <ExternalLinkIcon />
