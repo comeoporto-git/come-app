@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import Link from "next/link";
 import { AnalyticsDateRangePicker, type DateRange } from "@/components/AnalyticsDateRangePicker";
 import type { Tour, Transaction } from "@/lib/notion";
 
@@ -28,7 +29,9 @@ function isBernardoGuide(name: string) {
 
 type ServiceTourDetail = {
   id: string; date: string | null; clientName: string; guideName: string;
-  numGuests: number; status: string; revenue: number; cost: number; profit: number;
+  numGuests: number; status: string;
+  revenue: number; cost: number; profit: number;
+  revenueNet: number; costNet: number; profitNet: number;
 };
 function monthKey(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
@@ -263,12 +266,42 @@ function StackedVBars({ data, max, barHeight = 88, formatValue }: {
   );
 }
 
-function ProfitRow({ label, services, revenue, cost, profit, margin, tours }: {
-  label: string; services?: number; revenue: number; cost: number; profit: number; margin: number;
+function IvaToggle({ value, onChange }: { value: "com" | "sem"; onChange: (v: "com" | "sem") => void }) {
+  return (
+    <div className="inline-flex rounded-lg bg-white/10 p-0.5 text-xs font-semibold shrink-0">
+      {(["com", "sem"] as const).map((mode) => (
+        <button
+          key={mode}
+          type="button"
+          onClick={() => onChange(mode)}
+          className={`px-2.5 py-1 rounded-md transition-colors ${
+            value === mode ? "bg-white text-[#32373c] shadow-sm" : "text-white/60 hover:text-white"
+          }`}
+        >
+          {mode === "com" ? "Com IVA" : "Sem IVA"}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function ExternalLinkIcon() {
+  return (
+    <svg className="w-3 h-3 text-gray-300 shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path d="M6 3H3v10h10V10M9 3h4v4M12.5 3.5L7 9" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function ProfitRow({ label, services, ivaMode, gross, net, tours }: {
+  label: string; services?: number; ivaMode: "com" | "sem";
+  gross: { revenue: number; cost: number; profit: number; margin: number };
+  net: { revenue: number; cost: number; profit: number; margin: number };
   tours?: ServiceTourDetail[];
 }) {
   const [open, setOpen] = useState(false);
   const expandable = !!tours && tours.length > 0;
+  const shown = ivaMode === "com" ? gross : net;
   return (
     <div className="border-b border-gray-50 last:border-0">
       <button
@@ -290,33 +323,47 @@ function ProfitRow({ label, services, revenue, cost, profit, margin, tours }: {
               {label}{services != null && <span className="text-gray-400 font-normal"> · {services} serviços</span>}
             </span>
           </span>
-          <span className={`text-sm font-bold shrink-0 ${profit >= 0 ? "text-emerald-600" : "text-red-500"}`}>{fmtEur(profit)}</span>
+          <span className={`text-sm font-bold shrink-0 ${shown.profit >= 0 ? "text-emerald-600" : "text-red-500"}`}>{fmtEur(shown.profit)}</span>
         </div>
         <div className="flex items-center gap-3 text-xs text-gray-400">
-          <span>Receita <span className="text-gray-600 font-medium">{fmtEur(revenue)}</span></span>
-          <span>Custo <span className="text-gray-600 font-medium">{fmtEur(cost)}</span></span>
-          <span className={`ml-auto font-semibold ${profit >= 0 ? "text-emerald-600" : "text-red-500"}`}>{fmt(margin, 0)}% margem</span>
+          <span>Receita <span className="text-gray-600 font-medium">{fmtEur(shown.revenue)}</span></span>
+          <span>Custo <span className="text-gray-600 font-medium">{fmtEur(shown.cost)}</span></span>
+          <span className={`ml-auto font-semibold ${shown.profit >= 0 ? "text-emerald-600" : "text-red-500"}`}>{fmt(shown.margin, 0)}% margem</span>
         </div>
       </button>
       {open && expandable && (
         <div className="pb-3 pl-4 space-y-1.5">
-          {tours!.map((t) => (
-            <div key={t.id} className="flex items-center justify-between gap-3 bg-gray-50 rounded-lg px-2.5 py-1.5 text-xs">
-              <div className="min-w-0">
-                <p className="text-gray-700 font-medium truncate">
-                  {t.date ? new Date(t.date).toLocaleDateString("pt-PT", { day: "2-digit", month: "short", year: "numeric" }) : "Sem data"}
-                  {t.clientName && <span className="text-gray-400 font-normal"> · {t.clientName}</span>}
-                </p>
-                <p className="text-gray-400 truncate">
-                  {t.guideName || "Sem guia"} · {t.numGuests} pax · {t.status}
-                </p>
-              </div>
-              <div className="text-right shrink-0">
-                <p className={`font-semibold ${t.profit >= 0 ? "text-emerald-600" : "text-red-500"}`}>{fmtEur(t.profit)}</p>
-                <p className="text-gray-400">{fmtEur(t.revenue)} − {fmtEur(t.cost)}</p>
-              </div>
-            </div>
-          ))}
+          {tours!.map((t) => {
+            const tRevenue = ivaMode === "com" ? t.revenue : t.revenueNet;
+            const tCost    = ivaMode === "com" ? t.cost    : t.costNet;
+            const tProfit  = ivaMode === "com" ? t.profit  : t.profitNet;
+            return (
+              <Link
+                key={t.id}
+                href={`/guide/tours/${t.id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-between gap-3 bg-gray-50 hover:bg-gray-100 rounded-lg px-2.5 py-1.5 text-xs transition-colors"
+              >
+                <div className="min-w-0">
+                  <p className="text-gray-700 font-medium truncate">
+                    {t.date ? new Date(t.date).toLocaleDateString("pt-PT", { day: "2-digit", month: "short", year: "numeric" }) : "Sem data"}
+                    {t.clientName && <span className="text-gray-400 font-normal"> · {t.clientName}</span>}
+                  </p>
+                  <p className="text-gray-400 truncate">
+                    {t.guideName || "Sem guia"} · {t.numGuests} pax · {t.status}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <div className="text-right">
+                    <p className={`font-semibold ${tProfit >= 0 ? "text-emerald-600" : "text-red-500"}`}>{fmtEur(tProfit)}</p>
+                    <p className="text-gray-400">{fmtEur(tRevenue)} − {fmtEur(tCost)}</p>
+                  </div>
+                  <ExternalLinkIcon />
+                </div>
+              </Link>
+            );
+          })}
         </div>
       )}
     </div>
@@ -348,6 +395,7 @@ export function AnalyticsDashboard({
     };
   });
   const [category, setCategory] = useState<Category>("resumo");
+  const [ivaMode, setIvaMode] = useState<"com" | "sem">("com");
 
   // ── By year (always full history) ──────────────────────────────────────────
   const yearlyData = useMemo(() => {
@@ -623,14 +671,19 @@ export function AnalyticsDashboard({
     const profitFmtValues = monthlyFinancials.map((d) => fmtEur(d.profit));
 
     // Per-tour revenue & cost (for service profitability + guide cost comparison)
+    // "Net" figures use taxFree (valor sem IVA) instead of the tax-inclusive totalCost
     const tourRevMap: Record<string, number> = {};
     const tourCostMap: Record<string, number> = {};
+    const tourRevMapNet: Record<string, number> = {};
+    const tourCostMapNet: Record<string, number> = {};
     for (const t of txns) {
       if (!t.tourId) continue;
       if (isBillableEarning(t)) {
-        tourRevMap[t.tourId] = (tourRevMap[t.tourId] ?? 0) + t.totalCost;
+        tourRevMap[t.tourId]    = (tourRevMap[t.tourId]    ?? 0) + t.totalCost;
+        tourRevMapNet[t.tourId] = (tourRevMapNet[t.tourId] ?? 0) + t.taxFree;
       } else if (!isEarning(t)) {
-        tourCostMap[t.tourId] = (tourCostMap[t.tourId] ?? 0) + Math.abs(t.totalCost);
+        tourCostMap[t.tourId]    = (tourCostMap[t.tourId]    ?? 0) + Math.abs(t.totalCost);
+        tourCostMapNet[t.tourId] = (tourCostMapNet[t.tourId] ?? 0) + Math.abs(t.taxFree);
       }
     }
 
@@ -639,54 +692,70 @@ export function AnalyticsDashboard({
     const realizedTours = pastCompleted.filter((t) => t.status !== "Confirmed" && t.status !== "Pending");
 
     // Profit by service — revenue & cost of transactions linked to each tour, grouped by service name
-    const serviceProfitMap: Record<string, { services: number; revenue: number; cost: number; tours: ServiceTourDetail[] }> = {};
+    const serviceProfitMap: Record<string, {
+      services: number; revenue: number; cost: number; revenueNet: number; costNet: number; tours: ServiceTourDetail[];
+    }> = {};
     for (const t of realizedTours) {
       if (!t.id) continue;
       const name = t.serviceName || t.type || "Outro";
-      if (!serviceProfitMap[name]) serviceProfitMap[name] = { services: 0, revenue: 0, cost: 0, tours: [] };
-      const revenue = tourRevMap[t.id] ?? 0;
-      const cost    = tourCostMap[t.id] ?? 0;
+      if (!serviceProfitMap[name]) serviceProfitMap[name] = { services: 0, revenue: 0, cost: 0, revenueNet: 0, costNet: 0, tours: [] };
+      const revenue    = tourRevMap[t.id]    ?? 0;
+      const cost       = tourCostMap[t.id]   ?? 0;
+      const revenueNet = tourRevMapNet[t.id] ?? 0;
+      const costNet    = tourCostMapNet[t.id] ?? 0;
       serviceProfitMap[name].services++;
-      serviceProfitMap[name].revenue += revenue;
-      serviceProfitMap[name].cost    += cost;
+      serviceProfitMap[name].revenue    += revenue;
+      serviceProfitMap[name].cost       += cost;
+      serviceProfitMap[name].revenueNet += revenueNet;
+      serviceProfitMap[name].costNet    += costNet;
       serviceProfitMap[name].tours.push({
         id: t.id, date: t.date, clientName: t.clientName, guideName: t.guideName,
         numGuests: t.numGuests, status: t.status || "Sem estado",
         revenue, cost, profit: revenue - cost,
+        revenueNet, costNet, profitNet: revenueNet - costNet,
       });
     }
     const serviceProfit = Object.entries(serviceProfitMap)
       .map(([name, d]) => ({
         name, ...d,
-        tours:   [...d.tours].sort((a, b) => (b.date ?? "").localeCompare(a.date ?? "")),
-        profit:  d.revenue - d.cost,
-        margin:  d.revenue > 0 ? ((d.revenue - d.cost) / d.revenue) * 100 : 0,
+        tours:     [...d.tours].sort((a, b) => (b.date ?? "").localeCompare(a.date ?? "")),
+        profit:    d.revenue - d.cost,
+        margin:    d.revenue > 0 ? ((d.revenue - d.cost) / d.revenue) * 100 : 0,
+        profitNet: d.revenueNet - d.costNet,
+        marginNet: d.revenueNet > 0 ? ((d.revenueNet - d.costNet) / d.revenueNet) * 100 : 0,
       }))
       .sort((a, b) => b.revenue - a.revenue);
     const hasServiceProfit = serviceProfit.some((d) => d.revenue > 0 || d.cost > 0);
 
     // Guide cost comparison — Bernardo (owner/Super Guide) vs other guides
-    const guideGroupsRaw: Record<string, { services: number; revenue: number; cost: number }> = {
-      "Bernardo": { services: 0, revenue: 0, cost: 0 },
-      "Outros Guias": { services: 0, revenue: 0, cost: 0 },
+    const guideGroupsRaw: Record<string, { services: number; revenue: number; cost: number; revenueNet: number; costNet: number }> = {
+      "Bernardo": { services: 0, revenue: 0, cost: 0, revenueNet: 0, costNet: 0 },
+      "Outros Guias": { services: 0, revenue: 0, cost: 0, revenueNet: 0, costNet: 0 },
     };
     for (const t of realizedTours) {
       if (!t.id || !t.guideName) continue;
       const group = isBernardoGuide(t.guideName) ? "Bernardo" : "Outros Guias";
       guideGroupsRaw[group].services++;
-      guideGroupsRaw[group].revenue += tourRevMap[t.id] ?? 0;
-      guideGroupsRaw[group].cost    += tourCostMap[t.id] ?? 0;
+      guideGroupsRaw[group].revenue    += tourRevMap[t.id]    ?? 0;
+      guideGroupsRaw[group].cost       += tourCostMap[t.id]   ?? 0;
+      guideGroupsRaw[group].revenueNet += tourRevMapNet[t.id] ?? 0;
+      guideGroupsRaw[group].costNet    += tourCostMapNet[t.id] ?? 0;
     }
     const guideCostComparison = Object.entries(guideGroupsRaw)
       .map(([label, d]) => ({
         label, ...d,
-        profit:     d.revenue - d.cost,
-        avgCost:    d.services > 0 ? d.cost / d.services : 0,
-        avgRevenue: d.services > 0 ? d.revenue / d.services : 0,
-        margin:     d.revenue > 0 ? ((d.revenue - d.cost) / d.revenue) * 100 : 0,
+        profit:        d.revenue - d.cost,
+        avgCost:       d.services > 0 ? d.cost / d.services : 0,
+        avgRevenue:    d.services > 0 ? d.revenue / d.services : 0,
+        margin:        d.revenue > 0 ? ((d.revenue - d.cost) / d.revenue) * 100 : 0,
+        profitNet:     d.revenueNet - d.costNet,
+        avgCostNet:    d.services > 0 ? d.costNet / d.services : 0,
+        avgRevenueNet: d.services > 0 ? d.revenueNet / d.services : 0,
+        marginNet:     d.revenueNet > 0 ? ((d.revenueNet - d.costNet) / d.revenueNet) * 100 : 0,
       }))
       .filter((g) => g.services > 0);
-    const maxGuideAvgCost = Math.max(...guideCostComparison.map((g) => g.avgCost), 1);
+    const maxGuideAvgCost    = Math.max(...guideCostComparison.map((g) => g.avgCost), 1);
+    const maxGuideAvgCostNet = Math.max(...guideCostComparison.map((g) => g.avgCostNet), 1);
 
     // Range label
     const fmtDate = (d: Date) => d.toLocaleDateString("pt-PT", { day: "numeric", month: "short", year: "numeric" });
@@ -712,7 +781,7 @@ export function AnalyticsDashboard({
       totalExpenses, totalEarnings, expPerTour, topMethods, maxMethod,
       monthlyFinancials, maxMonthlyRev, maxMonthlyCost, maxMonthlyProfit, profitColors, profitFmtValues,
       serviceProfit, hasServiceProfit,
-      guideCostComparison, maxGuideAvgCost,
+      guideCostComparison, maxGuideAvgCost, maxGuideAvgCostNet,
       rangeLbl,
     };
   }, [allTours, allTransactions, teamMap, clientNameMap, dateRange]);
@@ -1127,6 +1196,11 @@ export function AnalyticsDashboard({
             </>
           )}
 
+          <div className="flex items-center justify-between px-1">
+            <p className="text-xs text-white/40 font-semibold uppercase tracking-wide">Análise de lucro</p>
+            <IvaToggle value={ivaMode} onChange={setIvaMode} />
+          </div>
+
           <SectionCard title="Lucro por Serviço" sub={`Receita e custo de transações ligadas a cada serviço · ${periodLabel}`}>
             {!a.hasServiceProfit ? (
               <EmptyState message="Sem receita ou custos ligados a serviços neste período" />
@@ -1137,10 +1211,9 @@ export function AnalyticsDashboard({
                     key={s.name}
                     label={s.name}
                     services={s.services}
-                    revenue={s.revenue}
-                    cost={s.cost}
-                    profit={s.profit}
-                    margin={s.margin}
+                    ivaMode={ivaMode}
+                    gross={{ revenue: s.revenue, cost: s.cost, profit: s.profit, margin: s.margin }}
+                    net={{ revenue: s.revenueNet, cost: s.costNet, profit: s.profitNet, margin: s.marginNet }}
                     tours={s.tours}
                   />
                 ))}
@@ -1157,28 +1230,34 @@ export function AnalyticsDashboard({
             ) : (
               <div className="space-y-4">
                 <div className="grid sm:grid-cols-2 gap-3">
-                  {a.guideCostComparison.map((g) => (
-                    <div key={g.label} className="bg-gray-50 rounded-xl p-3.5 space-y-2">
-                      <p className="text-xs font-semibold text-[#667470] uppercase tracking-wide">{g.label}</p>
-                      <p className="text-xs text-gray-400">{fmt(g.services)} serviços</p>
-                      <div className="grid grid-cols-2 gap-2 pt-1">
-                        <div>
-                          <p className="text-[10px] text-gray-400 uppercase">Custo médio</p>
-                          <p className="text-base font-bold text-[#32373c]">{fmtEur(g.avgCost)}</p>
+                  {a.guideCostComparison.map((g) => {
+                    const avgCost    = ivaMode === "com" ? g.avgCost    : g.avgCostNet;
+                    const avgRevenue = ivaMode === "com" ? g.avgRevenue : g.avgRevenueNet;
+                    const profit     = ivaMode === "com" ? g.profit     : g.profitNet;
+                    const margin     = ivaMode === "com" ? g.margin     : g.marginNet;
+                    return (
+                      <div key={g.label} className="bg-gray-50 rounded-xl p-3.5 space-y-2">
+                        <p className="text-xs font-semibold text-[#667470] uppercase tracking-wide">{g.label}</p>
+                        <p className="text-xs text-gray-400">{fmt(g.services)} serviços</p>
+                        <div className="grid grid-cols-2 gap-2 pt-1">
+                          <div>
+                            <p className="text-[10px] text-gray-400 uppercase">Custo médio</p>
+                            <p className="text-base font-bold text-[#32373c]">{fmtEur(avgCost)}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-gray-400 uppercase">Receita média</p>
+                            <p className="text-base font-bold text-[#32373c]">{fmtEur(avgRevenue)}</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-[10px] text-gray-400 uppercase">Receita média</p>
-                          <p className="text-base font-bold text-[#32373c]">{fmtEur(g.avgRevenue)}</p>
+                        <div className="flex items-center justify-between pt-1 border-t border-gray-100">
+                          <span className="text-xs text-gray-400">Lucro total</span>
+                          <span className={`text-sm font-bold ${profit >= 0 ? "text-emerald-600" : "text-red-500"}`}>
+                            {fmtEur(profit)} · {fmt(margin, 0)}%
+                          </span>
                         </div>
                       </div>
-                      <div className="flex items-center justify-between pt-1 border-t border-gray-100">
-                        <span className="text-xs text-gray-400">Lucro total</span>
-                        <span className={`text-sm font-bold ${g.profit >= 0 ? "text-emerald-600" : "text-red-500"}`}>
-                          {fmtEur(g.profit)} · {fmt(g.margin, 0)}%
-                        </span>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
                 <div className="space-y-2.5">
                   <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Custo médio por serviço</p>
@@ -1186,8 +1265,8 @@ export function AnalyticsDashboard({
                     <HBar
                       key={g.label}
                       label={g.label}
-                      value={g.avgCost}
-                      max={a.maxGuideAvgCost}
+                      value={ivaMode === "com" ? g.avgCost : g.avgCostNet}
+                      max={ivaMode === "com" ? a.maxGuideAvgCost : a.maxGuideAvgCostNet}
                       color={g.label === "Bernardo" ? "bg-[#667470]" : "bg-orange-400"}
                       labelWidth="w-24 sm:w-32"
                       formatValue={fmtEur}
