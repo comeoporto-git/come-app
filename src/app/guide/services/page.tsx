@@ -1,11 +1,7 @@
 import { auth } from "@/lib/auth";
 import {
-  getToursForGuide,
-  getPastToursForGuide,
-  getToursForChef,
-  getPastToursForChef,
-  getToursForDriver,
-  getPastToursForDriver,
+  getToursForPerson,
+  getPastToursForPerson,
   getAllUpcomingTours,
   getAllPastTours,
   getTeamMembers,
@@ -44,20 +40,16 @@ export default async function GuideDashboard() {
   const role = session.user.role;
   const isSuperGuide = role === "Super Guide";
   const isChef = role === "Chef";
-  const isDriver = role === "Driver";
   const email = session.user?.email ?? "";
   const currentNotionId = session.user?.notionId ?? "";
 
-  // Super Guide sees all tours; Chef sees chef-assigned; Driver sees driver-assigned; Guide sees own tours
+  // Super Guide sees every tour; everyone else sees every tour they're
+  // assigned to in ANY role slot (guide, chef, driver, logistics) — a
+  // person's `role` only picks their default view, not what they can be
+  // booked as.
   const [tours, pastTours, teamMembers] = await Promise.all([
-    isSuperGuide ? getAllUpcomingTours()    :
-    isChef       ? getToursForChef(email)   :
-    isDriver     ? getToursForDriver(email) :
-                   getToursForGuide(email),
-    isSuperGuide ? getAllPastTours()            :
-    isChef       ? getPastToursForChef(email)   :
-    isDriver     ? getPastToursForDriver(email) :
-                   getPastToursForGuide(email),
+    isSuperGuide ? getAllUpcomingTours()  : getToursForPerson(email),
+    isSuperGuide ? getAllPastTours()      : getPastToursForPerson(email),
     isSuperGuide ? getTeamMembers() : Promise.resolve([]),
   ]);
 
