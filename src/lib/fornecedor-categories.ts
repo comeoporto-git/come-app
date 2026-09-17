@@ -22,6 +22,8 @@ export const CATEGORIA_COLORS: Record<string, string> = {
   "Transfer":      "bg-stone-100 text-stone-700",
 };
 
+export const CATEGORIA_NAMES = Object.keys(CATEGORIA_COLORS).sort((a, b) => a.localeCompare(b));
+
 const FALLBACK_COLOR = "bg-gray-100 text-gray-500";
 
 export function categoriaBadgeClass(categoria: string | null | undefined): string {
