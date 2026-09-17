@@ -22,7 +22,7 @@ export default async function FornecedoresPage() {
 
   return (
     <div className="min-h-screen bg-[#667470] text-[#32373c]">
-      <main className="max-w-4xl mx-auto px-4 py-8 space-y-4">
+      <main className="max-w-6xl mx-auto px-4 py-8 space-y-4">
         {/* Header card */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-5 py-4 flex items-center justify-between">
           <div>
