@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
+import { categoriaBadgeClass } from "@/lib/fornecedor-categories";
 
 type FornecedorRow = {
   id: string;
@@ -13,12 +14,29 @@ type FornecedorRow = {
   email: string | null;
 };
 
+const UNCATEGORIZED = "__uncategorized__";
+
 export function FornecedoresList({ items }: { items: FornecedorRow[] }) {
   const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
 
-  const filtered = search.trim()
-    ? items.filter((f) => f.name.toLowerCase().includes(search.trim().toLowerCase()))
-    : items;
+  const categories = useMemo(() => {
+    const set = new Set<string>();
+    let hasUncategorized = false;
+    for (const f of items) {
+      if (f.categoria) set.add(f.categoria);
+      else hasUncategorized = true;
+    }
+    const sorted = Array.from(set).sort((a, b) => a.localeCompare(b));
+    return hasUncategorized ? [...sorted, UNCATEGORIZED] : sorted;
+  }, [items]);
+
+  const filtered = items.filter((f) => {
+    const matchesSearch = !search.trim() || f.name.toLowerCase().includes(search.trim().toLowerCase());
+    const matchesCategory =
+      !categoryFilter || (categoryFilter === UNCATEGORIZED ? !f.categoria : f.categoria === categoryFilter);
+    return matchesSearch && matchesCategory;
+  });
 
   return (
     <>
@@ -29,6 +47,42 @@ export function FornecedoresList({ items }: { items: FornecedorRow[] }) {
         onChange={(e) => setSearch(e.target.value)}
         className="w-full bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-2.5 text-sm text-[#32373c] placeholder-gray-400 focus:outline-none focus:border-[#667470]/40"
       />
+
+      {categories.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          <button
+            type="button"
+            onClick={() => setCategoryFilter("")}
+            className={`text-xs px-2.5 py-1 rounded-full font-medium border transition-colors ${
+              categoryFilter === ""
+                ? "bg-[#667470] text-white border-[#667470]"
+                : "bg-white text-gray-500 border-gray-200 hover:border-gray-300"
+            }`}
+          >
+            Todas
+          </button>
+          {categories.map((c) => {
+            const isUncategorized = c === UNCATEGORIZED;
+            const label = isUncategorized ? "Sem categoria" : c;
+            const active = categoryFilter === c;
+            const colorClass = isUncategorized ? "bg-gray-100 text-gray-500" : categoriaBadgeClass(c);
+            return (
+              <button
+                key={c}
+                type="button"
+                onClick={() => setCategoryFilter(active ? "" : c)}
+                className={`text-xs px-2.5 py-1 rounded-full font-medium border transition-colors ${
+                  active
+                    ? `${colorClass} border-transparent ring-2 ring-offset-1 ring-[#667470]/30`
+                    : "bg-white text-gray-500 border-gray-200 hover:border-gray-300"
+                }`}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       <section className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         {filtered.length === 0 ? (
@@ -50,7 +104,9 @@ export function FornecedoresList({ items }: { items: FornecedorRow[] }) {
                     <div className="flex items-center gap-2">
                       <p className="text-sm font-medium text-[#32373c] truncate">{f.name}</p>
                       {f.categoria && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#667470]/10 text-[#667470] font-medium flex-shrink-0">
+                        <span
+                          className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium flex-shrink-0 ${categoriaBadgeClass(f.categoria)}`}
+                        >
                           {f.categoria}
                         </span>
                       )}
