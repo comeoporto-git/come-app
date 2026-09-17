@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { categoriaBadgeClass } from "@/lib/fornecedor-categories";
+import { categoriaBadgeClass, CATEGORIA_NAMES } from "@/lib/fornecedor-categories";
+import { updateFornecedorAction } from "@/actions/transactions";
 
 type FornecedorRow = {
   id: string;
@@ -17,26 +18,38 @@ type FornecedorRow = {
 const UNCATEGORIZED = "__uncategorized__";
 
 export function FornecedoresList({ items }: { items: FornecedorRow[] }) {
+  const [rows, setRows] = useState(items);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
+  const [savingId, setSavingId] = useState<string | null>(null);
 
   const categories = useMemo(() => {
     const set = new Set<string>();
     let hasUncategorized = false;
-    for (const f of items) {
+    for (const f of rows) {
       if (f.categoria) set.add(f.categoria);
       else hasUncategorized = true;
     }
     const sorted = Array.from(set).sort((a, b) => a.localeCompare(b));
     return hasUncategorized ? [...sorted, UNCATEGORIZED] : sorted;
-  }, [items]);
+  }, [rows]);
 
-  const filtered = items.filter((f) => {
+  const filtered = rows.filter((f) => {
     const matchesSearch = !search.trim() || f.name.toLowerCase().includes(search.trim().toLowerCase());
     const matchesCategory =
       !categoryFilter || (categoryFilter === UNCATEGORIZED ? !f.categoria : f.categoria === categoryFilter);
     return matchesSearch && matchesCategory;
   });
+
+  async function handleCategoryChange(id: string, newCategoria: string) {
+    const previous = rows;
+    const value = newCategoria || null;
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, categoria: value } : r)));
+    setSavingId(id);
+    const res = await updateFornecedorAction(id, { categoria: newCategoria });
+    setSavingId(null);
+    if (res.error) setRows(previous);
+  }
 
   return (
     <>
@@ -87,42 +100,46 @@ export function FornecedoresList({ items }: { items: FornecedorRow[] }) {
       <section className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         {filtered.length === 0 ? (
           <div className="px-5 py-10 text-center text-gray-400 text-sm">
-            {items.length === 0 ? "Sem fornecedores registados" : "Nenhum fornecedor encontrado"}
+            {rows.length === 0 ? "Sem fornecedores registados" : "Nenhum fornecedor encontrado"}
           </div>
         ) : (
           <ul className="divide-y divide-gray-50">
             {filtered.map((f) => (
-              <li key={f.id}>
-                <Link
-                  href={`/admin/fornecedores/${f.id}`}
-                  className="flex items-center gap-3 px-5 py-3.5 hover:bg-gray-50 transition-colors"
-                >
+              <li key={f.id} className="flex items-center gap-3 px-5 py-3.5 hover:bg-gray-50 transition-colors">
+                <Link href={`/admin/fornecedores/${f.id}`} className="flex items-center gap-3 flex-1 min-w-0">
                   <div className="w-8 h-8 rounded-full bg-[#667470]/10 flex items-center justify-center text-xs font-bold text-[#667470] flex-shrink-0">
                     {f.name.charAt(0).toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium text-[#32373c] truncate">{f.name}</p>
-                      {f.categoria && (
-                        <span
-                          className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium flex-shrink-0 ${categoriaBadgeClass(f.categoria)}`}
-                        >
-                          {f.categoria}
-                        </span>
-                      )}
-                    </div>
+                    <p className="text-sm font-medium text-[#32373c] truncate">{f.name}</p>
                     <p className="text-xs text-gray-400 mt-0.5 truncate">
                       {f.count} {f.count === 1 ? "transação" : "transações"}
                       {f.contact && ` · ${f.contact}`}
                       {f.email && ` · ${f.email}`}
                     </p>
                   </div>
-                  {f.count > 0 && (
-                    <p className="text-sm font-semibold text-[#32373c] flex-shrink-0">
-                      {f.total.toFixed(2)} €
-                    </p>
+                </Link>
+
+                <select
+                  value={f.categoria ?? ""}
+                  onChange={(e) => handleCategoryChange(f.id, e.target.value)}
+                  disabled={savingId === f.id}
+                  className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium flex-shrink-0 border-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#667470]/30 disabled:opacity-50 ${categoriaBadgeClass(f.categoria)}`}
+                >
+                  <option value="">Sem categoria</option>
+                  {f.categoria && !CATEGORIA_NAMES.includes(f.categoria) && (
+                    <option value={f.categoria}>{f.categoria}</option>
                   )}
-                  <span className="text-gray-300 flex-shrink-0">→</span>
+                  {CATEGORIA_NAMES.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+
+                <Link href={`/admin/fornecedores/${f.id}`} className="flex items-center gap-2 flex-shrink-0">
+                  {f.count > 0 && (
+                    <p className="text-sm font-semibold text-[#32373c]">{f.total.toFixed(2)} €</p>
+                  )}
+                  <span className="text-gray-300">→</span>
                 </Link>
               </li>
             ))}
