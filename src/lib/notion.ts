@@ -1163,7 +1163,10 @@ export async function setComprovativoUrl(pageId: string, url: string, transferDa
 
 export const getFornecedores = unstable_cache(
   async (): Promise<Fornecedor[]> => {
-    const { data } = await supabase.from("fornecedores").select("id, name, iban").order("name");
+    const { data } = await supabase
+      .from("fornecedores")
+      .select("id, name, iban, categoria, email, contact, contribuinte")
+      .order("name");
     return (data ?? []).filter((f) => f.name);
   },
   ["fornecedores"],

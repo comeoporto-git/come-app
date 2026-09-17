@@ -16,13 +16,21 @@ export default async function FornecedoresPage() {
   const items = fornecedores
     .map((f) => {
       const s = stats.get(f.id) ?? { count: 0, total: 0 };
-      return { id: f.id, name: f.name, count: s.count, total: Math.abs(s.total) };
+      return {
+        id: f.id,
+        name: f.name,
+        count: s.count,
+        total: Math.abs(s.total),
+        categoria: f.categoria ?? null,
+        contact: f.contact ?? null,
+        email: f.email ?? null,
+      };
     })
     .sort((a, b) => b.total - a.total);
 
   return (
     <div className="min-h-screen bg-[#667470] text-[#32373c]">
-      <main className="max-w-6xl mx-auto px-4 py-8 space-y-4">
+      <main className="max-w-4xl mx-auto px-4 py-8 space-y-4">
         {/* Header card */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-5 py-4 flex items-center justify-between">
           <div>
@@ -35,7 +43,7 @@ export default async function FornecedoresPage() {
           </div>
         </div>
 
-        <FornecedoresList items={items} fornecedores={fornecedores} />
+        <FornecedoresList items={items} />
       </main>
     </div>
   );
