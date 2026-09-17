@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import type { Fornecedor, Transaction } from "@/lib/notion";
+import { getFornecedorDetailAction } from "@/actions/transactions";
+import { FornecedorDetailClient } from "@/components/fornecedores/FornecedorDetailClient";
 
 type FornecedorRow = {
   id: string;
@@ -10,12 +12,44 @@ type FornecedorRow = {
   total: number;
 };
 
-export function FornecedoresList({ items }: { items: FornecedorRow[] }) {
+type Detail = { fornecedor: Fornecedor; transactions: Transaction[] };
+
+export function FornecedoresList({
+  items,
+  fornecedores,
+}: {
+  items: FornecedorRow[];
+  fornecedores: Fornecedor[];
+}) {
   const [search, setSearch] = useState("");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [detail, setDetail] = useState<Detail | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const filtered = search.trim()
     ? items.filter((f) => f.name.toLowerCase().includes(search.trim().toLowerCase()))
     : items;
+
+  function close() {
+    setSelectedId(null);
+    setDetail(null);
+    setError("");
+  }
+
+  async function open(id: string) {
+    setSelectedId(id);
+    setDetail(null);
+    setError("");
+    setLoading(true);
+    const res = await getFornecedorDetailAction(id);
+    setLoading(false);
+    if ("error" in res) {
+      setError(res.error);
+      return;
+    }
+    setDetail(res);
+  }
 
   return (
     <>
@@ -36,9 +70,10 @@ export function FornecedoresList({ items }: { items: FornecedorRow[] }) {
           <ul className="divide-y divide-gray-50">
             {filtered.map((f) => (
               <li key={f.id}>
-                <Link
-                  href={`/admin/fornecedores/${f.id}`}
-                  className="flex items-center gap-3 px-5 py-3.5 hover:bg-gray-50 transition-colors"
+                <button
+                  type="button"
+                  onClick={() => open(f.id)}
+                  className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-gray-50 transition-colors text-left"
                 >
                   <div className="w-8 h-8 rounded-full bg-[#667470]/10 flex items-center justify-center text-xs font-bold text-[#667470] flex-shrink-0">
                     {f.name.charAt(0).toUpperCase()}
@@ -55,12 +90,51 @@ export function FornecedoresList({ items }: { items: FornecedorRow[] }) {
                     </p>
                   )}
                   <span className="text-gray-300 flex-shrink-0">→</span>
-                </Link>
+                </button>
               </li>
             ))}
           </ul>
         )}
       </section>
+
+      {selectedId && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center sm:justify-center bg-black/50"
+          onClick={close}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full sm:max-w-xl bg-[#667470] rounded-t-3xl sm:rounded-3xl max-h-[92vh] overflow-y-auto"
+          >
+            <div className="flex justify-center pt-3 pb-1 sm:hidden">
+              <div className="w-10 h-1 rounded-full bg-white/30" />
+            </div>
+
+            <div className="px-4 pb-8 pt-2 sm:p-4 space-y-4">
+              {loading && (
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-5 py-10 text-center text-gray-400 text-sm">
+                  A carregar…
+                </div>
+              )}
+
+              {error && (
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-5 py-4 text-sm text-red-600">
+                  {error}
+                </div>
+              )}
+
+              {detail && (
+                <FornecedorDetailClient
+                  fornecedor={detail.fornecedor}
+                  transactions={detail.transactions}
+                  fornecedores={fornecedores}
+                  onClose={close}
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

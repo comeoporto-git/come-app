@@ -14,6 +14,8 @@ import {
   setSocioTransferenciaFeita,
   setComprovativoUrl,
   getFornecedores,
+  getFornecedorById,
+  getTransactionsByFornecedor,
   supabase,
 } from "@/lib/notion";
 import type { Transaction, Fornecedor } from "@/lib/notion";
@@ -87,6 +89,19 @@ export async function createFornecedorAction(name: string): Promise<Fornecedor> 
   updateTag("fornecedores");
   revalidatePath("/admin/fornecedores");
   return fornecedor;
+}
+
+export async function getFornecedorDetailAction(
+  id: string,
+): Promise<{ fornecedor: Fornecedor; transactions: Transaction[] } | { error: string }> {
+  const session = await requireAuth();
+  if (session.user.role !== "Admin") return { error: "Forbidden" };
+  const [fornecedor, transactions] = await Promise.all([
+    getFornecedorById(id),
+    getTransactionsByFornecedor(id),
+  ]);
+  if (!fornecedor) return { error: "Fornecedor não encontrado" };
+  return { fornecedor, transactions };
 }
 
 export async function updateFornecedorAction(
