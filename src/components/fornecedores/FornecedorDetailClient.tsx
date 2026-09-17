@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { Transaction, Fornecedor } from "@/lib/notion";
 import { updateFornecedorAction } from "@/actions/transactions";
 import { EditExpenseModal } from "@/components/EditExpenseModal";
+import { CATEGORIA_NAMES } from "@/lib/fornecedor-categories";
 
 const STATUS_COLORS: Record<string, string> = {
   "Paid":             "bg-green-100 text-green-700",
@@ -89,9 +90,31 @@ export function FornecedorDetailClient({
             ) : (
               <form onSubmit={handleSave} className="mt-3 space-y-2 max-w-md">
                 <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[10px] text-gray-400 mb-0.5">Nome</label>
+                    <input
+                      name="name"
+                      defaultValue={current.name ?? ""}
+                      className="w-full border border-gray-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-[#667470]/30"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-gray-400 mb-0.5">Categoria</label>
+                    <select
+                      name="categoria"
+                      defaultValue={current.categoria ?? ""}
+                      className="w-full border border-gray-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-[#667470]/30 bg-white"
+                    >
+                      <option value="">Sem categoria</option>
+                      {current.categoria && !CATEGORIA_NAMES.includes(current.categoria) && (
+                        <option value={current.categoria}>{current.categoria}</option>
+                      )}
+                      {CATEGORIA_NAMES.map((c) => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                  </div>
                   {[
-                    { name: "name",         label: "Nome",         defaultValue: current.name },
-                    { name: "categoria",    label: "Categoria",    defaultValue: current.categoria },
                     { name: "contact",      label: "Contacto",     defaultValue: current.contact },
                     { name: "email",        label: "Email",        defaultValue: current.email },
                     { name: "iban",         label: "IBAN",         defaultValue: current.iban },
