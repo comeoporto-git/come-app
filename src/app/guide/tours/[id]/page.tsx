@@ -9,6 +9,8 @@ import {
   getClientsList,
   deleteSale,
 } from "@/lib/notion";
+import type { Fornecedor, Transaction } from "@/lib/notion";
+import { categoriaBadgeClass } from "@/lib/fornecedor-categories";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { Suspense } from "react";
@@ -31,6 +33,41 @@ function formatDate(iso: string | null, startTime: string | null): string {
     month: "long",
   });
   return startTime ? `${datePart} às ${startTime}` : datePart;
+}
+
+// Buckets expense transactions by their fornecedor's category, falling back
+// to the tour's team role (Guia/Chef/Motorista/Logistics) when a transaction
+// was paid directly to a team member rather than to a fornecedor.
+function computeCategoryBreakdown(
+  transactions: Transaction[],
+  fornecedores: Fornecedor[],
+  team: { guideName?: string | null; chefName?: string | null; driverName?: string | null; logisticsName?: string | null },
+): { label: string; total: number }[] {
+  const categoriaById = new Map(fornecedores.map((f) => [f.id, f.categoria]));
+  const teamRoles = [
+    team.guideName ? { name: team.guideName, label: "Guia" } : null,
+    team.chefName ? { name: team.chefName, label: "Chef" } : null,
+    team.driverName ? { name: team.driverName, label: "Motorista" } : null,
+    team.logisticsName ? { name: team.logisticsName, label: "Logistics" } : null,
+  ]
+    .filter(Boolean)
+    .map((r) => ({ name: r!.name.trim().toLowerCase(), label: r!.label }));
+
+  const totals = new Map<string, number>();
+  for (const t of transactions) {
+    const amount = Math.abs(t.totalCost);
+    if (amount === 0) continue;
+
+    const categoria = t.fornecedorId ? categoriaById.get(t.fornecedorId) : null;
+    const teamMatch = teamRoles.find((r) => r.name === t.supplier.trim().toLowerCase());
+    const label = categoria || teamMatch?.label || "Outros";
+
+    totals.set(label, (totals.get(label) ?? 0) + amount);
+  }
+
+  return Array.from(totals.entries())
+    .map(([label, total]) => ({ label, total }))
+    .sort((a, b) => b.total - a.total);
 }
 
 // ── Shell (renders immediately, only needs auth cookie) ───────────────────────
@@ -129,6 +166,11 @@ async function TourPageContent({
   const lucro      = faturacao + totalSpent; // totalSpent is negative, so this subtracts
   const margem     = faturacao > 0 ? (lucro / faturacao) * 100 : null;
   const isClosed   = tour.expensesClosed;
+
+  const categoryBreakdown = role === "Admin"
+    ? computeCategoryBreakdown(transactions, fornecedores, tour)
+    : [];
+  const maxCategoryTotal = Math.max(0, ...categoryBreakdown.map((c) => c.total));
 
   return (
     <>
@@ -301,6 +343,42 @@ async function TourPageContent({
                   value={margem !== null ? `${margem.toFixed(1)}%` : "—"}
                   color={margem !== null && margem >= 0 ? "text-emerald-600" : "text-red-500"}
                 />
+              </section>
+            )}
+
+            {/* Custos por Categoria — Admin only */}
+            {role === "Admin" && categoryBreakdown.length > 0 && (
+              <section className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                <div className="px-4 py-3 border-b border-gray-50">
+                  <h2 className="text-sm font-semibold text-gray-700">Custos por Categoria</h2>
+                </div>
+                <ul className="divide-y divide-gray-50">
+                  {categoryBreakdown.map(({ label, total }) => (
+                    <li key={label} className="px-4 py-2.5">
+                      <div className="flex items-center justify-between gap-3 mb-1.5">
+                        <span
+                          className={`text-xs px-2 py-0.5 rounded-full font-medium ${categoriaBadgeClass(label)}`}
+                        >
+                          {label}
+                        </span>
+                        <span className="text-sm font-semibold text-gray-800">
+                          €{total.toFixed(2)}
+                          {totalSpent !== 0 && (
+                            <span className="text-xs font-normal text-gray-400 ml-1">
+                              {((total / Math.abs(totalSpent)) * 100).toFixed(0)}%
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                      <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-[#667470]"
+                          style={{ width: `${maxCategoryTotal > 0 ? (total / maxCategoryTotal) * 100 : 0}%` }}
+                        />
+                      </div>
+                    </li>
+                  ))}
+                </ul>
               </section>
             )}
 
