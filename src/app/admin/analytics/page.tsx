@@ -1,6 +1,6 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { getAnalyticsTours, getAnalyticsTransactions, getTeamMembers, resolvePageTitles } from "@/lib/notion";
+import { getAnalyticsTours, getAnalyticsTransactions, getTeamMembers, getFornecedores, resolvePageTitles } from "@/lib/notion";
 import { AnalyticsDashboard } from "@/components/AnalyticsDashboard";
 
 export default async function AnalyticsPage() {
@@ -9,10 +9,11 @@ export default async function AnalyticsPage() {
   if (session.user.role !== "Admin" && session.user.role !== "Super Guide") redirect("/");
 
   // Fetch full history — period filtering happens client-side instantly
-  const [tours, transactions, teamMembers] = await Promise.all([
+  const [tours, transactions, teamMembers, fornecedores] = await Promise.all([
     getAnalyticsTours(),
     getAnalyticsTransactions(),
     getTeamMembers(),
+    getFornecedores(),
   ]);
 
   const teamMap = Object.fromEntries(teamMembers.map((m) => [m.id, m.name]));
@@ -50,6 +51,7 @@ export default async function AnalyticsPage() {
           transactions={transactions}
           teamMap={teamMap}
           clientNameMap={clientNameMap}
+          fornecedores={fornecedores}
         />
       </main>
     </div>

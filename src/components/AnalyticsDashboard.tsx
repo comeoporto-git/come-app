@@ -3,7 +3,8 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import { AnalyticsDateRangePicker, type DateRange } from "@/components/AnalyticsDateRangePicker";
-import type { Tour, Transaction } from "@/lib/notion";
+import type { Tour, Transaction, Fornecedor } from "@/lib/notion";
+import { categoriaBadgeClass } from "@/lib/fornecedor-categories";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -378,6 +379,56 @@ function EmptyState({ message = "Sem dados para este período" }: { message?: st
   return <p className="text-sm text-gray-400 text-center py-6">{message}</p>;
 }
 
+function ServicePaxBreakdownRow({ service, totalTours, paxBuckets }: {
+  service: string;
+  totalTours: number;
+  paxBuckets: { pax: number; tours: number; categories: { label: string; avg: number }[] }[];
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="border-b border-gray-50 last:border-0">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full text-left py-2.5 flex items-center justify-between gap-2 cursor-pointer"
+      >
+        <span className="text-sm font-medium text-[#32373c] truncate flex items-center gap-1.5">
+          <svg
+            className={`w-2.5 h-2.5 text-gray-300 shrink-0 transition-transform ${open ? "rotate-90" : ""}`}
+            viewBox="0 0 16 16" fill="currentColor"
+          >
+            <path d="M6 4l4 4-4 4V4z" />
+          </svg>
+          <span className="truncate">{service}</span>
+        </span>
+        <span className="text-xs text-gray-400 shrink-0">{totalTours} serviços</span>
+      </button>
+      {open && (
+        <div className="pb-3 pl-4 space-y-2.5">
+          {paxBuckets.map((p) => (
+            <div key={p.pax} className="bg-gray-50 rounded-xl p-3 space-y-2">
+              <p className="text-xs font-semibold text-gray-600">
+                {p.pax} Pax
+                <span className="text-gray-400 font-normal"> · {p.tours} {p.tours === 1 ? "serviço" : "serviços"}</span>
+              </p>
+              <div className="space-y-1.5">
+                {p.categories.map((c) => (
+                  <div key={c.label} className="flex items-center justify-between gap-2">
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${categoriaBadgeClass(c.label)}`}>
+                      {c.label}
+                    </span>
+                    <span className="text-xs font-semibold text-gray-700">{fmtEur(c.avg)} <span className="text-gray-400 font-normal">média</span></span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export function AnalyticsDashboard({
@@ -385,11 +436,13 @@ export function AnalyticsDashboard({
   transactions: allTransactions,
   teamMap,
   clientNameMap,
+  fornecedores,
 }: {
   tours: Tour[];
   transactions: Transaction[];
   teamMap: Record<string, string>;
   clientNameMap: Record<string, string>;
+  fornecedores: Fornecedor[];
 }) {
   const [dateRange, setDateRange] = useState<DateRange>(() => {
     const now = new Date();
@@ -731,6 +784,62 @@ export function AnalyticsDashboard({
       .sort((a, b) => b.revenue - a.revenue);
     const hasServiceProfit = serviceProfit.some((d) => d.revenue > 0 || d.cost > 0);
 
+    // Average cost by Despesa category (fornecedor category, falling back to team
+    // role when paid directly to a team member), grouped by service name and pax
+    // count — e.g. "Old School to New School · 2 Pax · €X em Restaurantes"
+    const categoriaByFornecedorId = new Map(fornecedores.map((f) => [f.id, f.categoria]));
+    const expensesByTour = new Map<string, typeof expenses>();
+    for (const t of expenses) {
+      if (!t.tourId) continue;
+      const list = expensesByTour.get(t.tourId) ?? [];
+      list.push(t);
+      expensesByTour.set(t.tourId, list);
+    }
+    const servicePaxMap: Record<string, Record<number, { tours: number; totals: Map<string, number> }>> = {};
+    for (const t of realizedTours) {
+      if (!t.id || !t.numGuests) continue;
+      const name = t.serviceName || t.type || "Outro";
+      const pax = t.numGuests;
+      if (!servicePaxMap[name]) servicePaxMap[name] = {};
+      if (!servicePaxMap[name][pax]) servicePaxMap[name][pax] = { tours: 0, totals: new Map() };
+      const bucket = servicePaxMap[name][pax];
+      bucket.tours++;
+
+      const teamRoles = [
+        t.guideName ? { name: t.guideName, label: "Guia" } : null,
+        t.chefName ? { name: t.chefName, label: "Chef" } : null,
+        t.driverName ? { name: t.driverName, label: "Motorista" } : null,
+        t.logisticsName ? { name: t.logisticsName, label: "Logistics" } : null,
+      ]
+        .filter(Boolean)
+        .map((r) => ({ name: r!.name.trim().toLowerCase(), label: r!.label }));
+
+      for (const tx of expensesByTour.get(t.id) ?? []) {
+        const amount = Math.abs(tx.totalCost);
+        if (amount === 0) continue;
+        const categoria = tx.fornecedorId ? categoriaByFornecedorId.get(tx.fornecedorId) : null;
+        const teamMatch = teamRoles.find((r) => r.name === tx.supplier.trim().toLowerCase());
+        const label = categoria || teamMatch?.label || "Outros";
+        bucket.totals.set(label, (bucket.totals.get(label) ?? 0) + amount);
+      }
+    }
+    const servicePaxBreakdown = Object.entries(servicePaxMap)
+      .map(([service, paxMap]) => {
+        const paxBuckets = Object.entries(paxMap)
+          .map(([paxStr, d]) => ({
+            pax: Number(paxStr),
+            tours: d.tours,
+            categories: Array.from(d.totals.entries())
+              .map(([label, total]) => ({ label, avg: total / d.tours }))
+              .sort((x, y) => y.avg - x.avg),
+          }))
+          .sort((x, y) => x.pax - y.pax);
+        const totalTours = paxBuckets.reduce((s, p) => s + p.tours, 0);
+        return { service, totalTours, paxBuckets };
+      })
+      .filter((s) => s.paxBuckets.length > 0)
+      .sort((x, y) => y.totalTours - x.totalTours);
+
     // Guide cost comparison — Bernardo (owner/Super Guide) vs other guides
     const guideGroupsRaw: Record<string, { services: number; revenue: number; cost: number; revenueNet: number; costNet: number }> = {
       "Bernardo": { services: 0, revenue: 0, cost: 0, revenueNet: 0, costNet: 0 },
@@ -785,10 +894,11 @@ export function AnalyticsDashboard({
       totalExpenses, totalEarnings, expPerTour, topMethods, maxMethod,
       monthlyFinancials, maxMonthlyRev, maxMonthlyCost, maxMonthlyProfit, profitColors, profitFmtValues,
       serviceProfit, hasServiceProfit,
+      servicePaxBreakdown,
       guideCostComparison, maxGuideAvgCost, maxGuideAvgCostNet,
       rangeLbl,
     };
-  }, [allTours, allTransactions, teamMap, clientNameMap, dateRange]);
+  }, [allTours, allTransactions, teamMap, clientNameMap, dateRange, fornecedores]);
 
   const periodLabel = (() => {
     const { start, end } = dateRange;
@@ -1219,6 +1329,26 @@ export function AnalyticsDashboard({
                     gross={{ revenue: s.revenue, cost: s.cost, profit: s.profit, margin: s.margin }}
                     net={{ revenue: s.revenueNet, cost: s.costNet, profit: s.profitNet, margin: s.marginNet }}
                     tours={s.tours}
+                  />
+                ))}
+              </div>
+            )}
+          </SectionCard>
+
+          <SectionCard
+            title="Custo Médio por Categoria e Pax"
+            sub={`Custo médio por despesa (fornecedor ou equipa), por serviço e nº de pax · ${periodLabel}`}
+          >
+            {a.servicePaxBreakdown.length === 0 ? (
+              <EmptyState message="Sem despesas ligadas a serviços neste período" />
+            ) : (
+              <div>
+                {a.servicePaxBreakdown.map((s) => (
+                  <ServicePaxBreakdownRow
+                    key={s.service}
+                    service={s.service}
+                    totalTours={s.totalTours}
+                    paxBuckets={s.paxBuckets}
                   />
                 ))}
               </div>
