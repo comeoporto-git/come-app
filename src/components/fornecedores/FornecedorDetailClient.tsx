@@ -17,12 +17,10 @@ export function FornecedorDetailClient({
   fornecedor,
   transactions,
   fornecedores,
-  onClose,
 }: {
   fornecedor: Fornecedor;
   transactions: Transaction[];
   fornecedores: Fornecedor[];
-  onClose?: () => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -61,21 +59,12 @@ export function FornecedorDetailClient({
     <>
       {/* Header */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-5 py-4">
-        {onClose ? (
-          <button
-            onClick={onClose}
-            className="text-xs text-gray-400 hover:text-[#667470] transition-colors mb-2 inline-flex items-center gap-1"
-          >
-            ✕ Fechar
-          </button>
-        ) : (
-          <Link
-            href="/admin/fornecedores"
-            className="text-xs text-gray-400 hover:text-[#667470] transition-colors mb-2 inline-flex items-center gap-1"
-          >
-            ← Fornecedores
-          </Link>
-        )}
+        <Link
+          href="/admin/fornecedores"
+          className="text-xs text-gray-400 hover:text-[#667470] transition-colors mb-2 inline-flex items-center gap-1"
+        >
+          ← Fornecedores
+        </Link>
 
         <div className="flex items-start justify-between mt-1 gap-4 flex-wrap">
           <div className="min-w-0">
