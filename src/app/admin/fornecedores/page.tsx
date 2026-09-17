@@ -35,7 +35,7 @@ export default async function FornecedoresPage() {
           </div>
         </div>
 
-        <FornecedoresList items={items} />
+        <FornecedoresList items={items} fornecedores={fornecedores} />
       </main>
     </div>
   );
