@@ -24,6 +24,7 @@ export default async function SuperGuideDashboard() {
     { href: "/super-guide/transferencias", icon: "💸", label: "Transferências em Falta", sub: "Despesas pagas pelos guias", bg: "bg-red-50", badge: transferenciasCount },
     { href: "/profile",             icon: "👤", label: "Perfil",                   sub: "Ver e editar os teus dados",   bg: "bg-[#667470]/10", badge: 0 },
     { href: "/super-guide/gestao-servicos", icon: "⚙️", label: "Gestão de Serviços", sub: "Equipa, incompletos, pendentes", bg: "bg-blue-50",  badge: 0 },
+    { href: "/admin/produtos",      icon: "📋", label: "Produtos & Serviços",  sub: "Preços, passos, tarefas, restaurantes", bg: "bg-purple-50", badge: 0 },
     { href: "/super-guide/analytics",      icon: "📈", label: "Analytics",           sub: "Serviços, equipa, despesas",    bg: "bg-emerald-50", badge: 0 },
   ];
 

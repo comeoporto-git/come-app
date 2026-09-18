@@ -24,6 +24,7 @@ const nav: { group: string | null; items: NavItem[] }[] = [
     items: [
       { label: "Serviços", href: "/admin/servicos" },
       { label: "Gestão", href: "/admin/gestao-servicos" },
+      { label: "Produtos & Serviços", href: "/admin/produtos" },
       { label: "Analytics", href: "/admin/analytics" },
     ],
   },

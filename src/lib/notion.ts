@@ -341,6 +341,272 @@ export async function getServiceTypesList(): Promise<{ id: string; name: string 
   return (data ?? []).map((r) => ({ id: r.id, name: r.name }));
 }
 
+// ── Service catalog (product settings: pricing, steps, tasks, restaurants) ────
+
+export type ServiceCatalogItem = {
+  id: string;
+  name: string;
+  type: string;
+  durationMinutes: number | null;
+};
+
+export async function getServiceCatalog(): Promise<ServiceCatalogItem[]> {
+  const { data } = await supabase
+    .from("services")
+    .select("id, name, type, duration_minutes")
+    .order("name");
+  return (data ?? []).map((r) => ({
+    id: r.id,
+    name: r.name,
+    type: r.type ?? "",
+    durationMinutes: r.duration_minutes,
+  }));
+}
+
+export type ServiceStep = { id: string; sortOrder: number; title: string; description: string };
+export type ServiceTask = { id: string; sortOrder: number; name: string; description: string };
+
+export type RestaurantHour = {
+  dayOfWeek: number; // 0 = Sunday .. 6 = Saturday
+  openTime: string | null;
+  closeTime: string | null;
+  closed: boolean;
+};
+
+export type ServiceRestaurant = {
+  id: string;
+  name: string;
+  address: string;
+  phone: string;
+  notes: string;
+  serviceNotes: string;
+  hours: RestaurantHour[];
+};
+
+export type ServiceDetail = {
+  id: string;
+  name: string;
+  type: string;
+  description: string;
+  durationMinutes: number | null;
+  equipa: string[];
+  processo: string;
+  pax_2_3: number | null;
+  pax_4_6: number | null;
+  pax_7_plus: number | null;
+  valor_chef_2_3: number | null;
+  valor_chef_4_6: number | null;
+  valor_chef_7_10: number | null;
+  valor_copa: number | null;
+  valor_driver: number | null;
+  steps: ServiceStep[];
+  tasks: ServiceTask[];
+  restaurants: ServiceRestaurant[];
+};
+
+type RestaurantHourRow = { day_of_week: number; open_time: string | null; close_time: string | null; closed: boolean };
+type RestaurantRow = { id: string; name: string; address: string | null; phone: string | null; notes: string | null; restaurant_hours: RestaurantHourRow[] };
+
+export async function getServiceDetail(id: string): Promise<ServiceDetail | null> {
+  const [{ data: service }, { data: steps }, { data: tasks }, { data: links }] = await Promise.all([
+    supabase.from("services").select("*").eq("id", id).single(),
+    supabase.from("service_steps").select("id, sort_order, title, description").eq("service_id", id).order("sort_order"),
+    supabase.from("service_tasks").select("id, sort_order, name, description").eq("service_id", id).order("sort_order"),
+    supabase
+      .from("service_restaurants")
+      .select("sort_order, notes, restaurants(id, name, address, phone, notes, restaurant_hours(day_of_week, open_time, close_time, closed))")
+      .eq("service_id", id)
+      .order("sort_order"),
+  ]);
+  if (!service) return null;
+
+  return {
+    id: service.id,
+    name: service.name,
+    type: service.type ?? "",
+    description: service.description ?? "",
+    durationMinutes: service.duration_minutes,
+    equipa: service.equipa ?? [],
+    processo: service.processo ?? "",
+    pax_2_3: service.pax_2_3,
+    pax_4_6: service.pax_4_6,
+    pax_7_plus: service.pax_7_plus,
+    valor_chef_2_3: service.valor_chef_2_3,
+    valor_chef_4_6: service.valor_chef_4_6,
+    valor_chef_7_10: service.valor_chef_7_10,
+    valor_copa: service.valor_copa,
+    valor_driver: service.valor_driver,
+    steps: (steps ?? []).map((s) => ({ id: s.id, sortOrder: s.sort_order, title: s.title, description: s.description ?? "" })),
+    tasks: (tasks ?? []).map((t) => ({ id: t.id, sortOrder: t.sort_order, name: t.name, description: t.description ?? "" })),
+    restaurants: ((links ?? []) as unknown as { sort_order: number; notes: string | null; restaurants: RestaurantRow | null }[])
+      .filter((l) => l.restaurants)
+      .map((l) => {
+        const r = l.restaurants as RestaurantRow;
+        return {
+          id: r.id,
+          name: r.name,
+          address: r.address ?? "",
+          phone: r.phone ?? "",
+          notes: r.notes ?? "",
+          serviceNotes: l.notes ?? "",
+          hours: (r.restaurant_hours ?? [])
+            .map((h) => ({ dayOfWeek: h.day_of_week, openTime: h.open_time, closeTime: h.close_time, closed: h.closed }))
+            .sort((a, b) => a.dayOfWeek - b.dayOfWeek),
+        };
+      }),
+  };
+}
+
+export async function updateServiceCore(id: string, data: {
+  name: string;
+  type: string;
+  description: string;
+  durationMinutes: number | null;
+  equipa: string[];
+}): Promise<void> {
+  const { error } = await supabase.from("services").update({
+    name:             data.name,
+    type:             data.type            || null,
+    description:      data.description     || null,
+    duration_minutes: data.durationMinutes,
+    equipa:           data.equipa.length ? data.equipa : null,
+  }).eq("id", id);
+  if (error) throw new Error(`updateServiceCore: ${error.message}`);
+}
+
+export async function updateServicePricing(id: string, data: {
+  pax_2_3: number | null;
+  pax_4_6: number | null;
+  pax_7_plus: number | null;
+  valor_chef_2_3: number | null;
+  valor_chef_4_6: number | null;
+  valor_chef_7_10: number | null;
+  valor_copa: number | null;
+  valor_driver: number | null;
+}): Promise<void> {
+  const { error } = await supabase.from("services").update({
+    pax_2_3:         data.pax_2_3,
+    pax_4_6:         data.pax_4_6,
+    pax_7_plus:      data.pax_7_plus,
+    valor_chef_2_3:  data.valor_chef_2_3,
+    valor_chef_4_6:  data.valor_chef_4_6,
+    valor_chef_7_10: data.valor_chef_7_10,
+    valor_copa:      data.valor_copa,
+    valor_driver:    data.valor_driver,
+  }).eq("id", id);
+  if (error) throw new Error(`updateServicePricing: ${error.message}`);
+}
+
+export async function addServiceStep(serviceId: string, title: string, description: string): Promise<void> {
+  const { count } = await supabase.from("service_steps").select("id", { count: "exact", head: true }).eq("service_id", serviceId);
+  const { error } = await supabase.from("service_steps").insert({
+    service_id: serviceId,
+    sort_order: count ?? 0,
+    title,
+    description: description || null,
+  });
+  if (error) throw new Error(`addServiceStep: ${error.message}`);
+}
+
+export async function updateServiceStep(id: string, title: string, description: string): Promise<void> {
+  const { error } = await supabase.from("service_steps").update({ title, description: description || null }).eq("id", id);
+  if (error) throw new Error(`updateServiceStep: ${error.message}`);
+}
+
+export async function deleteServiceStep(id: string): Promise<void> {
+  const { error } = await supabase.from("service_steps").delete().eq("id", id);
+  if (error) throw new Error(`deleteServiceStep: ${error.message}`);
+}
+
+export async function addServiceTask(serviceId: string, name: string, description: string): Promise<void> {
+  const { count } = await supabase.from("service_tasks").select("id", { count: "exact", head: true }).eq("service_id", serviceId);
+  const { error } = await supabase.from("service_tasks").insert({
+    service_id: serviceId,
+    sort_order: count ?? 0,
+    name,
+    description: description || null,
+  });
+  if (error) throw new Error(`addServiceTask: ${error.message}`);
+}
+
+export async function updateServiceTask(id: string, name: string, description: string): Promise<void> {
+  const { error } = await supabase.from("service_tasks").update({ name, description: description || null }).eq("id", id);
+  if (error) throw new Error(`updateServiceTask: ${error.message}`);
+}
+
+export async function deleteServiceTask(id: string): Promise<void> {
+  const { error } = await supabase.from("service_tasks").delete().eq("id", id);
+  if (error) throw new Error(`deleteServiceTask: ${error.message}`);
+}
+
+export async function getRestaurantsList(): Promise<{ id: string; name: string }[]> {
+  const { data } = await supabase.from("restaurants").select("id, name").order("name");
+  return data ?? [];
+}
+
+export type RestaurantHourInput = { dayOfWeek: number; openTime: string | null; closeTime: string | null; closed: boolean };
+
+export async function createRestaurant(data: {
+  name: string;
+  address: string;
+  phone: string;
+  notes: string;
+  hours: RestaurantHourInput[];
+}): Promise<string> {
+  const { data: row, error } = await supabase.from("restaurants").insert({
+    name:    data.name,
+    address: data.address || null,
+    phone:   data.phone   || null,
+    notes:   data.notes   || null,
+  }).select("id").single();
+  if (error) throw new Error(`createRestaurant: ${error.message}`);
+
+  if (data.hours.length) {
+    const { error: hoursError } = await supabase.from("restaurant_hours").insert(
+      data.hours.map((h) => ({
+        restaurant_id: row.id,
+        day_of_week:   h.dayOfWeek,
+        open_time:     h.closed ? null : h.openTime,
+        close_time:    h.closed ? null : h.closeTime,
+        closed:        h.closed,
+      })),
+    );
+    if (hoursError) throw new Error(`createRestaurant hours: ${hoursError.message}`);
+  }
+  return row.id;
+}
+
+export async function updateRestaurantHours(restaurantId: string, hours: RestaurantHourInput[]): Promise<void> {
+  const { error } = await supabase.from("restaurant_hours").upsert(
+    hours.map((h) => ({
+      restaurant_id: restaurantId,
+      day_of_week:   h.dayOfWeek,
+      open_time:     h.closed ? null : h.openTime,
+      close_time:    h.closed ? null : h.closeTime,
+      closed:        h.closed,
+    })),
+    { onConflict: "restaurant_id,day_of_week" },
+  );
+  if (error) throw new Error(`updateRestaurantHours: ${error.message}`);
+}
+
+export async function linkServiceRestaurant(serviceId: string, restaurantId: string, notes?: string): Promise<void> {
+  const { count } = await supabase.from("service_restaurants").select("service_id", { count: "exact", head: true }).eq("service_id", serviceId);
+  const { error } = await supabase.from("service_restaurants").insert({
+    service_id:    serviceId,
+    restaurant_id: restaurantId,
+    sort_order:    count ?? 0,
+    notes:         notes || null,
+  });
+  if (error) throw new Error(`linkServiceRestaurant: ${error.message}`);
+}
+
+export async function unlinkServiceRestaurant(serviceId: string, restaurantId: string): Promise<void> {
+  const { error } = await supabase.from("service_restaurants")
+    .delete().eq("service_id", serviceId).eq("restaurant_id", restaurantId);
+  if (error) throw new Error(`unlinkServiceRestaurant: ${error.message}`);
+}
+
 export async function getClientsList(): Promise<{ id: string; name: string }[]> {
   const { data } = await supabase.from("clients").select("id, name").order("name");
   return (data ?? []).map((r) => ({ id: r.id, name: r.name }));
