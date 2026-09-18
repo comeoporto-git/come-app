@@ -15,6 +15,8 @@ import {
   deleteServiceTaskAction,
   createRestaurantAction,
   updateRestaurantHoursAction,
+  updateRestaurantGoogleUrlAction,
+  fetchRestaurantHoursFromUrlAction,
   unlinkServiceRestaurantAction,
 } from "@/actions/services";
 
@@ -548,6 +550,11 @@ function RestaurantsSection({ service, canEdit }: { service: ServiceDetail; canE
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-[#32373c]">{r.name}</p>
                     {r.address && <p className="text-xs text-gray-400 mt-0.5">{r.address}</p>}
+                    {r.googleUrl && (
+                      <a href={r.googleUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-[#667470] hover:underline mt-0.5 inline-block">
+                        Ver no Google Maps
+                      </a>
+                    )}
                   </div>
                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${status.closed ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700"}`}>
                     {status.closed ? "Fechado" : "Aberto"}
@@ -557,7 +564,7 @@ function RestaurantsSection({ service, canEdit }: { service: ServiceDetail; canE
                 <WeeklyHours hours={r.hours} />
                 {canEdit && (
                   <div className="mt-2 flex gap-3">
-                    <RestaurantHoursEditor serviceId={service.id} restaurantId={r.id} hours={r.hours} />
+                    <RestaurantHoursEditor serviceId={service.id} restaurantId={r.id} hours={r.hours} googleUrl={r.googleUrl} />
                     <DeleteButton onConfirm={() => unlinkServiceRestaurantAction(service.id, r.id)} />
                   </div>
                 )}
@@ -603,12 +610,76 @@ function WeeklyHours({ hours }: { hours: ServiceDetail["restaurants"][number]["h
   );
 }
 
-function RestaurantHoursEditor({ serviceId, restaurantId, hours }: { serviceId: string; restaurantId: string; hours: ServiceDetail["restaurants"][number]["hours"] }) {
+function RestaurantHoursEditor({
+  serviceId, restaurantId, hours, googleUrl,
+}: {
+  serviceId: string;
+  restaurantId: string;
+  hours: ServiceDetail["restaurants"][number]["hours"];
+  googleUrl: string;
+}) {
   const [editing, setEditing] = useState(false);
   if (!editing) {
     return <button type="button" onClick={() => setEditing(true)} className="text-xs text-gray-400 hover:text-[#667470]">Editar horário</button>;
   }
-  return <HoursForm serviceId={serviceId} restaurantId={restaurantId} initialHours={hours} onDone={() => setEditing(false)} />;
+  return <HoursForm serviceId={serviceId} restaurantId={restaurantId} initialHours={hours} initialGoogleUrl={googleUrl} onDone={() => setEditing(false)} />;
+}
+
+/** Paste a Google Maps/Business URL and try to pre-fill the weekly hours from it. Experimental — always review before saving. */
+function GoogleHoursFetchField({
+  googleUrl, onGoogleUrlChange, onFetched,
+}: {
+  googleUrl: string;
+  onGoogleUrlChange: (v: string) => void;
+  onFetched: (hours: DraftHour[]) => void;
+}) {
+  const [fetching, setFetching] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+
+  async function handleFetch() {
+    if (!googleUrl.trim()) { setError("Cola um link do Google Maps primeiro"); return; }
+    setFetching(true);
+    setError(null);
+    setSuccess(false);
+    const result = await fetchRestaurantHoursFromUrlAction(googleUrl.trim());
+    setFetching(false);
+    if (result.error || !result.hours) {
+      setError(result.error || "Não foi possível obter o horário");
+      return;
+    }
+    onFetched(result.hours.map((h) => ({
+      dayOfWeek: h.dayOfWeek,
+      openTime: h.openTime ? h.openTime.slice(0, 5) : "",
+      closeTime: h.closeTime ? h.closeTime.slice(0, 5) : "",
+      closed: h.closed,
+    })));
+    setSuccess(true);
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex gap-2">
+        <input
+          value={googleUrl}
+          onChange={(e) => { onGoogleUrlChange(e.target.value); setSuccess(false); }}
+          placeholder="Link do Google Maps/Business…"
+          className={inputCls}
+        />
+        <button
+          type="button"
+          onClick={handleFetch}
+          disabled={fetching}
+          className="shrink-0 border border-gray-200 text-gray-600 text-xs font-semibold px-3 rounded-xl hover:bg-gray-50 disabled:opacity-50 transition-colors"
+        >
+          {fetching ? "A procurar…" : "Buscar horário"}
+        </button>
+      </div>
+      {error && <p className="text-xs text-red-500 font-medium">{error}</p>}
+      {success && <p className="text-xs text-emerald-600 font-medium">Horário preenchido — revê e guarda.</p>}
+      <p className="text-xs text-gray-400">Experimental: confirma sempre o horário antes de guardar.</p>
+    </div>
+  );
 }
 
 type DraftHour = { dayOfWeek: number; openTime: string; closeTime: string; closed: boolean };
@@ -626,14 +697,16 @@ function buildDraftHours(existing: ServiceDetail["restaurants"][number]["hours"]
 }
 
 function HoursForm({
-  serviceId, restaurantId, initialHours, onDone,
+  serviceId, restaurantId, initialHours, initialGoogleUrl, onDone,
 }: {
   serviceId: string;
   restaurantId: string;
   initialHours: ServiceDetail["restaurants"][number]["hours"];
+  initialGoogleUrl: string;
   onDone: () => void;
 }) {
   const [draft, setDraft] = useState<DraftHour[]>(buildDraftHours(initialHours));
+  const [googleUrl, setGoogleUrl] = useState(initialGoogleUrl);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -644,18 +717,23 @@ function HoursForm({
   async function handleSave() {
     setSaving(true);
     setError(null);
-    const result = await updateRestaurantHoursAction(
-      serviceId,
-      restaurantId,
-      draft.map((d) => ({ dayOfWeek: d.dayOfWeek, openTime: d.closed ? null : d.openTime || null, closeTime: d.closed ? null : d.closeTime || null, closed: d.closed })),
-    );
+    const [hoursResult, urlResult] = await Promise.all([
+      updateRestaurantHoursAction(
+        serviceId,
+        restaurantId,
+        draft.map((d) => ({ dayOfWeek: d.dayOfWeek, openTime: d.closed ? null : d.openTime || null, closeTime: d.closed ? null : d.closeTime || null, closed: d.closed })),
+      ),
+      updateRestaurantGoogleUrlAction(serviceId, restaurantId, googleUrl.trim()),
+    ]);
     setSaving(false);
-    if (result.error) setError(result.error);
+    if (hoursResult.error || urlResult.error) setError(hoursResult.error || urlResult.error || "Erro ao guardar");
     else { window.location.reload(); }
   }
 
   return (
-    <div className="mt-2 border border-gray-100 rounded-xl p-3 space-y-1.5 w-full">
+    <div className="mt-2 border border-gray-100 rounded-xl p-3 space-y-3 w-full">
+      <GoogleHoursFetchField googleUrl={googleUrl} onGoogleUrlChange={setGoogleUrl} onFetched={setDraft} />
+      <div className="space-y-1.5">
       {draft.map((d, i) => (
         <div key={d.dayOfWeek} className="flex items-center gap-2 text-xs">
           <span className="w-16 text-gray-500 shrink-0">{WEEKDAY_LABELS[d.dayOfWeek]}</span>
@@ -672,6 +750,7 @@ function HoursForm({
           )}
         </div>
       ))}
+      </div>
       {error && <p className="text-xs text-red-500 font-medium">{error}</p>}
       <div className="flex gap-2 pt-1">
         <button onClick={handleSave} disabled={saving} className="bg-[#32373c] text-white text-xs font-semibold px-3 py-1.5 rounded-lg disabled:opacity-50 hover:bg-[#1a2018] transition-colors">
@@ -690,6 +769,7 @@ function NewRestaurantForm({ serviceId, onDone }: { serviceId: string; onDone: (
   const [address, setAddress] = useState("");
   const [phone, setPhone] = useState("");
   const [notes, setNotes] = useState("");
+  const [googleUrl, setGoogleUrl] = useState("");
   const [draft, setDraft] = useState<DraftHour[]>(buildDraftHours([]));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -702,7 +782,7 @@ function NewRestaurantForm({ serviceId, onDone }: { serviceId: string; onDone: (
     setSaving(true);
     setError(null);
     const result = await createRestaurantAction(serviceId, {
-      name, address, phone, notes,
+      name, address, phone, notes, googleUrl: googleUrl.trim(),
       hours: draft.map((d) => ({ dayOfWeek: d.dayOfWeek, openTime: d.closed ? null : d.openTime || null, closeTime: d.closed ? null : d.closeTime || null, closed: d.closed })),
     });
     setSaving(false);
@@ -718,6 +798,7 @@ function NewRestaurantForm({ serviceId, onDone }: { serviceId: string; onDone: (
       </div>
       <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Morada" className={inputCls} />
       <textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notas (opcional)" className={`${inputCls} resize-none`} />
+      <GoogleHoursFetchField googleUrl={googleUrl} onGoogleUrlChange={setGoogleUrl} onFetched={setDraft} />
       <div className="border border-gray-100 rounded-xl p-3 space-y-1.5">
         <p className="text-xs text-gray-500 mb-1">Horário semanal</p>
         {draft.map((d, i) => (

@@ -379,6 +379,7 @@ export type ServiceRestaurant = {
   address: string;
   phone: string;
   notes: string;
+  googleUrl: string;
   serviceNotes: string;
   hours: RestaurantHour[];
 };
@@ -405,7 +406,7 @@ export type ServiceDetail = {
 };
 
 type RestaurantHourRow = { day_of_week: number; open_time: string | null; close_time: string | null; closed: boolean };
-type RestaurantRow = { id: string; name: string; address: string | null; phone: string | null; notes: string | null; restaurant_hours: RestaurantHourRow[] };
+type RestaurantRow = { id: string; name: string; address: string | null; phone: string | null; notes: string | null; google_url: string | null; restaurant_hours: RestaurantHourRow[] };
 
 /** Lightweight fetch of just a service's steps — for showing on a booking's page. */
 export async function getServiceSteps(serviceId: string): Promise<ServiceStep[]> {
@@ -424,7 +425,7 @@ export async function getServiceDetail(id: string): Promise<ServiceDetail | null
     supabase.from("service_tasks").select("id, sort_order, name, description, role").eq("service_id", id).order("sort_order"),
     supabase
       .from("service_restaurants")
-      .select("sort_order, notes, restaurants(id, name, address, phone, notes, restaurant_hours(day_of_week, open_time, close_time, closed))")
+      .select("sort_order, notes, restaurants(id, name, address, phone, notes, google_url, restaurant_hours(day_of_week, open_time, close_time, closed))")
       .eq("service_id", id)
       .order("sort_order"),
   ]);
@@ -458,6 +459,7 @@ export async function getServiceDetail(id: string): Promise<ServiceDetail | null
           address: r.address ?? "",
           phone: r.phone ?? "",
           notes: r.notes ?? "",
+          googleUrl: r.google_url ?? "",
           serviceNotes: l.notes ?? "",
           hours: (r.restaurant_hours ?? [])
             .map((h) => ({ dayOfWeek: h.day_of_week, openTime: h.open_time, closeTime: h.close_time, closed: h.closed }))
@@ -659,13 +661,15 @@ export async function createRestaurant(data: {
   address: string;
   phone: string;
   notes: string;
+  googleUrl?: string;
   hours: RestaurantHourInput[];
 }): Promise<string> {
   const { data: row, error } = await supabase.from("restaurants").insert({
-    name:    data.name,
-    address: data.address || null,
-    phone:   data.phone   || null,
-    notes:   data.notes   || null,
+    name:       data.name,
+    address:    data.address   || null,
+    phone:      data.phone     || null,
+    notes:      data.notes     || null,
+    google_url: data.googleUrl || null,
   }).select("id").single();
   if (error) throw new Error(`createRestaurant: ${error.message}`);
 
@@ -696,6 +700,11 @@ export async function updateRestaurantHours(restaurantId: string, hours: Restaur
     { onConflict: "restaurant_id,day_of_week" },
   );
   if (error) throw new Error(`updateRestaurantHours: ${error.message}`);
+}
+
+export async function updateRestaurantGoogleUrl(restaurantId: string, googleUrl: string): Promise<void> {
+  const { error } = await supabase.from("restaurants").update({ google_url: googleUrl || null }).eq("id", restaurantId);
+  if (error) throw new Error(`updateRestaurantGoogleUrl: ${error.message}`);
 }
 
 export async function linkServiceRestaurant(serviceId: string, restaurantId: string, notes?: string): Promise<void> {
