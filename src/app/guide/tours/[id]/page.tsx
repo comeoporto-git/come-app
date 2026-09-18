@@ -8,6 +8,7 @@ import {
   getServiceTypesList,
   getClientsList,
   getTasksForSale,
+  getServiceSteps,
   deleteSale,
 } from "@/lib/notion";
 import type { Fornecedor, Transaction } from "@/lib/notion";
@@ -163,6 +164,8 @@ async function TourPageContent({
   const driverMember = isDriver ? (teamMembers.find((m) => m.email === email) ?? null) : null;
 
   if (!tour) notFound();
+
+  const steps = tour.service ? await getServiceSteps(tour.service) : [];
 
   const totalSpent = transactions.reduce((s, t) => s + t.totalCost, 0); // negative values
   const faturacao  = earnings.reduce((s, t) => s + t.totalCost, 0);
@@ -324,6 +327,26 @@ async function TourPageContent({
                 )}
               </div>
             </section>
+
+            {/* Steps — from the service catalog, visible to everyone */}
+            {steps.length > 0 && (
+              <section className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="px-4 py-3 border-b border-gray-50">
+                  <h2 className="text-sm font-semibold text-gray-700">Passos do Serviço</h2>
+                </div>
+                <ol className="divide-y divide-gray-50">
+                  {steps.map((step, i) => (
+                    <li key={step.id} className="px-4 py-3 flex items-start gap-3">
+                      <span className="w-6 h-6 rounded-full bg-[#667470]/10 text-[#667470] text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-800">{step.title}</p>
+                        {step.description && <p className="text-sm text-gray-500 mt-0.5 whitespace-pre-line">{step.description}</p>}
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              </section>
+            )}
 
             {/* Tasks */}
             <TourTaskList tourId={id} tasks={tasks} canManage={canEditTeam} />

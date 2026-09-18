@@ -407,6 +407,16 @@ export type ServiceDetail = {
 type RestaurantHourRow = { day_of_week: number; open_time: string | null; close_time: string | null; closed: boolean };
 type RestaurantRow = { id: string; name: string; address: string | null; phone: string | null; notes: string | null; restaurant_hours: RestaurantHourRow[] };
 
+/** Lightweight fetch of just a service's steps — for showing on a booking's page. */
+export async function getServiceSteps(serviceId: string): Promise<ServiceStep[]> {
+  const { data } = await supabase
+    .from("service_steps")
+    .select("id, sort_order, title, description")
+    .eq("service_id", serviceId)
+    .order("sort_order");
+  return (data ?? []).map((s) => ({ id: s.id, sortOrder: s.sort_order, title: s.title, description: s.description ?? "" }));
+}
+
 export async function getServiceDetail(id: string): Promise<ServiceDetail | null> {
   const [{ data: service }, { data: steps }, { data: tasks }, { data: links }] = await Promise.all([
     supabase.from("services").select("*").eq("id", id).single(),

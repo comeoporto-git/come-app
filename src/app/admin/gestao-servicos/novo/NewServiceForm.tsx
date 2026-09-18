@@ -42,7 +42,7 @@ export default function NewServiceForm({ serviceTypes, clients, guides, chefs, a
             <select
               name="serviceId"
               required
-              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#667470] transition-colors bg-white"
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-[#32373c] bg-white placeholder:text-gray-400 focus:outline-none focus:border-[#667470] transition-colors"
             >
               <option value="">— Selecionar serviço —</option>
               {serviceTypes.map((s) => (
@@ -68,12 +68,12 @@ export default function NewServiceForm({ serviceTypes, clients, guides, chefs, a
                 value={clientQuery}
                 onChange={(e) => setClientQuery(e.target.value)}
                 placeholder="Nome do novo cliente…"
-                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#667470] transition-colors"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-[#32373c] bg-white placeholder:text-gray-400 focus:outline-none focus:border-[#667470] transition-colors"
               />
             ) : (
               <select
                 name="clientId"
-                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#667470] transition-colors bg-white"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-[#32373c] bg-white placeholder:text-gray-400 focus:outline-none focus:border-[#667470] transition-colors"
               >
                 <option value="">— Selecionar cliente —</option>
                 {clients.map((c) => (
@@ -89,7 +89,7 @@ export default function NewServiceForm({ serviceTypes, clients, guides, chefs, a
               name="date"
               type="date"
               required
-              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#667470] transition-colors"
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-[#32373c] bg-white placeholder:text-gray-400 focus:outline-none focus:border-[#667470] transition-colors"
             />
           </div>
 
@@ -99,7 +99,7 @@ export default function NewServiceForm({ serviceTypes, clients, guides, chefs, a
               <input
                 name="startTime"
                 type="time"
-                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#667470] transition-colors"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-[#32373c] bg-white placeholder:text-gray-400 focus:outline-none focus:border-[#667470] transition-colors"
               />
             </div>
             <div>
@@ -107,7 +107,7 @@ export default function NewServiceForm({ serviceTypes, clients, guides, chefs, a
               <input
                 name="endTime"
                 type="time"
-                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#667470] transition-colors"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-[#32373c] bg-white placeholder:text-gray-400 focus:outline-none focus:border-[#667470] transition-colors"
               />
             </div>
           </div>
@@ -117,7 +117,7 @@ export default function NewServiceForm({ serviceTypes, clients, guides, chefs, a
             <select
               name="status"
               defaultValue="Pending"
-              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#667470] transition-colors bg-white"
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-[#32373c] bg-white placeholder:text-gray-400 focus:outline-none focus:border-[#667470] transition-colors"
             >
               <option value="Pending">Pending</option>
               <option value="Confirmed">Confirmed</option>
@@ -130,7 +130,7 @@ export default function NewServiceForm({ serviceTypes, clients, guides, chefs, a
             <input
               name="notionId"
               placeholder="Ex: 2575, MyBookpack 001…"
-              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#667470] transition-colors"
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-[#32373c] bg-white placeholder:text-gray-400 focus:outline-none focus:border-[#667470] transition-colors"
             />
           </div>
         </div>
@@ -147,7 +147,7 @@ export default function NewServiceForm({ serviceTypes, clients, guides, chefs, a
               <label className="block text-xs font-medium text-gray-500 mb-1">Guia</label>
               <select
                 name="guideId"
-                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#667470] transition-colors bg-white"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-[#32373c] bg-white placeholder:text-gray-400 focus:outline-none focus:border-[#667470] transition-colors"
               >
                 <option value="">— Nenhum —</option>
                 {guides.map((g) => (
@@ -159,7 +159,7 @@ export default function NewServiceForm({ serviceTypes, clients, guides, chefs, a
               <label className="block text-xs font-medium text-gray-500 mb-1">Chef</label>
               <select
                 name="chefId"
-                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#667470] transition-colors bg-white"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-[#32373c] bg-white placeholder:text-gray-400 focus:outline-none focus:border-[#667470] transition-colors"
               >
                 <option value="">— Nenhum —</option>
                 {chefs.map((c) => (
@@ -184,7 +184,7 @@ export default function NewServiceForm({ serviceTypes, clients, guides, chefs, a
               type="number"
               min="1"
               placeholder="0"
-              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#667470] transition-colors"
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-[#32373c] bg-white placeholder:text-gray-400 focus:outline-none focus:border-[#667470] transition-colors"
             />
           </div>
           <div>
@@ -192,7 +192,7 @@ export default function NewServiceForm({ serviceTypes, clients, guides, chefs, a
             <input
               name="names"
               placeholder="Ex: João, Maria, Pedro…"
-              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#667470] transition-colors"
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-[#32373c] bg-white placeholder:text-gray-400 focus:outline-none focus:border-[#667470] transition-colors"
             />
           </div>
           <div>
@@ -201,7 +201,7 @@ export default function NewServiceForm({ serviceTypes, clients, guides, chefs, a
               name="phoneNumber"
               type="tel"
               placeholder="+351 9XX XXX XXX"
-              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#667470] transition-colors"
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-[#32373c] bg-white placeholder:text-gray-400 focus:outline-none focus:border-[#667470] transition-colors"
             />
           </div>
         </div>
@@ -218,7 +218,7 @@ export default function NewServiceForm({ serviceTypes, clients, guides, chefs, a
             <input
               name="meetingPoint"
               placeholder="Ex: Praça da Ribeira"
-              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#667470] transition-colors"
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-[#32373c] bg-white placeholder:text-gray-400 focus:outline-none focus:border-[#667470] transition-colors"
             />
           </div>
           <div>
@@ -227,7 +227,7 @@ export default function NewServiceForm({ serviceTypes, clients, guides, chefs, a
               name="notes"
               rows={3}
               placeholder="Informações adicionais…"
-              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#667470] transition-colors resize-none"
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-[#32373c] bg-white placeholder:text-gray-400 focus:outline-none focus:border-[#667470] transition-colors resize-none"
             />
           </div>
         </div>
