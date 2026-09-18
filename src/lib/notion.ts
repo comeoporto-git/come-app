@@ -468,43 +468,85 @@ export type SaleTask = {
   categoria: string[];
   dueDate: string | null;
   fileUrl: string | null;
+  role: string | null;
   teamMemberId: string | null;
   teamMemberName: string | null;
 };
 
 const TASK_STATUS_OPTIONS = ["To do", "In Progress", "Done"] as const;
 
-export async function getTasksForSale(saleId: string): Promise<SaleTask[]> {
+// Roles whose tasks are hidden from anyone who isn't Admin/Super Guide.
+const PRIVILEGED_TASK_ROLES = ["Admin", "Super Guide"];
+
+/**
+ * Tasks for a booking. Admin/Super Guide see everything; every other role
+ * sees everything except tasks assigned to the Admin or Super Guide role.
+ */
+export async function getTasksForSale(saleId: string, viewerRole: string): Promise<SaleTask[]> {
   const { data } = await supabase
     .from("tasks")
-    .select("id, name, task_description, status, priority, categoria, due_date, file_url, team_member_id, team(name)")
+    .select("id, name, task_description, status, priority, categoria, due_date, file_url, role, team_member_id, team(name)")
     .eq("sale_id", saleId)
     .order("due_date", { ascending: true, nullsFirst: false });
 
-  return ((data ?? []) as unknown as {
+  const rows = (data ?? []) as unknown as {
     id: string; name: string; task_description: string | null; status: string | null; priority: string | null;
-    categoria: string[] | null; due_date: string | null; file_url: string | null;
+    categoria: string[] | null; due_date: string | null; file_url: string | null; role: string | null;
     team_member_id: string | null; team: { name: string } | null;
-  }[]).map((t) => ({
-    id: t.id,
-    name: t.name,
-    description: t.task_description ?? "",
-    status: t.status,
-    priority: t.priority,
-    categoria: t.categoria ?? [],
-    dueDate: t.due_date,
-    fileUrl: t.file_url,
-    teamMemberId: t.team_member_id,
-    teamMemberName: t.team?.name ?? null,
-  }));
+  }[];
+
+  const canSeePrivileged = viewerRole === "Admin" || viewerRole === "Super Guide";
+
+  return rows
+    .filter((t) => canSeePrivileged || !PRIVILEGED_TASK_ROLES.includes(t.role ?? ""))
+    .map((t) => ({
+      id: t.id,
+      name: t.name,
+      description: t.task_description ?? "",
+      status: t.status,
+      priority: t.priority,
+      categoria: t.categoria ?? [],
+      dueDate: t.due_date,
+      fileUrl: t.file_url,
+      role: t.role,
+      teamMemberId: t.team_member_id,
+      teamMemberName: t.team?.name ?? null,
+    }));
 }
 
-export async function updateTaskStatus(taskId: string, status: string): Promise<void> {
+export async function updateTaskStatus(saleId: string, taskId: string, status: string, viewerRole: string): Promise<void> {
   if (!TASK_STATUS_OPTIONS.includes(status as typeof TASK_STATUS_OPTIONS[number])) {
     throw new Error(`updateTaskStatus: invalid status "${status}"`);
   }
+  const { data: task } = await supabase.from("tasks").select("sale_id, role").eq("id", taskId).single();
+  if (!task || task.sale_id !== saleId) throw new Error("updateTaskStatus: task not found for this sale");
+  const canSeePrivileged = viewerRole === "Admin" || viewerRole === "Super Guide";
+  if (!canSeePrivileged && PRIVILEGED_TASK_ROLES.includes(task.role ?? "")) {
+    throw new Error("updateTaskStatus: forbidden");
+  }
+
   const { error } = await supabase.from("tasks").update({ status }).eq("id", taskId);
   if (error) throw new Error(`updateTaskStatus: ${error.message}`);
+}
+
+export async function createSaleTask(saleId: string, data: {
+  name: string;
+  description: string;
+  role: string | null;
+  priority: string | null;
+  dueDate: string | null;
+}): Promise<void> {
+  const { error } = await supabase.from("tasks").insert({
+    id:               crypto.randomUUID(),
+    sale_id:          saleId,
+    name:             data.name,
+    task_description: data.description || null,
+    role:             data.role || null,
+    priority:         data.priority || null,
+    due_date:         data.dueDate || null,
+    status:           "To do",
+  });
+  if (error) throw new Error(`createSaleTask: ${error.message}`);
 }
 
 export async function updateServiceCore(id: string, data: {

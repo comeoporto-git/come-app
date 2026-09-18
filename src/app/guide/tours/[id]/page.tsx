@@ -152,7 +152,7 @@ async function TourPageContent({
     canSeeFinancials ? getSaleEmails(id) : Promise.resolve([]),
     canEditTeam ? getServiceTypesList() : Promise.resolve([]),
     canEditTeam ? getClientsList()      : Promise.resolve([]),
-    getTasksForSale(id),
+    getTasksForSale(id, role),
   ]);
 
   const transactions = canSeeFinancials ? txResult.expenses : txResult.expenses;
@@ -326,7 +326,7 @@ async function TourPageContent({
             </section>
 
             {/* Tasks */}
-            <TourTaskList tourId={id} tasks={tasks} />
+            <TourTaskList tourId={id} tasks={tasks} canManage={canEditTeam} />
 
             {/* Emails — Super Guide / Admin only */}
             {canSeeFinancials && <SaleEmails emails={emails} threadIds={tour.threadIds} />}
