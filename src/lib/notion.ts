@@ -457,6 +457,56 @@ export async function getServiceDetail(id: string): Promise<ServiceDetail | null
   };
 }
 
+// ── Sale tasks (operational checklist for a specific booking) ─────────────────
+
+export type SaleTask = {
+  id: string;
+  name: string;
+  description: string;
+  status: string | null;
+  priority: string | null;
+  categoria: string[];
+  dueDate: string | null;
+  fileUrl: string | null;
+  teamMemberId: string | null;
+  teamMemberName: string | null;
+};
+
+const TASK_STATUS_OPTIONS = ["To do", "In Progress", "Done"] as const;
+
+export async function getTasksForSale(saleId: string): Promise<SaleTask[]> {
+  const { data } = await supabase
+    .from("tasks")
+    .select("id, name, task_description, status, priority, categoria, due_date, file_url, team_member_id, team(name)")
+    .eq("sale_id", saleId)
+    .order("due_date", { ascending: true, nullsFirst: false });
+
+  return ((data ?? []) as unknown as {
+    id: string; name: string; task_description: string | null; status: string | null; priority: string | null;
+    categoria: string[] | null; due_date: string | null; file_url: string | null;
+    team_member_id: string | null; team: { name: string } | null;
+  }[]).map((t) => ({
+    id: t.id,
+    name: t.name,
+    description: t.task_description ?? "",
+    status: t.status,
+    priority: t.priority,
+    categoria: t.categoria ?? [],
+    dueDate: t.due_date,
+    fileUrl: t.file_url,
+    teamMemberId: t.team_member_id,
+    teamMemberName: t.team?.name ?? null,
+  }));
+}
+
+export async function updateTaskStatus(taskId: string, status: string): Promise<void> {
+  if (!TASK_STATUS_OPTIONS.includes(status as typeof TASK_STATUS_OPTIONS[number])) {
+    throw new Error(`updateTaskStatus: invalid status "${status}"`);
+  }
+  const { error } = await supabase.from("tasks").update({ status }).eq("id", taskId);
+  if (error) throw new Error(`updateTaskStatus: ${error.message}`);
+}
+
 export async function updateServiceCore(id: string, data: {
   name: string;
   type: string;

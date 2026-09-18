@@ -7,6 +7,7 @@ import {
   getTeamMembers,
   getServiceTypesList,
   getClientsList,
+  getTasksForSale,
   deleteSale,
 } from "@/lib/notion";
 import type { Fornecedor, Transaction } from "@/lib/notion";
@@ -22,6 +23,7 @@ import { ServiceInfoEditor } from "@/components/ServiceInfoEditor";
 import { MapsLink } from "@/components/MapsLink";
 import { DeleteSaleButton } from "@/components/DeleteSaleButton";
 import { EarningList } from "@/components/EarningList";
+import { TourTaskList } from "@/components/TourTaskList";
 import { SaleEmails } from "@/components/SaleEmails";
 import { getSaleEmails } from "@/lib/integration";
 
@@ -140,7 +142,7 @@ async function TourPageContent({
   const canEditTeam = role === "Super Guide" || role === "Admin";
   const canSeeFinancials = role === "Super Guide" || role === "Admin";
 
-  const [tour, txResult, fornecedores, teamMembers, emails, servicesList, clientsList] = await Promise.all([
+  const [tour, txResult, fornecedores, teamMembers, emails, servicesList, clientsList, tasks] = await Promise.all([
     getTourById(id),
     isChef
       ? getChefTransactionsForTour(id).then((t) => ({ expenses: t, earnings: [] }))
@@ -150,6 +152,7 @@ async function TourPageContent({
     canSeeFinancials ? getSaleEmails(id) : Promise.resolve([]),
     canEditTeam ? getServiceTypesList() : Promise.resolve([]),
     canEditTeam ? getClientsList()      : Promise.resolve([]),
+    getTasksForSale(id),
   ]);
 
   const transactions = canSeeFinancials ? txResult.expenses : txResult.expenses;
@@ -321,6 +324,9 @@ async function TourPageContent({
                 )}
               </div>
             </section>
+
+            {/* Tasks */}
+            <TourTaskList tourId={id} tasks={tasks} />
 
             {/* Emails — Super Guide / Admin only */}
             {canSeeFinancials && <SaleEmails emails={emails} threadIds={tour.threadIds} />}
