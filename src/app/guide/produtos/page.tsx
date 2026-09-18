@@ -1,23 +1,16 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { getServiceCatalog } from "@/lib/notion";
+import { groupByType, formatDuration } from "@/lib/serviceCatalogGrouping";
 import Link from "next/link";
 import Image from "next/image";
-
-function formatDuration(minutes: number | null): string {
-  if (!minutes) return "—";
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  if (h === 0) return `${m}min`;
-  if (m === 0) return `${h}h`;
-  return `${h}h${m}min`;
-}
 
 export default async function GuideProdutosPage() {
   const session = await auth();
   if (!session) redirect("/login");
 
   const services = await getServiceCatalog();
+  const groups = groupByType(services);
 
   return (
     <div className="min-h-screen bg-[#667470] text-[#32373c]">
@@ -38,19 +31,34 @@ export default async function GuideProdutosPage() {
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {services.map((s) => (
-            <Link key={s.id} href={`/guide/produtos/${s.id}`}>
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 hover:border-[#667470]/30 active:scale-[0.98] transition-all cursor-pointer h-full">
-                <p className="font-bold text-[#32373c]">{s.name}</p>
-                <div className="flex items-center gap-2 mt-2 flex-wrap">
-                  {s.type && (
-                    <span className="text-xs bg-[#667470]/10 text-[#667470] px-2 py-0.5 rounded-full font-medium">{s.type}</span>
-                  )}
-                  <span className="text-xs text-gray-400">{formatDuration(s.durationMinutes)}</span>
-                </div>
+        <div className="space-y-6">
+          {groups.map(([type, items]) => (
+            <section key={type} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="px-5 py-4 border-b border-gray-50 flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-[#32373c]">{type}</h2>
+                <span className="text-xs text-gray-400">{items.length}</span>
               </div>
-            </Link>
+              <table className="w-full text-sm">
+                <tbody className="divide-y divide-gray-50">
+                  {items.map((s) => (
+                    <tr key={s.id}>
+                      <td className="p-0">
+                        <Link
+                          href={`/guide/produtos/${s.id}`}
+                          className="flex items-center justify-between gap-3 px-5 py-3 hover:bg-gray-50 transition-colors"
+                        >
+                          <span className="font-medium text-[#32373c]">{s.name}</span>
+                          <span className="flex items-center gap-3 shrink-0">
+                            <span className="text-xs text-gray-400">{formatDuration(s.durationMinutes)}</span>
+                            <span className="text-gray-300">→</span>
+                          </span>
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </section>
           ))}
         </div>
 
