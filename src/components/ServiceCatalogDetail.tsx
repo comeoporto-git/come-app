@@ -33,7 +33,7 @@ function formatDuration(minutes: number | null): string {
   return `${h}h${m}min`;
 }
 
-const inputCls = "w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#667470] transition-colors";
+const inputCls = "w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-[#32373c] bg-white placeholder:text-gray-400 focus:outline-none focus:border-[#667470] transition-colors";
 
 export function ServiceCatalogDetail({ service, canEdit, showAdminSections }: Props) {
   return (
