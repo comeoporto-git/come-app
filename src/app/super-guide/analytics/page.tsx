@@ -1,7 +1,7 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { signOut } from "@/lib/auth";
-import { getAnalyticsTours, getAnalyticsTransactions, getTeamMembers, resolvePageTitles } from "@/lib/notion";
+import { getAnalyticsTours, getAnalyticsTransactions, getTeamMembers, getFornecedores, resolvePageTitles } from "@/lib/notion";
 import { AnalyticsDashboard } from "@/components/AnalyticsDashboard";
 import Image from "next/image";
 import Link from "next/link";
@@ -11,10 +11,11 @@ export default async function SuperGuideAnalyticsPage() {
   if (!session) redirect("/login");
   if (session.user.role !== "Super Guide" && session.user.role !== "Admin") redirect("/");
 
-  const [tours, transactions, teamMembers] = await Promise.all([
+  const [tours, transactions, teamMembers, fornecedores] = await Promise.all([
     getAnalyticsTours(),
     getAnalyticsTransactions(),
     getTeamMembers(),
+    getFornecedores(),
   ]);
 
   const teamMap = Object.fromEntries(teamMembers.map((m) => [m.id, m.name]));
@@ -66,6 +67,7 @@ export default async function SuperGuideAnalyticsPage() {
           transactions={transactions}
           teamMap={teamMap}
           clientNameMap={clientNameMap}
+          fornecedores={fornecedores}
         />
       </main>
     </div>
