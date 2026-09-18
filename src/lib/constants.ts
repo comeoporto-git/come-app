@@ -16,3 +16,7 @@ export function ownershipForDate(date: string | null | undefined): Record<string
 export const SERVICE_TEAM_ROLES = ["Guia", "Chef", "Copa", "Driver", "Logistics"] as const;
 
 export const WEEKDAY_LABELS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"] as const;
+
+// Roles a task can be assigned to (tasks.role). Admin/Super Guide tasks are
+// hidden from every other role — see getTasksForSale.
+export const TASK_ROLE_OPTIONS = ["Admin", "Guide", "Super Guide", "Chef", "Driver", "Logistics"] as const;
