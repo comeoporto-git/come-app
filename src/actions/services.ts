@@ -13,10 +13,12 @@ import {
   deleteServiceTask,
   createRestaurant,
   updateRestaurantHours,
+  updateRestaurantGoogleUrl,
   linkServiceRestaurant,
   unlinkServiceRestaurant,
   type RestaurantHourInput,
 } from "@/lib/notion";
+import { fetchRestaurantHoursFromUrl } from "@/lib/googlePlaceHours";
 
 async function requireAdmin() {
   const session = await auth();
@@ -140,7 +142,7 @@ export async function deleteServiceTaskAction(serviceId: string, taskId: string)
 
 export async function createRestaurantAction(
   serviceId: string,
-  data: { name: string; address: string; phone: string; notes: string; hours: RestaurantHourInput[] },
+  data: { name: string; address: string; phone: string; notes: string; googleUrl?: string; hours: RestaurantHourInput[] },
 ): Promise<{ error?: string }> {
   try {
     await requireAdmin();
@@ -164,6 +166,38 @@ export async function updateRestaurantHoursAction(
     await updateRestaurantHours(restaurantId, hours);
     revalidateService(serviceId);
     return {};
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+export async function updateRestaurantGoogleUrlAction(
+  serviceId: string,
+  restaurantId: string,
+  googleUrl: string,
+): Promise<{ error?: string }> {
+  try {
+    await requireAdmin();
+    await updateRestaurantGoogleUrl(restaurantId, googleUrl);
+    revalidateService(serviceId);
+    return {};
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/**
+ * Best-effort fetch of weekly hours from a Google Maps/Business URL. Not the
+ * Places API — scrapes public page markup, so it can fail or be wrong.
+ * Callers should treat the result as a pre-fill, not a final save.
+ */
+export async function fetchRestaurantHoursFromUrlAction(
+  url: string,
+): Promise<{ hours?: RestaurantHourInput[]; resolvedUrl?: string; error?: string }> {
+  try {
+    await requireAdmin();
+    const { hours, resolvedUrl } = await fetchRestaurantHoursFromUrl(url);
+    return { hours, resolvedUrl };
   } catch (e) {
     return { error: e instanceof Error ? e.message : String(e) };
   }
