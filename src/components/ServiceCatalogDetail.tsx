@@ -635,17 +635,20 @@ function GoogleHoursFetchField({
 }) {
   const [fetching, setFetching] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [debugSnippet, setDebugSnippet] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
   async function handleFetch() {
     if (!googleUrl.trim()) { setError("Cola um link do Google Maps primeiro"); return; }
     setFetching(true);
     setError(null);
+    setDebugSnippet(null);
     setSuccess(false);
     const result = await fetchRestaurantHoursFromUrlAction(googleUrl.trim());
     setFetching(false);
     if (result.error || !result.hours) {
       setError(result.error || "Não foi possível obter o horário");
+      setDebugSnippet(result.debugSnippet ?? null);
       return;
     }
     onFetched(result.hours.map((h) => ({
@@ -678,6 +681,14 @@ function GoogleHoursFetchField({
       {error && <p className="text-xs text-red-500 font-medium">{error}</p>}
       {success && <p className="text-xs text-emerald-600 font-medium">Horário preenchido — revê e guarda.</p>}
       <p className="text-xs text-gray-400">Experimental: confirma sempre o horário antes de guardar.</p>
+      {debugSnippet && (
+        <details className="text-xs">
+          <summary className="text-gray-400 cursor-pointer hover:text-gray-600">Detalhes técnicos (envia isto se pedires ajuda)</summary>
+          <pre className="mt-1 p-2 bg-gray-50 border border-gray-100 rounded-lg text-[10px] leading-tight whitespace-pre-wrap break-all max-h-64 overflow-y-auto select-all">
+            {debugSnippet}
+          </pre>
+        </details>
+      )}
     </div>
   );
 }

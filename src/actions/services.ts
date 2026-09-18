@@ -18,7 +18,7 @@ import {
   unlinkServiceRestaurant,
   type RestaurantHourInput,
 } from "@/lib/notion";
-import { fetchRestaurantHoursFromUrl } from "@/lib/googlePlaceHours";
+import { fetchRestaurantHoursFromUrl, HoursFetchError } from "@/lib/googlePlaceHours";
 
 async function requireAdmin() {
   const session = await auth();
@@ -193,12 +193,13 @@ export async function updateRestaurantGoogleUrlAction(
  */
 export async function fetchRestaurantHoursFromUrlAction(
   url: string,
-): Promise<{ hours?: RestaurantHourInput[]; resolvedUrl?: string; error?: string }> {
+): Promise<{ hours?: RestaurantHourInput[]; resolvedUrl?: string; error?: string; debugSnippet?: string }> {
   try {
     await requireAdmin();
     const { hours, resolvedUrl } = await fetchRestaurantHoursFromUrl(url);
     return { hours, resolvedUrl };
   } catch (e) {
+    if (e instanceof HoursFetchError) return { error: e.message, debugSnippet: e.debugSnippet };
     return { error: e instanceof Error ? e.message : String(e) };
   }
 }
