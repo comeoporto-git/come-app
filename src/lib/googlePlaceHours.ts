@@ -17,7 +17,35 @@ const BROWSER_HEADERS = {
   "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
   "Accept-Language": "en-US,en;q=0.9",
   Accept: "text/html,application/xhtml+xml",
+  // Pre-accepts Google's EU cookie-consent interstitial, which otherwise
+  // replaces the whole page (and any hours data) for unauthenticated
+  // automated requests — a well-known requirement for server-side fetches.
+  Cookie: "CONSENT=YES+cb.20210328-17-p0.en+FX+410;SOCS=CAI",
 };
+
+/** Thrown when hours can't be parsed — carries a diagnostic snippet so a failure can be debugged from the returned error alone. */
+export class HoursFetchError extends Error {
+  debugSnippet: string;
+  constructor(message: string, debugSnippet: string) {
+    super(message);
+    this.name = "HoursFetchError";
+    this.debugSnippet = debugSnippet;
+  }
+}
+
+function buildDebugSnippet(resolvedUrl: string, status: number, html: string): string {
+  const looksLikeConsentWall = /consent\.google\.com|before you continue|antes de continuar/i.test(html) || resolvedUrl.includes("consent.google.com");
+  const lines = [
+    `status: ${status}`,
+    `resolvedUrl: ${resolvedUrl}`,
+    `htmlLength: ${html.length}`,
+    `hasJsonLd: ${/application\/ld\+json/i.test(html)}`,
+    `looksLikeConsentWall: ${looksLikeConsentWall}`,
+    "--- first 3000 chars ---",
+    html.slice(0, 3000),
+  ];
+  return lines.join("\n");
+}
 
 export async function fetchRestaurantHoursFromUrl(url: string): Promise<{ hours: ParsedHour[]; resolvedUrl: string }> {
   let parsed: URL;
@@ -31,9 +59,12 @@ export async function fetchRestaurantHoursFromUrl(url: string): Promise<{ hours:
   }
 
   const res = await fetch(url, { redirect: "follow", headers: BROWSER_HEADERS });
-  if (!res.ok) throw new Error(`O Google respondeu com o estado ${res.status}`);
   const html = await res.text();
   const resolvedUrl = res.url;
+
+  if (!res.ok) {
+    throw new HoursFetchError(`O Google respondeu com o estado ${res.status}`, buildDebugSnippet(resolvedUrl, res.status, html));
+  }
 
   const fromJsonLd = parseJsonLdHours(html);
   if (fromJsonLd && fromJsonLd.length) return { hours: fromJsonLd, resolvedUrl };
@@ -41,7 +72,10 @@ export async function fetchRestaurantHoursFromUrl(url: string): Promise<{ hours:
   const fromEmbedded = parseEmbeddedHours(html);
   if (fromEmbedded && fromEmbedded.length) return { hours: fromEmbedded, resolvedUrl };
 
-  throw new Error("Não foi possível encontrar o horário nesta página — preenche manualmente");
+  throw new HoursFetchError(
+    "Não foi possível encontrar o horário nesta página — preenche manualmente",
+    buildDebugSnippet(resolvedUrl, res.status, html),
+  );
 }
 
 // ── Strategy 1: schema.org JSON-LD (OpeningHoursSpecification) ────────────────
