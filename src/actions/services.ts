@@ -103,11 +103,11 @@ export async function deleteServiceStepAction(serviceId: string, stepId: string)
   }
 }
 
-export async function addServiceTaskAction(serviceId: string, name: string, description: string): Promise<{ error?: string }> {
+export async function addServiceTaskAction(serviceId: string, name: string, description: string, role: string | null): Promise<{ error?: string }> {
   try {
     await requireAdmin();
     if (!name.trim()) return { error: "Nome obrigatório" };
-    await addServiceTask(serviceId, name.trim(), description.trim());
+    await addServiceTask(serviceId, name.trim(), description.trim(), role);
     revalidateService(serviceId);
     return {};
   } catch (e) {
@@ -115,11 +115,11 @@ export async function addServiceTaskAction(serviceId: string, name: string, desc
   }
 }
 
-export async function updateServiceTaskAction(serviceId: string, taskId: string, name: string, description: string): Promise<{ error?: string }> {
+export async function updateServiceTaskAction(serviceId: string, taskId: string, name: string, description: string, role: string | null): Promise<{ error?: string }> {
   try {
     await requireAdmin();
     if (!name.trim()) return { error: "Nome obrigatório" };
-    await updateServiceTask(taskId, name.trim(), description.trim());
+    await updateServiceTask(taskId, name.trim(), description.trim(), role);
     revalidateService(serviceId);
     return {};
   } catch (e) {
