@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { ServiceDetail } from "@/lib/notion";
-import { SERVICE_TEAM_ROLES, WEEKDAY_LABELS } from "@/lib/constants";
+import { SERVICE_TEAM_ROLES, TASK_ROLE_OPTIONS, WEEKDAY_LABELS } from "@/lib/constants";
 import { getOpenStatusForDate } from "@/lib/restaurantOpenStatus";
 import {
   updateServiceCoreAction,
@@ -244,23 +244,26 @@ function StepsSection({ service, canEdit }: { service: ServiceDetail; canEdit: b
 }
 
 function StepForm({
-  initialTitle, initialDescription, onDone, submit,
+  initialTitle, initialDescription, initialRole = null, roleField = false, onDone, submit,
 }: {
   serviceId: string;
   initialTitle: string;
   initialDescription: string;
+  initialRole?: string | null;
+  roleField?: boolean;
   onDone: () => void;
-  submit: (title: string, description: string) => Promise<{ error?: string }>;
+  submit: (title: string, description: string, role: string | null) => Promise<{ error?: string }>;
 }) {
   const [title, setTitle] = useState(initialTitle);
   const [description, setDescription] = useState(initialDescription);
+  const [role, setRole] = useState(initialRole ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleSave() {
     setSaving(true);
     setError(null);
-    const result = await submit(title, description);
+    const result = await submit(title, description, roleField ? (role || null) : null);
     setSaving(false);
     if (result.error) setError(result.error);
     else { window.location.reload(); }
@@ -270,6 +273,12 @@ function StepForm({
     <div className="space-y-2">
       <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Título do passo" className={inputCls} />
       <textarea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Descrição (opcional)" className={`${inputCls} resize-none`} />
+      {roleField && (
+        <select value={role} onChange={(e) => setRole(e.target.value)} className={`${inputCls} bg-white`}>
+          <option value="">Sem função responsável</option>
+          {TASK_ROLE_OPTIONS.map((r) => <option key={r} value={r}>{r}</option>)}
+        </select>
+      )}
       {error && <p className="text-xs text-red-500 font-medium">{error}</p>}
       <div className="flex gap-2">
         <button onClick={handleSave} disabled={saving} className="bg-[#32373c] text-white text-xs font-semibold px-3 py-1.5 rounded-lg disabled:opacity-50 hover:bg-[#1a2018] transition-colors">
@@ -429,6 +438,15 @@ function NumField({ label, value, onChange }: { label: string; value: string | n
 
 // ── Tasks (Admin only) ──────────────────────────────────────────────────────────
 
+const TASK_ROLE_COLORS: Record<string, string> = {
+  Admin:         "bg-purple-50 text-purple-600 border-purple-100",
+  "Super Guide": "bg-purple-50 text-purple-600 border-purple-100",
+  Guide:         "bg-[#667470]/10 text-[#667470] border-[#667470]/20",
+  Chef:          "bg-red-50 text-red-600 border-red-100",
+  Driver:        "bg-slate-100 text-slate-600 border-slate-200",
+  Logistics:     "bg-orange-50 text-orange-600 border-orange-100",
+};
+
 function TasksSection({ service, canEdit }: { service: ServiceDetail; canEdit: boolean }) {
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -457,8 +475,10 @@ function TasksSection({ service, canEdit }: { service: ServiceDetail; canEdit: b
                   serviceId={service.id}
                   initialTitle={task.name}
                   initialDescription={task.description}
+                  initialRole={task.role}
+                  roleField
                   onDone={() => setEditingId(null)}
-                  submit={(name, desc) => updateServiceTaskAction(service.id, task.id, name, desc)}
+                  submit={(name, desc, role) => updateServiceTaskAction(service.id, task.id, name, desc, role)}
                 />
               </li>
             ) : (
@@ -467,6 +487,11 @@ function TasksSection({ service, canEdit }: { service: ServiceDetail; canEdit: b
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-[#32373c]">{task.name}</p>
                   {task.description && <p className="text-sm text-gray-500 mt-0.5 whitespace-pre-line">{task.description}</p>}
+                  {task.role && (
+                    <span className={`inline-block text-xs border px-1.5 py-0.5 rounded-md font-medium mt-1.5 ${TASK_ROLE_COLORS[task.role] ?? "bg-gray-50 text-gray-500 border-gray-100"}`}>
+                      {task.role}
+                    </span>
+                  )}
                 </div>
                 {canEdit && (
                   <div className="flex gap-2 shrink-0">
@@ -485,8 +510,9 @@ function TasksSection({ service, canEdit }: { service: ServiceDetail; canEdit: b
             serviceId={service.id}
             initialTitle=""
             initialDescription=""
+            roleField
             onDone={() => setAdding(false)}
-            submit={(name, desc) => addServiceTaskAction(service.id, name, desc)}
+            submit={(name, desc, role) => addServiceTaskAction(service.id, name, desc, role)}
           />
         </div>
       )}

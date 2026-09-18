@@ -364,7 +364,7 @@ export async function getServiceCatalog(): Promise<ServiceCatalogItem[]> {
 }
 
 export type ServiceStep = { id: string; sortOrder: number; title: string; description: string };
-export type ServiceTask = { id: string; sortOrder: number; name: string; description: string };
+export type ServiceTask = { id: string; sortOrder: number; name: string; description: string; role: string | null };
 
 export type RestaurantHour = {
   dayOfWeek: number; // 0 = Sunday .. 6 = Saturday
@@ -411,7 +411,7 @@ export async function getServiceDetail(id: string): Promise<ServiceDetail | null
   const [{ data: service }, { data: steps }, { data: tasks }, { data: links }] = await Promise.all([
     supabase.from("services").select("*").eq("id", id).single(),
     supabase.from("service_steps").select("id, sort_order, title, description").eq("service_id", id).order("sort_order"),
-    supabase.from("service_tasks").select("id, sort_order, name, description").eq("service_id", id).order("sort_order"),
+    supabase.from("service_tasks").select("id, sort_order, name, description, role").eq("service_id", id).order("sort_order"),
     supabase
       .from("service_restaurants")
       .select("sort_order, notes, restaurants(id, name, address, phone, notes, restaurant_hours(day_of_week, open_time, close_time, closed))")
@@ -437,7 +437,7 @@ export async function getServiceDetail(id: string): Promise<ServiceDetail | null
     valor_copa: service.valor_copa,
     valor_driver: service.valor_driver,
     steps: (steps ?? []).map((s) => ({ id: s.id, sortOrder: s.sort_order, title: s.title, description: s.description ?? "" })),
-    tasks: (tasks ?? []).map((t) => ({ id: t.id, sortOrder: t.sort_order, name: t.name, description: t.description ?? "" })),
+    tasks: (tasks ?? []).map((t) => ({ id: t.id, sortOrder: t.sort_order, name: t.name, description: t.description ?? "", role: t.role })),
     restaurants: ((links ?? []) as unknown as { sort_order: number; notes: string | null; restaurants: RestaurantRow | null }[])
       .filter((l) => l.restaurants)
       .map((l) => {
@@ -479,14 +479,19 @@ const TASK_STATUS_OPTIONS = ["To do", "In Progress", "Done"] as const;
 const PRIVILEGED_TASK_ROLES = ["Admin", "Super Guide"];
 
 /**
- * Tasks for a booking. Admin/Super Guide see everything; every other role
- * sees everything except tasks assigned to the Admin or Super Guide role.
+ * Tasks for a booking. Only tasks created through the role-assignment
+ * feature (role IS NOT NULL) are shown — this excludes the older freeform
+ * tasks (e.g. "Definir Chef", "Adicionar Despesas") that predate it and
+ * were never meant to show up here. Admin/Super Guide see everything;
+ * every other role sees everything except tasks assigned to the Admin or
+ * Super Guide role.
  */
 export async function getTasksForSale(saleId: string, viewerRole: string): Promise<SaleTask[]> {
   const { data } = await supabase
     .from("tasks")
     .select("id, name, task_description, status, priority, categoria, due_date, file_url, role, team_member_id, team(name)")
     .eq("sale_id", saleId)
+    .not("role", "is", null)
     .order("due_date", { ascending: true, nullsFirst: false });
 
   const rows = (data ?? []) as unknown as {
@@ -610,19 +615,20 @@ export async function deleteServiceStep(id: string): Promise<void> {
   if (error) throw new Error(`deleteServiceStep: ${error.message}`);
 }
 
-export async function addServiceTask(serviceId: string, name: string, description: string): Promise<void> {
+export async function addServiceTask(serviceId: string, name: string, description: string, role: string | null): Promise<void> {
   const { count } = await supabase.from("service_tasks").select("id", { count: "exact", head: true }).eq("service_id", serviceId);
   const { error } = await supabase.from("service_tasks").insert({
     service_id: serviceId,
     sort_order: count ?? 0,
     name,
     description: description || null,
+    role: role || null,
   });
   if (error) throw new Error(`addServiceTask: ${error.message}`);
 }
 
-export async function updateServiceTask(id: string, name: string, description: string): Promise<void> {
-  const { error } = await supabase.from("service_tasks").update({ name, description: description || null }).eq("id", id);
+export async function updateServiceTask(id: string, name: string, description: string, role: string | null): Promise<void> {
+  const { error } = await supabase.from("service_tasks").update({ name, description: description || null, role: role || null }).eq("id", id);
   if (error) throw new Error(`updateServiceTask: ${error.message}`);
 }
 
