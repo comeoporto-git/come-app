@@ -71,6 +71,13 @@ export const FEATURES: Feature[] = [
     defaultRoles: ["Admin", "Super Guide"],
   },
   {
+    key: "product_catalog",
+    label: "Produtos & Serviços",
+    description: "Catálogo de tipos de serviço: preço por pax, passos, tarefas e restaurantes sugeridos",
+    path: "/admin/produtos",
+    defaultRoles: ["Admin", "Super Guide"],
+  },
+  {
     key: "user_management",
     label: "Utilizadores",
     description: "Gerir contas e roles da equipa",

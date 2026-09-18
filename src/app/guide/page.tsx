@@ -41,6 +41,7 @@ export default async function GuideHome() {
         <div className="grid grid-cols-2 gap-3">
           {[
             { href: "/guide/services", icon: "🗓️", label: "Os meus Serviços" },
+            { href: "/guide/produtos", icon: "📋", label: "Produtos & Serviços" },
             { href: "/profile",        icon: "👤", label: "Perfil" },
           ].map((item) => (
             <Link

@@ -11,3 +11,8 @@ export const OWNERSHIP_AFTER: Record<string, number> = { "António": 40, "Bernar
 export function ownershipForDate(date: string | null | undefined): Record<string, number> {
   return date && date < PARTNER_SPLIT_DATE ? OWNERSHIP_BEFORE : OWNERSHIP_AFTER;
 }
+
+// Roles that can be required team members on a service (services.equipa).
+export const SERVICE_TEAM_ROLES = ["Guia", "Chef", "Copa", "Driver", "Logistics"] as const;
+
+export const WEEKDAY_LABELS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"] as const;

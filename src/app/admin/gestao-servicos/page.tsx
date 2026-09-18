@@ -73,6 +73,17 @@ export default async function GestaoToursPage() {
               </div>
             </Link>
 
+            <Link href="/admin/produtos">
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex items-center gap-4 hover:border-[#667470]/30 active:scale-[0.98] transition-all cursor-pointer">
+                <div className="w-12 h-12 rounded-2xl bg-[#667470]/10 flex items-center justify-center text-2xl shrink-0">📋</div>
+                <div>
+                  <p className="font-bold text-[#32373c]">Produtos & Serviços</p>
+                  <p className="text-sm text-gray-400">Preços, passos, tarefas, restaurantes</p>
+                </div>
+                <span className="ml-auto text-gray-300 text-lg">→</span>
+              </div>
+            </Link>
+
             {role === "Admin" && (
               <Link href="/admin/gestao-servicos/novo">
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex items-center gap-4 hover:border-[#667470]/30 active:scale-[0.98] transition-all cursor-pointer">
