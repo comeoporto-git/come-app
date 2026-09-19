@@ -16,7 +16,6 @@ import {
   createRestaurantAction,
   updateRestaurantHoursAction,
   updateRestaurantGoogleUrlAction,
-  fetchRestaurantHoursFromUrlAction,
   unlinkServiceRestaurantAction,
 } from "@/actions/services";
 
@@ -625,71 +624,14 @@ function RestaurantHoursEditor({
   return <HoursForm serviceId={serviceId} restaurantId={restaurantId} initialHours={hours} initialGoogleUrl={googleUrl} onDone={() => setEditing(false)} />;
 }
 
-/** Paste a Google Maps/Business URL and try to pre-fill the weekly hours from it. Experimental — always review before saving. */
-function GoogleHoursFetchField({
-  googleUrl, onGoogleUrlChange, onFetched,
-}: {
-  googleUrl: string;
-  onGoogleUrlChange: (v: string) => void;
-  onFetched: (hours: DraftHour[]) => void;
-}) {
-  const [fetching, setFetching] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [debugSnippet, setDebugSnippet] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
-
-  async function handleFetch() {
-    if (!googleUrl.trim()) { setError("Cola um link do Google Maps primeiro"); return; }
-    setFetching(true);
-    setError(null);
-    setDebugSnippet(null);
-    setSuccess(false);
-    const result = await fetchRestaurantHoursFromUrlAction(googleUrl.trim());
-    setFetching(false);
-    if (result.error || !result.hours) {
-      setError(result.error || "Não foi possível obter o horário");
-      setDebugSnippet(result.debugSnippet ?? null);
-      return;
-    }
-    onFetched(result.hours.map((h) => ({
-      dayOfWeek: h.dayOfWeek,
-      openTime: h.openTime ? h.openTime.slice(0, 5) : "",
-      closeTime: h.closeTime ? h.closeTime.slice(0, 5) : "",
-      closed: h.closed,
-    })));
-    setSuccess(true);
-  }
-
+function GoogleUrlField({ googleUrl, onGoogleUrlChange }: { googleUrl: string; onGoogleUrlChange: (v: string) => void }) {
   return (
-    <div className="space-y-1.5">
-      <div className="flex gap-2">
-        <input
-          value={googleUrl}
-          onChange={(e) => { onGoogleUrlChange(e.target.value); setSuccess(false); }}
-          placeholder="Link do Google Maps/Business…"
-          className={inputCls}
-        />
-        <button
-          type="button"
-          onClick={handleFetch}
-          disabled={fetching}
-          className="shrink-0 border border-gray-200 text-gray-600 text-xs font-semibold px-3 rounded-xl hover:bg-gray-50 disabled:opacity-50 transition-colors"
-        >
-          {fetching ? "A procurar…" : "Buscar horário"}
-        </button>
-      </div>
-      {error && <p className="text-xs text-red-500 font-medium">{error}</p>}
-      {success && <p className="text-xs text-emerald-600 font-medium">Horário preenchido — revê e guarda.</p>}
-      <p className="text-xs text-gray-400">Experimental: confirma sempre o horário antes de guardar.</p>
-      {debugSnippet && (
-        <details className="text-xs">
-          <summary className="text-gray-400 cursor-pointer hover:text-gray-600">Detalhes técnicos (envia isto se pedires ajuda)</summary>
-          <pre className="mt-1 p-2 bg-gray-50 border border-gray-100 rounded-lg text-[10px] leading-tight whitespace-pre-wrap break-all max-h-64 overflow-y-auto select-all">
-            {debugSnippet}
-          </pre>
-        </details>
-      )}
-    </div>
+    <input
+      value={googleUrl}
+      onChange={(e) => onGoogleUrlChange(e.target.value)}
+      placeholder="Link do Google Maps/Business…"
+      className={inputCls}
+    />
   );
 }
 
@@ -743,7 +685,7 @@ function HoursForm({
 
   return (
     <div className="mt-2 border border-gray-100 rounded-xl p-3 space-y-3 w-full">
-      <GoogleHoursFetchField googleUrl={googleUrl} onGoogleUrlChange={setGoogleUrl} onFetched={setDraft} />
+      <GoogleUrlField googleUrl={googleUrl} onGoogleUrlChange={setGoogleUrl} />
       <div className="space-y-1.5">
       {draft.map((d, i) => (
         <div key={d.dayOfWeek} className="flex items-center gap-2 text-xs">
@@ -809,7 +751,7 @@ function NewRestaurantForm({ serviceId, onDone }: { serviceId: string; onDone: (
       </div>
       <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Morada" className={inputCls} />
       <textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notas (opcional)" className={`${inputCls} resize-none`} />
-      <GoogleHoursFetchField googleUrl={googleUrl} onGoogleUrlChange={setGoogleUrl} onFetched={setDraft} />
+      <GoogleUrlField googleUrl={googleUrl} onGoogleUrlChange={setGoogleUrl} />
       <div className="border border-gray-100 rounded-xl p-3 space-y-1.5">
         <p className="text-xs text-gray-500 mb-1">Horário semanal</p>
         {draft.map((d, i) => (

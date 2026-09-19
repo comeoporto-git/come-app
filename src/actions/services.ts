@@ -18,7 +18,6 @@ import {
   unlinkServiceRestaurant,
   type RestaurantHourInput,
 } from "@/lib/notion";
-import { fetchRestaurantHoursFromUrl, HoursFetchError } from "@/lib/googlePlaceHours";
 
 async function requireAdmin() {
   const session = await auth();
@@ -182,24 +181,6 @@ export async function updateRestaurantGoogleUrlAction(
     revalidateService(serviceId);
     return {};
   } catch (e) {
-    return { error: e instanceof Error ? e.message : String(e) };
-  }
-}
-
-/**
- * Best-effort fetch of weekly hours from a Google Maps/Business URL. Not the
- * Places API — scrapes public page markup, so it can fail or be wrong.
- * Callers should treat the result as a pre-fill, not a final save.
- */
-export async function fetchRestaurantHoursFromUrlAction(
-  url: string,
-): Promise<{ hours?: RestaurantHourInput[]; resolvedUrl?: string; error?: string; debugSnippet?: string }> {
-  try {
-    await requireAdmin();
-    const { hours, resolvedUrl } = await fetchRestaurantHoursFromUrl(url);
-    return { hours, resolvedUrl };
-  } catch (e) {
-    if (e instanceof HoursFetchError) return { error: e.message, debugSnippet: e.debugSnippet };
     return { error: e instanceof Error ? e.message : String(e) };
   }
 }
