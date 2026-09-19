@@ -4,7 +4,8 @@ import { auth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import {
   updateServiceCore,
-  updateServicePricing,
+  upsertServicePriceYear,
+  deleteServicePriceYear,
   addServiceStep,
   updateServiceStep,
   deleteServiceStep,
@@ -49,8 +50,9 @@ export async function updateServiceCoreAction(
   }
 }
 
-export async function updateServicePricingAction(
+export async function upsertServicePriceYearAction(
   id: string,
+  year: number,
   data: {
     pax_2_3: number | null;
     pax_4_6: number | null;
@@ -64,8 +66,20 @@ export async function updateServicePricingAction(
 ): Promise<{ error?: string }> {
   try {
     await requireAdmin();
-    await updateServicePricing(id, data);
+    if (!Number.isInteger(year) || year < 2000 || year > 2100) return { error: "Ano inválido" };
+    await upsertServicePriceYear(id, year, data);
     revalidateService(id);
+    return {};
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+export async function deleteServicePriceYearAction(serviceId: string, priceId: string): Promise<{ error?: string }> {
+  try {
+    await requireAdmin();
+    await deleteServicePriceYear(priceId);
+    revalidateService(serviceId);
     return {};
   } catch (e) {
     return { error: e instanceof Error ? e.message : String(e) };

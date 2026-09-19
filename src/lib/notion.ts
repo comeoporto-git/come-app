@@ -308,30 +308,14 @@ export async function createService(data: {
   name: string;
   type?: string;
   equipa?: string[];
-  pax_2_3?: number | null;
-  pax_4_6?: number | null;
-  pax_7_plus?: number | null;
-  valor_chef_2_3?: number | null;
-  valor_chef_4_6?: number | null;
-  valor_chef_7_10?: number | null;
-  valor_copa?: number | null;
-  valor_driver?: number | null;
   processo?: string;
 }): Promise<void> {
   const { error } = await supabase.from("services").insert({
-    id:              crypto.randomUUID(),
-    name:            data.name,
-    type:            data.type            || null,
-    equipa:          data.equipa?.length  ? data.equipa : null,
-    pax_2_3:         data.pax_2_3         ?? null,
-    pax_4_6:         data.pax_4_6         ?? null,
-    pax_7_plus:      data.pax_7_plus      ?? null,
-    valor_chef_2_3:  data.valor_chef_2_3  ?? null,
-    valor_chef_4_6:  data.valor_chef_4_6  ?? null,
-    valor_chef_7_10: data.valor_chef_7_10 ?? null,
-    valor_copa:      data.valor_copa      ?? null,
-    valor_driver:    data.valor_driver    ?? null,
-    processo:        data.processo        || null,
+    id:       crypto.randomUUID(),
+    name:     data.name,
+    type:     data.type           || null,
+    equipa:   data.equipa?.length ? data.equipa : null,
+    processo: data.processo       || null,
   });
   if (error) throw new Error(`createService: ${error.message}`);
 }
@@ -386,14 +370,9 @@ export type ServiceRestaurant = {
   hours: RestaurantHour[];
 };
 
-export type ServiceDetail = {
+export type ServicePriceYear = {
   id: string;
-  name: string;
-  type: string;
-  description: string;
-  durationMinutes: number | null;
-  equipa: string[];
-  processo: string;
+  year: number;
   pax_2_3: number | null;
   pax_4_6: number | null;
   pax_7_plus: number | null;
@@ -402,6 +381,17 @@ export type ServiceDetail = {
   valor_chef_7_10: number | null;
   valor_copa: number | null;
   valor_driver: number | null;
+};
+
+export type ServiceDetail = {
+  id: string;
+  name: string;
+  type: string;
+  description: string;
+  durationMinutes: number | null;
+  equipa: string[];
+  processo: string;
+  prices: ServicePriceYear[]; // sorted by year, descending
   steps: ServiceStep[];
   tasks: ServiceTask[];
   restaurants: ServiceRestaurant[];
@@ -448,8 +438,13 @@ export async function getServiceRestaurants(serviceId: string): Promise<ServiceR
 }
 
 export async function getServiceDetail(id: string): Promise<ServiceDetail | null> {
-  const [{ data: service }, { data: steps }, { data: tasks }, { data: links }] = await Promise.all([
+  const [{ data: service }, { data: prices }, { data: steps }, { data: tasks }, { data: links }] = await Promise.all([
     supabase.from("services").select("*").eq("id", id).single(),
+    supabase
+      .from("service_prices")
+      .select("id, year, pax_2_3, pax_4_6, pax_7_plus, valor_chef_2_3, valor_chef_4_6, valor_chef_7_10, valor_copa, valor_driver")
+      .eq("service_id", id)
+      .order("year", { ascending: false }),
     supabase.from("service_steps").select("id, sort_order, title, description").eq("service_id", id).order("sort_order"),
     supabase.from("service_tasks").select("id, sort_order, name, description, role").eq("service_id", id).order("sort_order"),
     supabase
@@ -468,14 +463,7 @@ export async function getServiceDetail(id: string): Promise<ServiceDetail | null
     durationMinutes: service.duration_minutes,
     equipa: service.equipa ?? [],
     processo: service.processo ?? "",
-    pax_2_3: service.pax_2_3,
-    pax_4_6: service.pax_4_6,
-    pax_7_plus: service.pax_7_plus,
-    valor_chef_2_3: service.valor_chef_2_3,
-    valor_chef_4_6: service.valor_chef_4_6,
-    valor_chef_7_10: service.valor_chef_7_10,
-    valor_copa: service.valor_copa,
-    valor_driver: service.valor_driver,
+    prices: prices ?? [],
     steps: (steps ?? []).map((s) => ({ id: s.id, sortOrder: s.sort_order, title: s.title, description: s.description ?? "" })),
     tasks: (tasks ?? []).map((t) => ({ id: t.id, sortOrder: t.sort_order, name: t.name, description: t.description ?? "", role: t.role })),
     restaurants: ((links ?? []) as unknown as { sort_order: number; notes: string | null; restaurants: RestaurantRow | null }[])
@@ -612,7 +600,7 @@ export async function updateServiceCore(id: string, data: {
   if (error) throw new Error(`updateServiceCore: ${error.message}`);
 }
 
-export async function updateServicePricing(id: string, data: {
+export async function upsertServicePriceYear(serviceId: string, year: number, data: {
   pax_2_3: number | null;
   pax_4_6: number | null;
   pax_7_plus: number | null;
@@ -622,7 +610,9 @@ export async function updateServicePricing(id: string, data: {
   valor_copa: number | null;
   valor_driver: number | null;
 }): Promise<void> {
-  const { error } = await supabase.from("services").update({
+  const { error } = await supabase.from("service_prices").upsert({
+    service_id:      serviceId,
+    year,
     pax_2_3:         data.pax_2_3,
     pax_4_6:         data.pax_4_6,
     pax_7_plus:      data.pax_7_plus,
@@ -631,8 +621,13 @@ export async function updateServicePricing(id: string, data: {
     valor_chef_7_10: data.valor_chef_7_10,
     valor_copa:      data.valor_copa,
     valor_driver:    data.valor_driver,
-  }).eq("id", id);
-  if (error) throw new Error(`updateServicePricing: ${error.message}`);
+  }, { onConflict: "service_id,year" });
+  if (error) throw new Error(`upsertServicePriceYear: ${error.message}`);
+}
+
+export async function deleteServicePriceYear(priceId: string): Promise<void> {
+  const { error } = await supabase.from("service_prices").delete().eq("id", priceId);
+  if (error) throw new Error(`deleteServicePriceYear: ${error.message}`);
 }
 
 export async function addServiceStep(serviceId: string, title: string, description: string): Promise<void> {
@@ -1042,12 +1037,39 @@ export async function updateTourTeam(
 const SALE_SELECT_WITH_PRICES = `
   *,
   clients(name),
-  services(name, type, equipa, pax_2_3, pax_4_6, pax_7_plus),
+  services(name, type, equipa, service_prices(year, pax_2_3, pax_4_6, pax_7_plus)),
   guide:team!sales_guide_id_fkey(name),
   chef:team!sales_chef_id_fkey(name),
   driver:team!sales_driver_id_fkey(name),
   logistics:team!sales_logistics_id_fkey(name)
 `.trim();
+
+type YearPriceRow = { year: number; pax_2_3: number | null; pax_4_6: number | null; pax_7_plus: number | null };
+
+/** Picks the price row whose year is closest to the sale's year, preferring the earlier one on a tie. */
+function pickPriceForYear(prices: YearPriceRow[], year: number): YearPriceRow | undefined {
+  if (!prices.length) return undefined;
+  return [...prices].sort((a, b) => {
+    const diff = Math.abs(a.year - year) - Math.abs(b.year - year);
+    return diff !== 0 ? diff : a.year - b.year;
+  })[0];
+}
+
+function pricePerPaxForTour(
+  svc: { service_prices?: YearPriceRow[] },
+  tour: Tour,
+): { price1: number; price23: number; price46: number; price7: number; pricePerPax: number } {
+  const year = tour.date ? new Date(tour.date).getFullYear() : new Date().getFullYear();
+  const price = pickPriceForYear(svc.service_prices ?? [], year);
+  const p1  = (price?.pax_2_3 ?? 0) * 2;
+  const p23 = price?.pax_2_3    ?? 0;
+  const p46 = price?.pax_4_6    ?? 0;
+  const p7  = price?.pax_7_plus ?? 0;
+  const pricePerPax = tour.numGuests >= 7 ? p7
+                    : tour.numGuests >= 4 ? p46
+                    : tour.numGuests >= 2 ? p23 : p1;
+  return { price1: p1, price23: p23, price46: p46, price7: p7, pricePerPax };
+}
 
 export async function getFinalisedSales(): Promise<FinalisedSale[]> {
   const { data } = await supabase.from("sales")
@@ -1059,14 +1081,7 @@ export async function getFinalisedSales(): Promise<FinalisedSale[]> {
     const tour = mapSaleRow(row);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const svc  = (row as any).services ?? {};
-    const p1   = (svc.pax_2_3 ?? 0) * 2;
-    const p23  = svc.pax_2_3  ?? 0;
-    const p46  = svc.pax_4_6  ?? 0;
-    const p7   = svc.pax_7_plus ?? 0;
-    const pricePerPax = tour.numGuests >= 7 ? p7
-                      : tour.numGuests >= 4 ? p46
-                      : tour.numGuests >= 2 ? p23 : p1;
-    return { ...tour, price1: p1, price23: p23, price46: p46, price7: p7, pricePerPax };
+    return { ...tour, ...pricePerPaxForTour(svc, tour) };
   });
 }
 
@@ -1080,14 +1095,7 @@ export async function getInvoicedSales(): Promise<FinalisedSale[]> {
     const tour = mapSaleRow(row);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const svc  = (row as any).services ?? {};
-    const p1   = (svc.pax_2_3 ?? 0) * 2;
-    const p23  = svc.pax_2_3  ?? 0;
-    const p46  = svc.pax_4_6  ?? 0;
-    const p7   = svc.pax_7_plus ?? 0;
-    const pricePerPax = tour.numGuests >= 7 ? p7
-                      : tour.numGuests >= 4 ? p46
-                      : tour.numGuests >= 2 ? p23 : p1;
-    return { ...tour, price1: p1, price23: p23, price46: p46, price7: p7, pricePerPax };
+    return { ...tour, ...pricePerPaxForTour(svc, tour) };
   });
 }
 
@@ -1115,13 +1123,7 @@ export async function getAnalyticsTours(): Promise<Tour[]> {
       all.push(...data.map((row: any) => {
         const tour = mapSaleRow(row);
         const svc  = row.services ?? {};
-        const p1   = (svc.pax_2_3 ?? 0) * 2;
-        const p23  = svc.pax_2_3  ?? 0;
-        const p46  = svc.pax_4_6  ?? 0;
-        const p7   = svc.pax_7_plus ?? 0;
-        const pricePerPax = tour.numGuests >= 7 ? p7
-                          : tour.numGuests >= 4 ? p46
-                          : tour.numGuests >= 2 ? p23 : p1;
+        const { pricePerPax } = pricePerPaxForTour(svc, tour);
         return { ...tour, expectedRevenue: pricePerPax * tour.numGuests };
       }));
       if (data.length < PAGE) break;
