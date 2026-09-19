@@ -9,10 +9,13 @@ import {
   getClientsList,
   getTasksForSale,
   getServiceSteps,
+  getServiceRestaurants,
   deleteSale,
 } from "@/lib/notion";
 import type { Fornecedor, Transaction } from "@/lib/notion";
 import { categoriaBadgeClass } from "@/lib/fornecedor-categories";
+import { getOpenStatusForDate } from "@/lib/restaurantOpenStatus";
+import { WEEKDAY_LABELS } from "@/lib/constants";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { Suspense } from "react";
@@ -166,6 +169,8 @@ async function TourPageContent({
   if (!tour) notFound();
 
   const steps = tour.service ? await getServiceSteps(tour.service) : [];
+  const restaurants = tour.service ? await getServiceRestaurants(tour.service) : [];
+  const tourDate = tour.date ? new Date(`${tour.date}T12:00:00`) : null;
 
   const totalSpent = transactions.reduce((s, t) => s + t.totalCost, 0); // negative values
   const faturacao  = earnings.reduce((s, t) => s + t.totalCost, 0);
@@ -345,6 +350,52 @@ async function TourPageContent({
                     </li>
                   ))}
                 </ol>
+              </section>
+            )}
+
+            {/* Suggested restaurants — from the service catalog, visible to everyone */}
+            {restaurants.length > 0 && (
+              <section className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="px-4 py-3 border-b border-gray-50">
+                  <h2 className="text-sm font-semibold text-gray-700">Restaurantes Sugeridos</h2>
+                </div>
+                <ul className="divide-y divide-gray-50">
+                  {restaurants.map((r) => {
+                    const status = tourDate ? getOpenStatusForDate(r.hours, tourDate) : null;
+                    return (
+                      <li key={r.id} className="px-4 py-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-gray-800">{r.name}</p>
+                            {r.address && <p className="text-xs text-gray-400 mt-0.5">{r.address}</p>}
+                          </div>
+                          {status && (
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-semibold shrink-0 ${status.closed ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700"}`}>
+                              {status.closed ? "Fechado" : "Aberto"}
+                            </span>
+                          )}
+                        </div>
+                        {status && <p className="text-xs text-gray-400 mt-1">{status.label} — dia do tour</p>}
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {WEEKDAY_LABELS.map((label, i) => {
+                            const row = r.hours.find((h) => h.dayOfWeek === i);
+                            const closed = !row || row.closed || !row.openTime || !row.closeTime;
+                            const isTourDay = tourDate?.getDay() === i;
+                            return (
+                              <span
+                                key={i}
+                                title={closed ? `${label}: fechado` : `${label}: ${row!.openTime!.slice(0, 5)}–${row!.closeTime!.slice(0, 5)}`}
+                                className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${closed ? "bg-gray-50 text-gray-300" : "bg-emerald-50 text-emerald-700"} ${isTourDay ? "ring-2 ring-[#667470]" : ""}`}
+                              >
+                                {label.slice(0, 3)}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
               </section>
             )}
 

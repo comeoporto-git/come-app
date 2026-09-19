@@ -14,10 +14,12 @@ import {
   addServiceTaskAction,
   updateServiceTaskAction,
   deleteServiceTaskAction,
+  reorderServiceTasksAction,
   createRestaurantAction,
   updateRestaurantHoursAction,
   updateRestaurantGoogleUrlAction,
   unlinkServiceRestaurantAction,
+  reorderServiceRestaurantsAction,
 } from "@/actions/services";
 
 type Props = {
@@ -181,19 +183,20 @@ function CoreSection({ service, canEdit }: { service: ServiceDetail; canEdit: bo
   );
 }
 
-// ── Steps (visible to all roles) ───────────────────────────────────────────────
+// ── Shared drag-to-reorder helper ────────────────────────────────────────────────
 
-function StepsSection({ service, canEdit }: { service: ServiceDetail; canEdit: boolean }) {
-  const [steps, setSteps] = useState(service.steps);
-  const [adding, setAdding] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
+function useDragReorder<T extends { id: string }>(
+  initialItems: T[],
+  persist: (orderedIds: string[]) => Promise<{ error?: string }>,
+) {
+  const [items, setItems] = useState(initialItems);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
-  const [reorderError, setReorderError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   function handleDragOver(e: React.DragEvent, overIndex: number) {
     e.preventDefault();
     if (dragIndex === null || dragIndex === overIndex) return;
-    setSteps((prev) => {
+    setItems((prev) => {
       const next = [...prev];
       const [moved] = next.splice(dragIndex, 1);
       next.splice(overIndex, 0, moved);
@@ -204,13 +207,38 @@ function StepsSection({ service, canEdit }: { service: ServiceDetail; canEdit: b
 
   async function handleDragEnd() {
     setDragIndex(null);
-    setReorderError(null);
-    const result = await reorderServiceStepsAction(service.id, steps.map((s) => s.id));
+    setError(null);
+    const result = await persist(items.map((i) => i.id));
     if (result.error) {
-      setReorderError(result.error);
-      setSteps(service.steps);
+      setError(result.error);
+      setItems(initialItems);
     }
   }
+
+  return { items, setItems, dragIndex, setDragIndex, error, handleDragOver, handleDragEnd };
+}
+
+function DragHandle() {
+  return (
+    <span
+      className="shrink-0 mt-1 text-gray-300 hover:text-gray-400 cursor-grab active:cursor-grabbing select-none"
+      title="Arrastar para reordenar"
+      aria-hidden="true"
+    >
+      <svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor"><circle cx="2" cy="2" r="1.5" /><circle cx="8" cy="2" r="1.5" /><circle cx="2" cy="8" r="1.5" /><circle cx="8" cy="8" r="1.5" /><circle cx="2" cy="14" r="1.5" /><circle cx="8" cy="14" r="1.5" /></svg>
+    </span>
+  );
+}
+
+// ── Steps (visible to all roles) ───────────────────────────────────────────────
+
+function StepsSection({ service, canEdit }: { service: ServiceDetail; canEdit: boolean }) {
+  const { items: steps, dragIndex, setDragIndex, error: reorderError, handleDragOver, handleDragEnd } = useDragReorder(
+    service.steps,
+    (orderedIds) => reorderServiceStepsAction(service.id, orderedIds),
+  );
+  const [adding, setAdding] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   return (
     <section className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -248,15 +276,7 @@ function StepsSection({ service, canEdit }: { service: ServiceDetail; canEdit: b
                 onDragEnd={handleDragEnd}
                 className={`px-5 py-3 flex items-start gap-3 transition-opacity ${dragIndex === i ? "opacity-40" : ""}`}
               >
-                {canEdit && (
-                  <span
-                    className="shrink-0 mt-1 text-gray-300 hover:text-gray-400 cursor-grab active:cursor-grabbing select-none"
-                    title="Arrastar para reordenar"
-                    aria-hidden="true"
-                  >
-                    <svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor"><circle cx="2" cy="2" r="1.5" /><circle cx="8" cy="2" r="1.5" /><circle cx="2" cy="8" r="1.5" /><circle cx="8" cy="8" r="1.5" /><circle cx="2" cy="14" r="1.5" /><circle cx="8" cy="14" r="1.5" /></svg>
-                  </span>
-                )}
+                {canEdit && <DragHandle />}
                 <span className="w-6 h-6 rounded-full bg-[#667470]/10 text-[#667470] text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-[#32373c]">{step.title}</p>
@@ -493,6 +513,10 @@ const TASK_ROLE_COLORS: Record<string, string> = {
 };
 
 function TasksSection({ service, canEdit }: { service: ServiceDetail; canEdit: boolean }) {
+  const { items: tasksList, dragIndex, setDragIndex, error: reorderError, handleDragOver, handleDragEnd } = useDragReorder(
+    service.tasks,
+    (orderedIds) => reorderServiceTasksAction(service.id, orderedIds),
+  );
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -509,11 +533,12 @@ function TasksSection({ service, canEdit }: { service: ServiceDetail; canEdit: b
           </button>
         )}
       </div>
-      {service.tasks.length === 0 && !adding ? (
+      {reorderError && <p className="px-5 pt-3 text-xs text-red-500 font-medium">{reorderError}</p>}
+      {tasksList.length === 0 && !adding ? (
         <div className="px-5 py-6 text-center text-sm text-gray-400">Nenhuma tarefa definida</div>
       ) : (
         <ul className="divide-y divide-gray-50">
-          {service.tasks.map((task) =>
+          {tasksList.map((task, i) =>
             editingId === task.id ? (
               <li key={task.id} className="px-5 py-3">
                 <StepForm
@@ -527,7 +552,16 @@ function TasksSection({ service, canEdit }: { service: ServiceDetail; canEdit: b
                 />
               </li>
             ) : (
-              <li key={task.id} className="px-5 py-3 flex items-start gap-3">
+              <li
+                key={task.id}
+                draggable={canEdit}
+                onDragStart={() => setDragIndex(i)}
+                onDragOver={(e) => handleDragOver(e, i)}
+                onDrop={(e) => e.preventDefault()}
+                onDragEnd={handleDragEnd}
+                className={`px-5 py-3 flex items-start gap-3 transition-opacity ${dragIndex === i ? "opacity-40" : ""}`}
+              >
+                {canEdit && <DragHandle />}
                 <span className="w-5 h-5 rounded border border-gray-200 shrink-0 mt-0.5" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-[#32373c]">{task.name}</p>
@@ -568,6 +602,10 @@ function TasksSection({ service, canEdit }: { service: ServiceDetail; canEdit: b
 // ── Suggested restaurants + weekly schedule ─────────────────────────────────────
 
 function RestaurantsSection({ service, canEdit }: { service: ServiceDetail; canEdit: boolean }) {
+  const { items: restaurantsList, dragIndex, setDragIndex, error: reorderError, handleDragOver, handleDragEnd } = useDragReorder(
+    service.restaurants,
+    (orderedIds) => reorderServiceRestaurantsAction(service.id, orderedIds),
+  );
   const [checkDate, setCheckDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [adding, setAdding] = useState(false);
   const dateObj = checkDate ? new Date(checkDate + "T12:00:00") : new Date();
@@ -581,36 +619,48 @@ function RestaurantsSection({ service, canEdit }: { service: ServiceDetail; canE
           <input type="date" value={checkDate} onChange={(e) => setCheckDate(e.target.value)} className="border border-gray-200 rounded-lg px-2 py-1 text-xs" />
         </div>
       </div>
-      {service.restaurants.length === 0 && !adding ? (
+      {reorderError && <p className="px-5 pt-3 text-xs text-red-500 font-medium">{reorderError}</p>}
+      {restaurantsList.length === 0 && !adding ? (
         <div className="px-5 py-6 text-center text-sm text-gray-400">Nenhum restaurante sugerido</div>
       ) : (
         <ul className="divide-y divide-gray-50">
-          {service.restaurants.map((r) => {
+          {restaurantsList.map((r, i) => {
             const status = getOpenStatusForDate(r.hours, dateObj);
             return (
-              <li key={r.id} className="px-5 py-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-[#32373c]">{r.name}</p>
-                    {r.address && <p className="text-xs text-gray-400 mt-0.5">{r.address}</p>}
-                    {r.googleUrl && (
-                      <a href={r.googleUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-[#667470] hover:underline mt-0.5 inline-block">
-                        Ver no Google Maps
-                      </a>
-                    )}
+              <li
+                key={r.id}
+                draggable={canEdit}
+                onDragStart={() => setDragIndex(i)}
+                onDragOver={(e) => handleDragOver(e, i)}
+                onDrop={(e) => e.preventDefault()}
+                onDragEnd={handleDragEnd}
+                className={`px-5 py-3 flex items-start gap-3 transition-opacity ${dragIndex === i ? "opacity-40" : ""}`}
+              >
+                {canEdit && <DragHandle />}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-[#32373c]">{r.name}</p>
+                      {r.address && <p className="text-xs text-gray-400 mt-0.5">{r.address}</p>}
+                      {r.googleUrl && (
+                        <a href={r.googleUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-[#667470] hover:underline mt-0.5 inline-block">
+                          Ver no Google Maps
+                        </a>
+                      )}
+                    </div>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${status.closed ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700"}`}>
+                      {status.closed ? "Fechado" : "Aberto"}
+                    </span>
                   </div>
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${status.closed ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700"}`}>
-                    {status.closed ? "Fechado" : "Aberto"}
-                  </span>
+                  <p className="text-xs text-gray-400 mt-1">{status.label}</p>
+                  <WeeklyHours hours={r.hours} />
+                  {canEdit && (
+                    <div className="mt-2 flex gap-3">
+                      <RestaurantHoursEditor serviceId={service.id} restaurantId={r.id} hours={r.hours} googleUrl={r.googleUrl} />
+                      <DeleteButton onConfirm={() => unlinkServiceRestaurantAction(service.id, r.id)} />
+                    </div>
+                  )}
                 </div>
-                <p className="text-xs text-gray-400 mt-1">{status.label}</p>
-                <WeeklyHours hours={r.hours} />
-                {canEdit && (
-                  <div className="mt-2 flex gap-3">
-                    <RestaurantHoursEditor serviceId={service.id} restaurantId={r.id} hours={r.hours} googleUrl={r.googleUrl} />
-                    <DeleteButton onConfirm={() => unlinkServiceRestaurantAction(service.id, r.id)} />
-                  </div>
-                )}
               </li>
             );
           })}

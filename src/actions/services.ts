@@ -12,11 +12,13 @@ import {
   addServiceTask,
   updateServiceTask,
   deleteServiceTask,
+  reorderServiceTasks,
   createRestaurant,
   updateRestaurantHours,
   updateRestaurantGoogleUrl,
   linkServiceRestaurant,
   unlinkServiceRestaurant,
+  reorderServiceRestaurants,
   type RestaurantHourInput,
 } from "@/lib/notion";
 
@@ -151,6 +153,17 @@ export async function deleteServiceTaskAction(serviceId: string, taskId: string)
   }
 }
 
+export async function reorderServiceTasksAction(serviceId: string, orderedIds: string[]): Promise<{ error?: string }> {
+  try {
+    await requireAdmin();
+    await reorderServiceTasks(orderedIds);
+    revalidateService(serviceId);
+    return {};
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
 export async function createRestaurantAction(
   serviceId: string,
   data: { name: string; address: string; phone: string; notes: string; googleUrl?: string; hours: RestaurantHourInput[] },
@@ -201,6 +214,17 @@ export async function unlinkServiceRestaurantAction(serviceId: string, restauran
   try {
     await requireAdmin();
     await unlinkServiceRestaurant(serviceId, restaurantId);
+    revalidateService(serviceId);
+    return {};
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+export async function reorderServiceRestaurantsAction(serviceId: string, orderedRestaurantIds: string[]): Promise<{ error?: string }> {
+  try {
+    await requireAdmin();
+    await reorderServiceRestaurants(serviceId, orderedRestaurantIds);
     revalidateService(serviceId);
     return {};
   } catch (e) {
