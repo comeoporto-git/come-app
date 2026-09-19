@@ -627,6 +627,14 @@ export async function deleteServiceStep(id: string): Promise<void> {
   if (error) throw new Error(`deleteServiceStep: ${error.message}`);
 }
 
+export async function reorderServiceSteps(orderedIds: string[]): Promise<void> {
+  const results = await Promise.all(
+    orderedIds.map((id, index) => supabase.from("service_steps").update({ sort_order: index }).eq("id", id)),
+  );
+  const failed = results.find((r) => r.error);
+  if (failed?.error) throw new Error(`reorderServiceSteps: ${failed.error.message}`);
+}
+
 export async function addServiceTask(serviceId: string, name: string, description: string, role: string | null): Promise<void> {
   const { count } = await supabase.from("service_tasks").select("id", { count: "exact", head: true }).eq("service_id", serviceId);
   const { error } = await supabase.from("service_tasks").insert({
