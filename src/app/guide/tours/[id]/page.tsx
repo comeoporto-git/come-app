@@ -14,7 +14,7 @@ import {
 } from "@/lib/notion";
 import type { Fornecedor, Transaction } from "@/lib/notion";
 import { categoriaBadgeClass } from "@/lib/fornecedor-categories";
-import { getOpenStatusForDate } from "@/lib/restaurantOpenStatus";
+import { getOpenStatusForDate, isRowClosed, formatDayHours } from "@/lib/restaurantOpenStatus";
 import { WEEKDAY_LABELS } from "@/lib/constants";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
@@ -379,12 +379,12 @@ async function TourPageContent({
                         <div className="flex flex-wrap gap-1 mt-2">
                           {WEEKDAY_LABELS.map((label, i) => {
                             const row = r.hours.find((h) => h.dayOfWeek === i);
-                            const closed = !row || row.closed || !row.openTime || !row.closeTime;
+                            const closed = isRowClosed(row);
                             const isTourDay = tourDate?.getDay() === i;
                             return (
                               <span
                                 key={i}
-                                title={closed ? `${label}: fechado` : `${label}: ${row!.openTime!.slice(0, 5)}–${row!.closeTime!.slice(0, 5)}`}
+                                title={closed ? `${label}: fechado` : `${label}: ${formatDayHours(row)}`}
                                 className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${closed ? "bg-gray-50 text-gray-300" : "bg-emerald-50 text-emerald-700"} ${isTourDay ? "ring-2 ring-[#667470]" : ""}`}
                               >
                                 {label.slice(0, 3)}
