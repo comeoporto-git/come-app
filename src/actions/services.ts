@@ -8,6 +8,7 @@ import {
   addServiceStep,
   updateServiceStep,
   deleteServiceStep,
+  reorderServiceSteps,
   addServiceTask,
   updateServiceTask,
   deleteServiceTask,
@@ -97,6 +98,17 @@ export async function deleteServiceStepAction(serviceId: string, stepId: string)
   try {
     await requireAdmin();
     await deleteServiceStep(stepId);
+    revalidateService(serviceId);
+    return {};
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+export async function reorderServiceStepsAction(serviceId: string, orderedIds: string[]): Promise<{ error?: string }> {
+  try {
+    await requireAdmin();
+    await reorderServiceSteps(orderedIds);
     revalidateService(serviceId);
     return {};
   } catch (e) {

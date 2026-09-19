@@ -10,6 +10,7 @@ import {
   addServiceStepAction,
   updateServiceStepAction,
   deleteServiceStepAction,
+  reorderServiceStepsAction,
   addServiceTaskAction,
   updateServiceTaskAction,
   deleteServiceTaskAction,
@@ -183,8 +184,33 @@ function CoreSection({ service, canEdit }: { service: ServiceDetail; canEdit: bo
 // ── Steps (visible to all roles) ───────────────────────────────────────────────
 
 function StepsSection({ service, canEdit }: { service: ServiceDetail; canEdit: boolean }) {
+  const [steps, setSteps] = useState(service.steps);
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [reorderError, setReorderError] = useState<string | null>(null);
+
+  function handleDragOver(e: React.DragEvent, overIndex: number) {
+    e.preventDefault();
+    if (dragIndex === null || dragIndex === overIndex) return;
+    setSteps((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(dragIndex, 1);
+      next.splice(overIndex, 0, moved);
+      return next;
+    });
+    setDragIndex(overIndex);
+  }
+
+  async function handleDragEnd() {
+    setDragIndex(null);
+    setReorderError(null);
+    const result = await reorderServiceStepsAction(service.id, steps.map((s) => s.id));
+    if (result.error) {
+      setReorderError(result.error);
+      setSteps(service.steps);
+    }
+  }
 
   return (
     <section className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -196,11 +222,12 @@ function StepsSection({ service, canEdit }: { service: ServiceDetail; canEdit: b
           </button>
         )}
       </div>
-      {service.steps.length === 0 && !adding ? (
+      {reorderError && <p className="px-5 pt-3 text-xs text-red-500 font-medium">{reorderError}</p>}
+      {steps.length === 0 && !adding ? (
         <div className="px-5 py-6 text-center text-sm text-gray-400">Nenhum passo definido</div>
       ) : (
         <ol className="divide-y divide-gray-50">
-          {service.steps.map((step, i) =>
+          {steps.map((step, i) =>
             editingId === step.id ? (
               <li key={step.id} className="px-5 py-3">
                 <StepForm
@@ -212,7 +239,24 @@ function StepsSection({ service, canEdit }: { service: ServiceDetail; canEdit: b
                 />
               </li>
             ) : (
-              <li key={step.id} className="px-5 py-3 flex items-start gap-3">
+              <li
+                key={step.id}
+                draggable={canEdit}
+                onDragStart={() => setDragIndex(i)}
+                onDragOver={(e) => handleDragOver(e, i)}
+                onDrop={(e) => e.preventDefault()}
+                onDragEnd={handleDragEnd}
+                className={`px-5 py-3 flex items-start gap-3 transition-opacity ${dragIndex === i ? "opacity-40" : ""}`}
+              >
+                {canEdit && (
+                  <span
+                    className="shrink-0 mt-1 text-gray-300 hover:text-gray-400 cursor-grab active:cursor-grabbing select-none"
+                    title="Arrastar para reordenar"
+                    aria-hidden="true"
+                  >
+                    <svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor"><circle cx="2" cy="2" r="1.5" /><circle cx="8" cy="2" r="1.5" /><circle cx="2" cy="8" r="1.5" /><circle cx="8" cy="8" r="1.5" /><circle cx="2" cy="14" r="1.5" /><circle cx="8" cy="14" r="1.5" /></svg>
+                  </span>
+                )}
                 <span className="w-6 h-6 rounded-full bg-[#667470]/10 text-[#667470] text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-[#32373c]">{step.title}</p>
