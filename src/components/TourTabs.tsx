@@ -287,6 +287,7 @@ export function TourTabs({
   const [tab, setTab]       = useState<Tab>("upcoming");
   const [query, setQuery]   = useState("");
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
+  const [showCancelled, setShowCancelled] = useState(false);
 
   const allTours = [...upcoming, ...past];
   const statusOptions      = uniqueValues(allTours, "status");
@@ -294,11 +295,18 @@ export function TourTabs({
   const teamIdOptions      = uniqueTeamIds(allTours);
 
   const activeFilters = showFilters ? filters : EMPTY_FILTERS;
-  const visibleUpcoming = filterTours(upcoming, query, activeFilters, teamMap);
-  const visiblePast     = filterTours(past,     query, activeFilters, teamMap);
+  const hideCancelled = showFilters && !showCancelled;
+  function excludeCancelledIfHidden(list: Tour[]): Tour[] {
+    return hideCancelled ? list.filter((t) => t.status !== "Cancelled" && t.status !== "Canceled") : list;
+  }
 
-  const duplicateUpcoming = getDuplicateDates(upcoming);
-  const duplicatePast     = getDuplicateDates(past);
+  const baseUpcoming = excludeCancelledIfHidden(upcoming);
+  const basePast     = excludeCancelledIfHidden(past);
+  const visibleUpcoming = filterTours(baseUpcoming, query, activeFilters, teamMap);
+  const visiblePast     = filterTours(basePast,     query, activeFilters, teamMap);
+
+  const duplicateUpcoming = getDuplicateDates(baseUpcoming);
+  const duplicatePast     = getDuplicateDates(basePast);
 
   const hasActiveFilters =
     filters.status.length > 0 || filters.team.length > 0 || filters.serviceType.length > 0;
@@ -315,7 +323,7 @@ export function TourTabs({
               : "bg-white/20 text-white/70 hover:bg-white/30"
           }`}
         >
-          Próximas{upcoming.length > 0 ? ` · ${upcoming.length}` : ""}
+          Próximas{baseUpcoming.length > 0 ? ` · ${baseUpcoming.length}` : ""}
         </button>
         <button
           onClick={() => setTab("past")}
@@ -325,7 +333,7 @@ export function TourTabs({
               : "bg-white/20 text-white/70 hover:bg-white/30"
           }`}
         >
-          Anteriores{past.length > 0 ? ` · ${past.length}` : ""}
+          Anteriores{basePast.length > 0 ? ` · ${basePast.length}` : ""}
         </button>
       </div>
 
@@ -379,6 +387,16 @@ export function TourTabs({
             selected={filters.serviceType}
             onChange={(values) => setFilters((f) => ({ ...f, serviceType: values }))}
           />
+
+          <label className="flex items-center gap-1.5 text-sm text-white/70 pl-1 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={showCancelled}
+              onChange={(e) => setShowCancelled(e.target.checked)}
+              className="accent-white"
+            />
+            Mostrar Serviços Cancelados
+          </label>
 
           {hasActiveFilters && (
             <button

@@ -418,6 +418,33 @@ export async function getServiceSteps(serviceId: string): Promise<ServiceStep[]>
   return (data ?? []).map((s) => ({ id: s.id, sortOrder: s.sort_order, title: s.title, description: s.description ?? "" }));
 }
 
+/** Lightweight fetch of just a service's suggested restaurants — for showing on a booking's page. */
+export async function getServiceRestaurants(serviceId: string): Promise<ServiceRestaurant[]> {
+  const { data: links } = await supabase
+    .from("service_restaurants")
+    .select("sort_order, notes, restaurants(id, name, address, phone, notes, google_url, restaurant_hours(day_of_week, open_time, close_time, closed))")
+    .eq("service_id", serviceId)
+    .order("sort_order");
+
+  return ((links ?? []) as unknown as { sort_order: number; notes: string | null; restaurants: RestaurantRow | null }[])
+    .filter((l) => l.restaurants)
+    .map((l) => {
+      const r = l.restaurants as RestaurantRow;
+      return {
+        id: r.id,
+        name: r.name,
+        address: r.address ?? "",
+        phone: r.phone ?? "",
+        notes: r.notes ?? "",
+        googleUrl: r.google_url ?? "",
+        serviceNotes: l.notes ?? "",
+        hours: (r.restaurant_hours ?? [])
+          .map((h) => ({ dayOfWeek: h.day_of_week, openTime: h.open_time, closeTime: h.close_time, closed: h.closed }))
+          .sort((a, b) => a.dayOfWeek - b.dayOfWeek),
+      };
+    });
+}
+
 export async function getServiceDetail(id: string): Promise<ServiceDetail | null> {
   const [{ data: service }, { data: steps }, { data: tasks }, { data: links }] = await Promise.all([
     supabase.from("services").select("*").eq("id", id).single(),
@@ -657,6 +684,14 @@ export async function deleteServiceTask(id: string): Promise<void> {
   if (error) throw new Error(`deleteServiceTask: ${error.message}`);
 }
 
+export async function reorderServiceTasks(orderedIds: string[]): Promise<void> {
+  const results = await Promise.all(
+    orderedIds.map((id, index) => supabase.from("service_tasks").update({ sort_order: index }).eq("id", id)),
+  );
+  const failed = results.find((r) => r.error);
+  if (failed?.error) throw new Error(`reorderServiceTasks: ${failed.error.message}`);
+}
+
 export async function getRestaurantsList(): Promise<{ id: string; name: string }[]> {
   const { data } = await supabase.from("restaurants").select("id, name").order("name");
   return data ?? [];
@@ -730,6 +765,16 @@ export async function unlinkServiceRestaurant(serviceId: string, restaurantId: s
   const { error } = await supabase.from("service_restaurants")
     .delete().eq("service_id", serviceId).eq("restaurant_id", restaurantId);
   if (error) throw new Error(`unlinkServiceRestaurant: ${error.message}`);
+}
+
+export async function reorderServiceRestaurants(serviceId: string, orderedRestaurantIds: string[]): Promise<void> {
+  const results = await Promise.all(
+    orderedRestaurantIds.map((restaurantId, index) =>
+      supabase.from("service_restaurants").update({ sort_order: index }).eq("service_id", serviceId).eq("restaurant_id", restaurantId),
+    ),
+  );
+  const failed = results.find((r) => r.error);
+  if (failed?.error) throw new Error(`reorderServiceRestaurants: ${failed.error.message}`);
 }
 
 export async function getClientsList(): Promise<{ id: string; name: string }[]> {
