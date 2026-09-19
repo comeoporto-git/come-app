@@ -17,7 +17,7 @@ import {
   reorderServiceTasksAction,
   createRestaurantAction,
   updateRestaurantHoursAction,
-  updateRestaurantGoogleUrlAction,
+  updateRestaurantDetailsAction,
   unlinkServiceRestaurantAction,
   reorderServiceRestaurantsAction,
 } from "@/actions/services";
@@ -642,6 +642,8 @@ function RestaurantsSection({ service, canEdit }: { service: ServiceDetail; canE
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-[#32373c]">{r.name}</p>
                       {r.address && <p className="text-xs text-gray-400 mt-0.5">{r.address}</p>}
+                      {r.phone && <p className="text-xs text-gray-400 mt-0.5">{r.phone}</p>}
+                      {r.notes && <p className="text-xs text-gray-400 mt-0.5 whitespace-pre-line">{r.notes}</p>}
                       {r.googleUrl && (
                         <a href={r.googleUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-[#667470] hover:underline mt-0.5 inline-block">
                           Ver no Google Maps
@@ -656,7 +658,7 @@ function RestaurantsSection({ service, canEdit }: { service: ServiceDetail; canE
                   <WeeklyHours hours={r.hours} />
                   {canEdit && (
                     <div className="mt-2 flex gap-3">
-                      <RestaurantHoursEditor serviceId={service.id} restaurantId={r.id} hours={r.hours} googleUrl={r.googleUrl} />
+                      <RestaurantHoursEditor serviceId={service.id} restaurant={r} />
                       <DeleteButton onConfirm={() => unlinkServiceRestaurantAction(service.id, r.id)} />
                     </div>
                   )}
@@ -704,18 +706,16 @@ function WeeklyHours({ hours }: { hours: ServiceDetail["restaurants"][number]["h
 }
 
 function RestaurantHoursEditor({
-  serviceId, restaurantId, hours, googleUrl,
+  serviceId, restaurant,
 }: {
   serviceId: string;
-  restaurantId: string;
-  hours: ServiceDetail["restaurants"][number]["hours"];
-  googleUrl: string;
+  restaurant: ServiceDetail["restaurants"][number];
 }) {
   const [editing, setEditing] = useState(false);
   if (!editing) {
-    return <button type="button" onClick={() => setEditing(true)} className="text-xs text-gray-400 hover:text-[#667470]">Editar horário</button>;
+    return <button type="button" onClick={() => setEditing(true)} className="text-xs text-gray-400 hover:text-[#667470]">Editar restaurante</button>;
   }
-  return <HoursForm serviceId={serviceId} restaurantId={restaurantId} initialHours={hours} initialGoogleUrl={googleUrl} onDone={() => setEditing(false)} />;
+  return <HoursForm serviceId={serviceId} restaurant={restaurant} onDone={() => setEditing(false)} />;
 }
 
 function GoogleUrlField({ googleUrl, onGoogleUrlChange }: { googleUrl: string; onGoogleUrlChange: (v: string) => void }) {
@@ -776,16 +776,18 @@ function DayHoursRow({ d, onChange }: { d: DraftHour; onChange: (patch: Partial<
 }
 
 function HoursForm({
-  serviceId, restaurantId, initialHours, initialGoogleUrl, onDone,
+  serviceId, restaurant, onDone,
 }: {
   serviceId: string;
-  restaurantId: string;
-  initialHours: ServiceDetail["restaurants"][number]["hours"];
-  initialGoogleUrl: string;
+  restaurant: ServiceDetail["restaurants"][number];
   onDone: () => void;
 }) {
-  const [draft, setDraft] = useState<DraftHour[]>(buildDraftHours(initialHours));
-  const [googleUrl, setGoogleUrl] = useState(initialGoogleUrl);
+  const [name, setName] = useState(restaurant.name);
+  const [address, setAddress] = useState(restaurant.address);
+  const [phone, setPhone] = useState(restaurant.phone);
+  const [notes, setNotes] = useState(restaurant.notes);
+  const [googleUrl, setGoogleUrl] = useState(restaurant.googleUrl);
+  const [draft, setDraft] = useState<DraftHour[]>(buildDraftHours(restaurant.hours));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -794,12 +796,16 @@ function HoursForm({
   }
 
   async function handleSave() {
+    if (!name.trim()) { setError("Nome obrigatório"); return; }
     setSaving(true);
     setError(null);
-    const [hoursResult, urlResult] = await Promise.all([
+    const [detailsResult, hoursResult] = await Promise.all([
+      updateRestaurantDetailsAction(serviceId, restaurant.id, {
+        name: name.trim(), address: address.trim(), phone: phone.trim(), notes: notes.trim(), googleUrl: googleUrl.trim(),
+      }),
       updateRestaurantHoursAction(
         serviceId,
-        restaurantId,
+        restaurant.id,
         draft.map((d) => ({
           dayOfWeek: d.dayOfWeek,
           openTime: d.closed ? null : d.openTime || null,
@@ -809,15 +815,20 @@ function HoursForm({
           closed: d.closed,
         })),
       ),
-      updateRestaurantGoogleUrlAction(serviceId, restaurantId, googleUrl.trim()),
     ]);
     setSaving(false);
-    if (hoursResult.error || urlResult.error) setError(hoursResult.error || urlResult.error || "Erro ao guardar");
+    if (detailsResult.error || hoursResult.error) setError(detailsResult.error || hoursResult.error || "Erro ao guardar");
     else { window.location.reload(); }
   }
 
   return (
     <div className="mt-2 border border-gray-100 rounded-xl p-3 space-y-3 w-full">
+      <div className="grid grid-cols-2 gap-3">
+        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome do restaurante *" className={inputCls} />
+        <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Telefone" className={inputCls} />
+      </div>
+      <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Morada" className={inputCls} />
+      <textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notas (opcional)" className={`${inputCls} resize-none`} />
       <GoogleUrlField googleUrl={googleUrl} onGoogleUrlChange={setGoogleUrl} />
       <div className="space-y-1.5">
       {draft.map((d, i) => (
@@ -827,7 +838,7 @@ function HoursForm({
       {error && <p className="text-xs text-red-500 font-medium">{error}</p>}
       <div className="flex gap-2 pt-1">
         <button onClick={handleSave} disabled={saving} className="bg-[#32373c] text-white text-xs font-semibold px-3 py-1.5 rounded-lg disabled:opacity-50 hover:bg-[#1a2018] transition-colors">
-          {saving ? "A guardar…" : "Guardar horário"}
+          {saving ? "A guardar…" : "Guardar restaurante"}
         </button>
         <button onClick={onDone} disabled={saving} className="border border-gray-200 text-gray-600 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-gray-50 transition-colors">
           Cancelar

@@ -758,9 +758,18 @@ export async function updateRestaurantHours(restaurantId: string, hours: Restaur
   if (error) throw new Error(`updateRestaurantHours: ${error.message}`);
 }
 
-export async function updateRestaurantGoogleUrl(restaurantId: string, googleUrl: string): Promise<void> {
-  const { error } = await supabase.from("restaurants").update({ google_url: googleUrl || null }).eq("id", restaurantId);
-  if (error) throw new Error(`updateRestaurantGoogleUrl: ${error.message}`);
+export async function updateRestaurantDetails(
+  restaurantId: string,
+  data: { name: string; address: string; phone: string; notes: string; googleUrl: string },
+): Promise<void> {
+  const { error } = await supabase.from("restaurants").update({
+    name:       data.name,
+    address:    data.address   || null,
+    phone:      data.phone     || null,
+    notes:      data.notes     || null,
+    google_url: data.googleUrl || null,
+  }).eq("id", restaurantId);
+  if (error) throw new Error(`updateRestaurantDetails: ${error.message}`);
 }
 
 export async function linkServiceRestaurant(serviceId: string, restaurantId: string, notes?: string): Promise<void> {

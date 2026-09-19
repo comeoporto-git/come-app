@@ -15,7 +15,7 @@ import {
   reorderServiceTasks,
   createRestaurant,
   updateRestaurantHours,
-  updateRestaurantGoogleUrl,
+  updateRestaurantDetails,
   linkServiceRestaurant,
   unlinkServiceRestaurant,
   reorderServiceRestaurants,
@@ -195,14 +195,15 @@ export async function updateRestaurantHoursAction(
   }
 }
 
-export async function updateRestaurantGoogleUrlAction(
+export async function updateRestaurantDetailsAction(
   serviceId: string,
   restaurantId: string,
-  googleUrl: string,
+  data: { name: string; address: string; phone: string; notes: string; googleUrl: string },
 ): Promise<{ error?: string }> {
   try {
     await requireAdmin();
-    await updateRestaurantGoogleUrl(restaurantId, googleUrl);
+    if (!data.name.trim()) return { error: "Nome obrigatório" };
+    await updateRestaurantDetails(restaurantId, data);
     revalidateService(serviceId);
     return {};
   } catch (e) {
