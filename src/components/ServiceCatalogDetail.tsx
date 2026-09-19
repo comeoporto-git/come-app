@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { ServiceDetail } from "@/lib/notion";
 import { SERVICE_TEAM_ROLES, TASK_ROLE_OPTIONS, WEEKDAY_LABELS } from "@/lib/constants";
-import { getOpenStatusForDate } from "@/lib/restaurantOpenStatus";
+import { getOpenStatusForDate, isRowClosed, formatDayHours } from "@/lib/restaurantOpenStatus";
 import {
   updateServiceCoreAction,
   updateServicePricingAction,
@@ -688,11 +688,11 @@ function WeeklyHours({ hours }: { hours: ServiceDetail["restaurants"][number]["h
     <div className="flex flex-wrap gap-1 mt-2">
       {WEEKDAY_LABELS.map((label, i) => {
         const row = hours.find((h) => h.dayOfWeek === i);
-        const closed = !row || row.closed || !row.openTime || !row.closeTime;
+        const closed = isRowClosed(row);
         return (
           <span
             key={i}
-            title={closed ? `${label}: fechado` : `${label}: ${row!.openTime!.slice(0, 5)}–${row!.closeTime!.slice(0, 5)}`}
+            title={closed ? `${label}: fechado` : `${label}: ${formatDayHours(row)}`}
             className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${closed ? "bg-gray-50 text-gray-300" : "bg-emerald-50 text-emerald-700"}`}
           >
             {label.slice(0, 3)}
@@ -729,7 +729,14 @@ function GoogleUrlField({ googleUrl, onGoogleUrlChange }: { googleUrl: string; o
   );
 }
 
-type DraftHour = { dayOfWeek: number; openTime: string; closeTime: string; closed: boolean };
+type DraftHour = {
+  dayOfWeek: number;
+  openTime: string;
+  closeTime: string;
+  openTime2: string;
+  closeTime2: string;
+  closed: boolean;
+};
 
 function buildDraftHours(existing: ServiceDetail["restaurants"][number]["hours"]): DraftHour[] {
   return WEEKDAY_LABELS.map((_, i) => {
@@ -738,9 +745,34 @@ function buildDraftHours(existing: ServiceDetail["restaurants"][number]["hours"]
       dayOfWeek: i,
       openTime: row?.openTime?.slice(0, 5) ?? "",
       closeTime: row?.closeTime?.slice(0, 5) ?? "",
+      openTime2: row?.openTime2?.slice(0, 5) ?? "",
+      closeTime2: row?.closeTime2?.slice(0, 5) ?? "",
       closed: row?.closed ?? true,
     };
   });
+}
+
+function DayHoursRow({ d, onChange }: { d: DraftHour; onChange: (patch: Partial<DraftHour>) => void }) {
+  return (
+    <div className="flex items-center gap-2 text-xs flex-wrap">
+      <span className="w-16 text-gray-500 shrink-0">{WEEKDAY_LABELS[d.dayOfWeek]}</span>
+      <label className="flex items-center gap-1 text-gray-400 shrink-0">
+        <input type="checkbox" checked={!d.closed} onChange={(e) => onChange({ closed: !e.target.checked })} />
+        Aberto
+      </label>
+      {!d.closed && (
+        <>
+          <input type="time" value={d.openTime} onChange={(e) => onChange({ openTime: e.target.value })} className="border border-gray-200 rounded-md px-1.5 py-0.5 text-xs" />
+          <span className="text-gray-300">–</span>
+          <input type="time" value={d.closeTime} onChange={(e) => onChange({ closeTime: e.target.value })} className="border border-gray-200 rounded-md px-1.5 py-0.5 text-xs" />
+          <span className="text-gray-300 px-0.5" title="2º horário (ex: almoço/jantar)">+</span>
+          <input type="time" value={d.openTime2} onChange={(e) => onChange({ openTime2: e.target.value })} className="border border-gray-200 rounded-md px-1.5 py-0.5 text-xs" />
+          <span className="text-gray-300">–</span>
+          <input type="time" value={d.closeTime2} onChange={(e) => onChange({ closeTime2: e.target.value })} className="border border-gray-200 rounded-md px-1.5 py-0.5 text-xs" />
+        </>
+      )}
+    </div>
+  );
 }
 
 function HoursForm({
@@ -768,7 +800,14 @@ function HoursForm({
       updateRestaurantHoursAction(
         serviceId,
         restaurantId,
-        draft.map((d) => ({ dayOfWeek: d.dayOfWeek, openTime: d.closed ? null : d.openTime || null, closeTime: d.closed ? null : d.closeTime || null, closed: d.closed })),
+        draft.map((d) => ({
+          dayOfWeek: d.dayOfWeek,
+          openTime: d.closed ? null : d.openTime || null,
+          closeTime: d.closed ? null : d.closeTime || null,
+          openTime2: d.closed ? null : d.openTime2 || null,
+          closeTime2: d.closed ? null : d.closeTime2 || null,
+          closed: d.closed,
+        })),
       ),
       updateRestaurantGoogleUrlAction(serviceId, restaurantId, googleUrl.trim()),
     ]);
@@ -782,20 +821,7 @@ function HoursForm({
       <GoogleUrlField googleUrl={googleUrl} onGoogleUrlChange={setGoogleUrl} />
       <div className="space-y-1.5">
       {draft.map((d, i) => (
-        <div key={d.dayOfWeek} className="flex items-center gap-2 text-xs">
-          <span className="w-16 text-gray-500 shrink-0">{WEEKDAY_LABELS[d.dayOfWeek]}</span>
-          <label className="flex items-center gap-1 text-gray-400 shrink-0">
-            <input type="checkbox" checked={!d.closed} onChange={(e) => update(i, { closed: !e.target.checked })} />
-            Aberto
-          </label>
-          {!d.closed && (
-            <>
-              <input type="time" value={d.openTime} onChange={(e) => update(i, { openTime: e.target.value })} className="border border-gray-200 rounded-md px-1.5 py-0.5 text-xs" />
-              <span className="text-gray-300">–</span>
-              <input type="time" value={d.closeTime} onChange={(e) => update(i, { closeTime: e.target.value })} className="border border-gray-200 rounded-md px-1.5 py-0.5 text-xs" />
-            </>
-          )}
-        </div>
+        <DayHoursRow key={d.dayOfWeek} d={d} onChange={(patch) => update(i, patch)} />
       ))}
       </div>
       {error && <p className="text-xs text-red-500 font-medium">{error}</p>}
@@ -830,7 +856,14 @@ function NewRestaurantForm({ serviceId, onDone }: { serviceId: string; onDone: (
     setError(null);
     const result = await createRestaurantAction(serviceId, {
       name, address, phone, notes, googleUrl: googleUrl.trim(),
-      hours: draft.map((d) => ({ dayOfWeek: d.dayOfWeek, openTime: d.closed ? null : d.openTime || null, closeTime: d.closed ? null : d.closeTime || null, closed: d.closed })),
+      hours: draft.map((d) => ({
+        dayOfWeek: d.dayOfWeek,
+        openTime: d.closed ? null : d.openTime || null,
+        closeTime: d.closed ? null : d.closeTime || null,
+        openTime2: d.closed ? null : d.openTime2 || null,
+        closeTime2: d.closed ? null : d.closeTime2 || null,
+        closed: d.closed,
+      })),
     });
     setSaving(false);
     if (result.error) setError(result.error);
@@ -849,20 +882,7 @@ function NewRestaurantForm({ serviceId, onDone }: { serviceId: string; onDone: (
       <div className="border border-gray-100 rounded-xl p-3 space-y-1.5">
         <p className="text-xs text-gray-500 mb-1">Horário semanal</p>
         {draft.map((d, i) => (
-          <div key={d.dayOfWeek} className="flex items-center gap-2 text-xs">
-            <span className="w-16 text-gray-500 shrink-0">{WEEKDAY_LABELS[d.dayOfWeek]}</span>
-            <label className="flex items-center gap-1 text-gray-400 shrink-0">
-              <input type="checkbox" checked={!d.closed} onChange={(e) => update(i, { closed: !e.target.checked })} />
-              Aberto
-            </label>
-            {!d.closed && (
-              <>
-                <input type="time" value={d.openTime} onChange={(e) => update(i, { openTime: e.target.value })} className="border border-gray-200 rounded-md px-1.5 py-0.5 text-xs" />
-                <span className="text-gray-300">–</span>
-                <input type="time" value={d.closeTime} onChange={(e) => update(i, { closeTime: e.target.value })} className="border border-gray-200 rounded-md px-1.5 py-0.5 text-xs" />
-              </>
-            )}
-          </div>
+          <DayHoursRow key={d.dayOfWeek} d={d} onChange={(patch) => update(i, patch)} />
         ))}
       </div>
       {error && <p className="text-xs text-red-500 font-medium">{error}</p>}

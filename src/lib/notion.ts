@@ -370,6 +370,8 @@ export type RestaurantHour = {
   dayOfWeek: number; // 0 = Sunday .. 6 = Saturday
   openTime: string | null;
   closeTime: string | null;
+  openTime2: string | null;
+  closeTime2: string | null;
   closed: boolean;
 };
 
@@ -405,7 +407,7 @@ export type ServiceDetail = {
   restaurants: ServiceRestaurant[];
 };
 
-type RestaurantHourRow = { day_of_week: number; open_time: string | null; close_time: string | null; closed: boolean };
+type RestaurantHourRow = { day_of_week: number; open_time: string | null; close_time: string | null; open_time_2: string | null; close_time_2: string | null; closed: boolean };
 type RestaurantRow = { id: string; name: string; address: string | null; phone: string | null; notes: string | null; google_url: string | null; restaurant_hours: RestaurantHourRow[] };
 
 /** Lightweight fetch of just a service's steps — for showing on a booking's page. */
@@ -422,7 +424,7 @@ export async function getServiceSteps(serviceId: string): Promise<ServiceStep[]>
 export async function getServiceRestaurants(serviceId: string): Promise<ServiceRestaurant[]> {
   const { data: links } = await supabase
     .from("service_restaurants")
-    .select("sort_order, notes, restaurants(id, name, address, phone, notes, google_url, restaurant_hours(day_of_week, open_time, close_time, closed))")
+    .select("sort_order, notes, restaurants(id, name, address, phone, notes, google_url, restaurant_hours(day_of_week, open_time, close_time, open_time_2, close_time_2, closed))")
     .eq("service_id", serviceId)
     .order("sort_order");
 
@@ -439,7 +441,7 @@ export async function getServiceRestaurants(serviceId: string): Promise<ServiceR
         googleUrl: r.google_url ?? "",
         serviceNotes: l.notes ?? "",
         hours: (r.restaurant_hours ?? [])
-          .map((h) => ({ dayOfWeek: h.day_of_week, openTime: h.open_time, closeTime: h.close_time, closed: h.closed }))
+          .map((h) => ({ dayOfWeek: h.day_of_week, openTime: h.open_time, closeTime: h.close_time, openTime2: h.open_time_2, closeTime2: h.close_time_2, closed: h.closed }))
           .sort((a, b) => a.dayOfWeek - b.dayOfWeek),
       };
     });
@@ -452,7 +454,7 @@ export async function getServiceDetail(id: string): Promise<ServiceDetail | null
     supabase.from("service_tasks").select("id, sort_order, name, description, role").eq("service_id", id).order("sort_order"),
     supabase
       .from("service_restaurants")
-      .select("sort_order, notes, restaurants(id, name, address, phone, notes, google_url, restaurant_hours(day_of_week, open_time, close_time, closed))")
+      .select("sort_order, notes, restaurants(id, name, address, phone, notes, google_url, restaurant_hours(day_of_week, open_time, close_time, open_time_2, close_time_2, closed))")
       .eq("service_id", id)
       .order("sort_order"),
   ]);
@@ -489,7 +491,7 @@ export async function getServiceDetail(id: string): Promise<ServiceDetail | null
           googleUrl: r.google_url ?? "",
           serviceNotes: l.notes ?? "",
           hours: (r.restaurant_hours ?? [])
-            .map((h) => ({ dayOfWeek: h.day_of_week, openTime: h.open_time, closeTime: h.close_time, closed: h.closed }))
+            .map((h) => ({ dayOfWeek: h.day_of_week, openTime: h.open_time, closeTime: h.close_time, openTime2: h.open_time_2, closeTime2: h.close_time_2, closed: h.closed }))
             .sort((a, b) => a.dayOfWeek - b.dayOfWeek),
         };
       }),
@@ -697,7 +699,14 @@ export async function getRestaurantsList(): Promise<{ id: string; name: string }
   return data ?? [];
 }
 
-export type RestaurantHourInput = { dayOfWeek: number; openTime: string | null; closeTime: string | null; closed: boolean };
+export type RestaurantHourInput = {
+  dayOfWeek: number;
+  openTime: string | null;
+  closeTime: string | null;
+  openTime2: string | null;
+  closeTime2: string | null;
+  closed: boolean;
+};
 
 export async function createRestaurant(data: {
   name: string;
@@ -723,6 +732,8 @@ export async function createRestaurant(data: {
         day_of_week:   h.dayOfWeek,
         open_time:     h.closed ? null : h.openTime,
         close_time:    h.closed ? null : h.closeTime,
+        open_time_2:   h.closed ? null : h.openTime2,
+        close_time_2:  h.closed ? null : h.closeTime2,
         closed:        h.closed,
       })),
     );
@@ -738,6 +749,8 @@ export async function updateRestaurantHours(restaurantId: string, hours: Restaur
       day_of_week:   h.dayOfWeek,
       open_time:     h.closed ? null : h.openTime,
       close_time:    h.closed ? null : h.closeTime,
+      open_time_2:   h.closed ? null : h.openTime2,
+      close_time_2:  h.closed ? null : h.closeTime2,
       closed:        h.closed,
     })),
     { onConflict: "restaurant_id,day_of_week" },
