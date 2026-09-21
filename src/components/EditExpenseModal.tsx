@@ -214,6 +214,7 @@ export function EditExpenseModal({
                : "Company",
         paymentMethod: form.paymentMethod,
         socioPessoal: form.socioPessoal || null,
+        originalStatus: transaction.status,
         ...(invoiceImageUrl ? { invoiceImageUrl } : {}),
       });
       router.refresh();

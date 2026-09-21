@@ -280,6 +280,7 @@ export async function editExpenseAction(
     paymentMethod: string;
     socioPessoal?: string | null;
     invoiceImageUrl?: string;
+    originalStatus?: string;
   }
 ): Promise<void> {
   const session = await requireAuth();
@@ -291,6 +292,13 @@ export async function editExpenseAction(
   ) {
     throw new Error("Forbidden");
   }
+  // Editing can supply the missing invoice number/receipt for an expense that
+  // was logged as "Pending Receipt" — reflect that in status the same way
+  // finishPendingExpenseAction does, instead of leaving it stuck as pending.
+  const newStatus =
+    data.originalStatus === "Pending Receipt" && data.invoiceId
+      ? (data.paymentMethod === "Honorários" ? "Pending Payment" : "Paid")
+      : undefined;
   await updateTransaction(transactionId, {
     supplier: data.supplier,
     fornecedorId: data.fornecedorId,
@@ -305,6 +313,7 @@ export async function editExpenseAction(
     paymentMethod: data.paymentMethod,
     socioPessoal: data.socioPessoal,
     ...(data.invoiceImageUrl ? { invoiceImageUrl: data.invoiceImageUrl } : {}),
+    ...(newStatus ? { status: newStatus } : {}),
   });
   revalidatePath(`/guide/tours/${tourId}`);
   revalidatePath("/admin/socios");
