@@ -1,7 +1,7 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { signOut } from "@/lib/auth";
-import { getAccountantTransactions, getMatchedTransactions, getUnmatchedBankTransactions } from "@/lib/notion";
+import { getAccountantTransactions, getMatchedTransactionMap, getUnmatchedBankTransactions } from "@/lib/notion";
 import { getStoredTransactions } from "@/lib/enablebanking";
 import { VerifyButton } from "@/components/VerifyButton";
 import { ExportCSVButton } from "@/components/ExportCSVButton";
@@ -29,18 +29,17 @@ export default async function AccountantPage({
   const { tab = "movimentos", days: daysParam } = await searchParams;
   const days = daysParam === "0" ? 0 : (parseInt(daysParam ?? "30", 10) || 30);
 
-  const [transactions, bankTxns, matchedExpenses, unmatchedEntries] = await Promise.all([
+  const [transactions, bankTxns, matchedMap, unmatchedEntries] = await Promise.all([
     getAccountantTransactions(),
     getStoredTransactions(days),
-    getMatchedTransactions(),
+    getMatchedTransactionMap(),
     getUnmatchedBankTransactions(),
   ]);
 
-  // Join: bankReference → Notion expense
-  const matchedByRef = new Map(matchedExpenses.map((e) => [e.bankReference, e]));
+  // Join: bank transaction_id → Notion expense(s)
   const annotated = bankTxns.map((txn) => ({
     ...txn,
-    invoice: matchedByRef.get(txn.transaction_id) ?? null,
+    invoice: matchedMap[txn.transaction_id]?.[0] ?? null,
   }));
 
   const debits     = annotated.filter((t) => t.credit_debit === "DBIT");
