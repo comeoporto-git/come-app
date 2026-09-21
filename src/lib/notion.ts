@@ -1313,18 +1313,6 @@ export async function getPeloGuiaTransactionsForMatching(): Promise<Transaction[
   } catch { return []; }
 }
 
-export async function getMatchedTransactions(): Promise<Transaction[]> {
-  try {
-    const { data } = await supabase.from("transactions")
-      .select(TX_SELECT)
-      .not("id_banco", "is", null)
-      .neq("id_banco", "")
-      .order("data", { ascending: false })
-      .limit(200);
-    return (data ?? []).map(mapTransactionRow);
-  } catch { return []; }
-}
-
 export async function getMatchedTransactionMap(): Promise<Record<string, Transaction[]>> {
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
