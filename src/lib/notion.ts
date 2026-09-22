@@ -659,6 +659,29 @@ export async function reorderServiceSteps(orderedIds: string[]): Promise<void> {
   if (failed?.error) throw new Error(`reorderServiceSteps: ${failed.error.message}`);
 }
 
+/** Adds a newly-created service task template to every upcoming, non-cancelled booking of that service. */
+async function propagateServiceTaskToSales(serviceId: string, task: { name: string; description: string; role: string | null }): Promise<void> {
+  const { data: sales } = await supabase
+    .from("sales")
+    .select("id")
+    .eq("service_id", serviceId)
+    .neq("status", "Cancelled")
+    .gte("date", today0());
+  if (!sales || sales.length === 0) return;
+
+  const { error } = await supabase.from("tasks").insert(
+    sales.map((s) => ({
+      id:                crypto.randomUUID(),
+      sale_id:           s.id,
+      name:              task.name,
+      task_description:  task.description || null,
+      role:              task.role,
+      status:            "To do",
+    })),
+  );
+  if (error) throw new Error(`propagateServiceTaskToSales: ${error.message}`);
+}
+
 export async function addServiceTask(serviceId: string, name: string, description: string, role: string | null): Promise<void> {
   const { count } = await supabase.from("service_tasks").select("id", { count: "exact", head: true }).eq("service_id", serviceId);
   const { error } = await supabase.from("service_tasks").insert({
@@ -669,6 +692,8 @@ export async function addServiceTask(serviceId: string, name: string, descriptio
     role: role || null,
   });
   if (error) throw new Error(`addServiceTask: ${error.message}`);
+
+  await propagateServiceTaskToSales(serviceId, { name, description, role });
 }
 
 export async function updateServiceTask(id: string, name: string, description: string, role: string | null): Promise<void> {
