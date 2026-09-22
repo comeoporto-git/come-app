@@ -38,7 +38,14 @@ function nextStatus(status: string | null): string {
   return STATUS_ORDER[(i + 1) % STATUS_ORDER.length];
 }
 
-export function TourTaskList({ tourId, tasks, canManage }: { tourId: string; tasks: SaleTask[]; canManage: boolean }) {
+export function TourTaskList({
+  tourId, tasks, canManage, onTasksChange,
+}: {
+  tourId: string;
+  tasks: SaleTask[];
+  canManage: boolean;
+  onTasksChange?: (tasks: SaleTask[]) => void;
+}) {
   const [items, setItems] = useState(tasks);
   const [pending, startTransition] = useTransition();
   const [errorId, setErrorId] = useState<string | null>(null);
@@ -49,12 +56,15 @@ export function TourTaskList({ tourId, tasks, canManage }: { tourId: string; tas
   function toggle(task: SaleTask) {
     const status = nextStatus(task.status);
     setErrorId(null);
-    setItems((prev) => prev.map((t) => (t.id === task.id ? { ...t, status } : t)));
+    const optimistic = items.map((t) => (t.id === task.id ? { ...t, status } : t));
+    setItems(optimistic);
+    onTasksChange?.(optimistic);
     startTransition(async () => {
       const result = await updateTaskStatusAction(tourId, task.id, status);
       if (result.error) {
         setErrorId(task.id);
-        setItems((prev) => prev.map((t) => (t.id === task.id ? { ...t, status: task.status } : t)));
+        setItems(items);
+        onTasksChange?.(items);
       }
     });
   }
@@ -134,7 +144,12 @@ export function TourTaskList({ tourId, tasks, canManage }: { tourId: string; tas
         <div className="px-4 py-3 border-t border-gray-50">
           <NewTaskForm
             tourId={tourId}
-            onCreated={(task) => { setItems((prev) => [...prev, task]); setAdding(false); }}
+            onCreated={(task) => {
+              const next = [...items, task];
+              setItems(next);
+              onTasksChange?.(next);
+              setAdding(false);
+            }}
             onCancel={() => setAdding(false)}
           />
         </div>

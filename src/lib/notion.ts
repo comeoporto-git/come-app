@@ -548,6 +548,36 @@ export async function getTasksForSale(saleId: string, viewerRole: string): Promi
     }));
 }
 
+export type TaskCount = { done: number; total: number };
+
+/** Bulk done/total task counts per sale — for showing a "2/6" badge on a list of service cards without fetching full task details. */
+export async function getTaskCountsForSales(saleIds: string[], viewerRole: string): Promise<Record<string, TaskCount>> {
+  const counts: Record<string, TaskCount> = {};
+  if (!saleIds.length) return counts;
+
+  const canSeePrivileged = viewerRole === "Admin" || viewerRole === "Super Guide";
+  const CHUNK = 150;
+  try {
+    for (let i = 0; i < saleIds.length; i += CHUNK) {
+      const chunk = saleIds.slice(i, i + CHUNK);
+      const { data } = await supabase
+        .from("tasks")
+        .select("sale_id, status, role")
+        .in("sale_id", chunk)
+        .not("role", "is", null);
+
+      for (const row of (data ?? []) as { sale_id: string; status: string | null; role: string | null }[]) {
+        if (!canSeePrivileged && PRIVILEGED_TASK_ROLES.includes(row.role ?? "")) continue;
+        const c = counts[row.sale_id] ?? { done: 0, total: 0 };
+        c.total += 1;
+        if (row.status === "Done") c.done += 1;
+        counts[row.sale_id] = c;
+      }
+    }
+    return counts;
+  } catch { return counts; }
+}
+
 export async function updateTaskStatus(saleId: string, taskId: string, status: string, viewerRole: string): Promise<void> {
   if (!TASK_STATUS_OPTIONS.includes(status as typeof TASK_STATUS_OPTIONS[number])) {
     throw new Error(`updateTaskStatus: invalid status "${status}"`);

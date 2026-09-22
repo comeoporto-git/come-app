@@ -1,11 +1,24 @@
 "use server";
 
 import { auth } from "@/lib/auth";
-import { updateTaskStatus, createSaleTask } from "@/lib/notion";
+import { updateTaskStatus, createSaleTask, getTasksForSale, type SaleTask } from "@/lib/notion";
 import { revalidatePath } from "next/cache";
 
 const ALLOWED_ROLES: ReadonlyArray<string> = ["Guide", "Super Guide", "Admin", "Chef", "Driver", "Logistics"];
 const CAN_MANAGE_ROLES: ReadonlyArray<string> = ["Admin", "Super Guide"];
+
+export async function getSaleTasksAction(tourId: string): Promise<{ tasks?: SaleTask[]; error?: string }> {
+  try {
+    const session = await auth();
+    if (!session || !ALLOWED_ROLES.includes(session.user.role)) {
+      return { error: "Unauthorized" };
+    }
+    const tasks = await getTasksForSale(tourId, session.user.role);
+    return { tasks };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
+}
 
 export async function updateTaskStatusAction(tourId: string, taskId: string, status: string): Promise<{ error?: string }> {
   try {
