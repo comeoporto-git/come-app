@@ -1,6 +1,9 @@
--- Trigger: when a sale is created with a specific service,
--- automatically create the corresponding "IN -" earning transaction.
--- Replicates the Notion automation.
+-- The service_prices_by_year migration moved pax_2_3/pax_4_6/pax_7_plus from
+-- services into a per-year service_prices table and updated sales_computed
+-- accordingly, but left create_earning_transaction() (AFTER INSERT ON sales)
+-- still reading those columns off services, where they no longer exist.
+-- Every sale/tour insert (from the app's "+ Serviço" form and the Workspace
+-- Add-on alike) was failing with: column "pax_2_3" does not exist.
 
 CREATE OR REPLACE FUNCTION create_earning_transaction()
 RETURNS TRIGGER AS $$
@@ -65,8 +68,3 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
-
-CREATE OR REPLACE TRIGGER trigger_create_earning_on_sale
-  AFTER INSERT ON sales
-  FOR EACH ROW
-  EXECUTE FUNCTION create_earning_transaction();
