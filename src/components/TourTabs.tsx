@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import type { Tour } from "@/lib/notion";
+import type { Tour, TaskCount } from "@/lib/notion";
+import { useServiceTasks, ServiceTaskBadge, ServiceTaskPanel } from "@/components/ServiceCardTasks";
 
 type Tab = "upcoming" | "past";
 
@@ -68,26 +69,34 @@ function TourCard({
   guideName,
   isMyTour,
   hasDuplicate,
+  taskCount,
+  canManageTasks,
 }: {
   tour: Tour;
   past?: boolean;
   guideName?: string;
   isMyTour?: boolean;
   hasDuplicate?: boolean;
+  taskCount?: TaskCount;
+  canManageTasks: boolean;
 }) {
   const ts = typeStyle(tour.serviceType);
   const isCanceled = tour.status === "Cancelled";
+  const { expanded, tasks, loading, count, toggle, updateTasks } = useServiceTasks(
+    tour.id,
+    taskCount ?? { done: 0, total: 0 },
+  );
   return (
-    <Link href={`/guide/tours/${tour.id}`}>
-      <li
-        className={`rounded-2xl overflow-hidden shadow-sm border transition-all active:scale-[0.98] cursor-pointer ${
-          isCanceled
-            ? "bg-gray-100 border-gray-200 opacity-60"
-            : past
-              ? "bg-white/60 border-white/20"
-              : "bg-white border-gray-100"
-        } text-[#32373c] ${isCanceled ? "" : (ts?.border ?? "")} ${hasDuplicate && !isCanceled ? "ring-2 ring-amber-400" : ""}`}
-      >
+    <li
+      className={`rounded-2xl overflow-hidden shadow-sm border ${
+        isCanceled
+          ? "bg-gray-100 border-gray-200 opacity-60"
+          : past
+            ? "bg-white/60 border-white/20"
+            : "bg-white border-gray-100"
+      } text-[#32373c] ${isCanceled ? "" : (ts?.border ?? "")} ${hasDuplicate && !isCanceled ? "ring-2 ring-amber-400" : ""}`}
+    >
+      <Link href={`/guide/tours/${tour.id}`} className="block transition-all active:scale-[0.98] cursor-pointer">
         <div className="flex items-start justify-between gap-3 p-5">
           <div className="flex-1 min-w-0 space-y-1">
             <p className={`text-xs ${past ? "text-[#32373c]/50" : "text-gray-400"}`}>
@@ -135,10 +144,22 @@ function TourCard({
                 {tour.status}
               </span>
             )}
+            {count.total > 0 && (
+              <ServiceTaskBadge done={count.done} total={count.total} expanded={expanded} onClick={toggle} />
+            )}
           </div>
         </div>
-      </li>
-    </Link>
+      </Link>
+      {expanded && (
+        <ServiceTaskPanel
+          tourId={tour.id}
+          tasks={tasks}
+          loading={loading}
+          canManage={canManageTasks}
+          onTasksChange={updateTasks}
+        />
+      )}
+    </li>
   );
 }
 
@@ -277,12 +298,16 @@ export function TourTabs({
   teamMap,
   currentUserId,
   showFilters = false,
+  taskCounts,
+  canManageTasks = false,
 }: {
   upcoming: Tour[];
   past: Tour[];
   teamMap?: Record<string, string>;
   currentUserId?: string;
   showFilters?: boolean;
+  taskCounts?: Record<string, TaskCount>;
+  canManageTasks?: boolean;
 }) {
   const [tab, setTab]       = useState<Tab>("upcoming");
   const [query, setQuery]   = useState("");
@@ -424,6 +449,8 @@ export function TourTabs({
                 guideName={teamMap?.[tour.teamId ?? ""]}
                 isMyTour={!!currentUserId && tour.teamId === currentUserId}
                 hasDuplicate={duplicateUpcoming.has(dateKey(tour.date))}
+                taskCount={taskCounts?.[tour.id]}
+                canManageTasks={canManageTasks}
               />
             ))}
           </ul>
@@ -442,6 +469,8 @@ export function TourTabs({
               guideName={teamMap?.[tour.teamId ?? ""]}
               isMyTour={!!currentUserId && tour.teamId === currentUserId}
               hasDuplicate={duplicatePast.has(dateKey(tour.date))}
+              taskCount={taskCounts?.[tour.id]}
+              canManageTasks={canManageTasks}
             />
           ))}
         </ul>
