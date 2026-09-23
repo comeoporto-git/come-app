@@ -2,7 +2,17 @@
 
 import { useState } from "react";
 import { updateTourTeamAction } from "@/actions/transactions";
-import type { TeamMember } from "@/lib/notion";
+import type { ExtraTeamMember, TeamMember, TeamSlotRole } from "@/lib/notion";
+
+const ROLE_LABELS: { role: TeamSlotRole; label: string }[] = [
+  { role: "Guide",     label: "Guia" },
+  { role: "Chef",      label: "Chef" },
+  { role: "Driver",    label: "Driver" },
+  { role: "Logistics", label: "Logistics" },
+];
+
+// An extra member row while editing. `key` keeps React rows stable when one is removed.
+type ExtraRow = { key: number; teamId: string; role: TeamSlotRole };
 
 export function TeamPicker({
   tourId,
@@ -18,6 +28,7 @@ export function TeamPicker({
   logisticsId,
   logisticsName,
   logisticsPhone,
+  extraTeam,
   teamMembers,
 }: {
   tourId: string;
@@ -33,8 +44,12 @@ export function TeamPicker({
   logisticsId: string | null;
   logisticsName: string;
   logisticsPhone?: string;
+  extraTeam: ExtraTeamMember[];
   teamMembers: TeamMember[];
 }) {
+  const initialExtras = (): ExtraRow[] =>
+    extraTeam.map((m, i) => ({ key: i, teamId: m.teamId, role: m.role }));
+
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,6 +57,9 @@ export function TeamPicker({
   const [selectedChef, setSelectedChef]           = useState(chefId       ?? "");
   const [selectedDriver, setSelectedDriver]       = useState(driverId     ?? "");
   const [selectedLogistics, setSelectedLogistics] = useState(logisticsId  ?? "");
+  const [extras, setExtras] = useState<ExtraRow[]>(initialExtras);
+  const [nextKey, setNextKey] = useState(extraTeam.length);
+  const [pickingRole, setPickingRole] = useState(false);
 
   async function handleSave() {
     setSaving(true);
@@ -53,6 +71,7 @@ export function TeamPicker({
         selectedChef       || null,
         selectedDriver     || null,
         selectedLogistics  || null,
+        extras.filter((e) => e.teamId).map(({ teamId, role }) => ({ teamId, role })),
       );
       if (result.error) {
         setError(result.error);
@@ -71,20 +90,54 @@ export function TeamPicker({
     setSelectedChef(chefId            ?? "");
     setSelectedDriver(driverId        ?? "");
     setSelectedLogistics(logisticsId  ?? "");
+    setExtras(initialExtras());
+    setPickingRole(false);
     setEditing(false);
   }
 
-  // Derive phone for currently selected members (used after editing)
+  function addExtra(role: TeamSlotRole) {
+    setExtras((prev) => [...prev, { key: nextKey, teamId: "", role }]);
+    setNextKey((k) => k + 1);
+    setPickingRole(false);
+  }
+
+  function updateExtra(key: number, teamId: string) {
+    setExtras((prev) => prev.map((e) => (e.key === key ? { ...e, teamId } : e)));
+  }
+
+  function removeExtra(key: number) {
+    setExtras((prev) => prev.filter((e) => e.key !== key));
+  }
+
   const phoneFor = (id: string) =>
     teamMembers.find((m) => m.id === id)?.phone ?? undefined;
+
+  const primaries: Record<TeamSlotRole, { value: string; onChange: (id: string) => void; name: string; phone?: string }> = {
+    Guide:     { value: selectedGuide,     onChange: setSelectedGuide,     name: guideName,     phone: guidePhone },
+    Chef:      { value: selectedChef,      onChange: setSelectedChef,      name: chefName,      phone: chefPhone },
+    Driver:    { value: selectedDriver,    onChange: setSelectedDriver,    name: driverName,    phone: driverPhone },
+    Logistics: { value: selectedLogistics, onChange: setSelectedLogistics, name: logisticsName, phone: logisticsPhone },
+  };
 
   if (!editing) {
     return (
       <div className="space-y-3">
-        <TeamRow label="Guia"       value={guideName      || "—"} phone={guidePhone} />
-        <TeamRow label="Chef"       value={chefName       || "—"} phone={chefPhone} />
-        <TeamRow label="Driver"     value={driverName     || "—"} phone={driverPhone} />
-        <TeamRow label="Logistics"  value={logisticsName  || "—"} phone={logisticsPhone} />
+        {ROLE_LABELS.map(({ role, label }) => {
+          const extrasForRole = extraTeam.filter((m) => m.role === role);
+          const primary = primaries[role];
+          const people = [
+            ...(primary.name ? [{ key: "primary", name: primary.name, phone: primary.phone }] : []),
+            ...extrasForRole.map((m) => ({ key: m.teamId, name: m.name || "—", phone: phoneFor(m.teamId) })),
+          ];
+          if (people.length === 0) return <TeamRow key={role} label={label} value="—" />;
+          return (
+            <div key={role}>
+              {people.map((p, i) => (
+                <TeamRow key={p.key} label={i === 0 ? label : undefined} value={p.name} phone={p.phone} />
+              ))}
+            </div>
+          );
+        })}
         <button
           onClick={() => setEditing(true)}
           className="mt-1 text-xs text-[#667470] font-semibold hover:underline"
@@ -97,30 +150,71 @@ export function TeamPicker({
 
   return (
     <div className="space-y-3">
-      <TeamSelect
-        label="Guia"
-        value={selectedGuide}
-        onChange={setSelectedGuide}
-        members={teamMembers}
-      />
-      <TeamSelect
-        label="Chef"
-        value={selectedChef}
-        onChange={setSelectedChef}
-        members={teamMembers}
-      />
-      <TeamSelect
-        label="Driver"
-        value={selectedDriver}
-        onChange={setSelectedDriver}
-        members={teamMembers}
-      />
-      <TeamSelect
-        label="Logistics"
-        value={selectedLogistics}
-        onChange={setSelectedLogistics}
-        members={teamMembers}
-      />
+      {ROLE_LABELS.map(({ role, label }) => (
+        <div key={role} className="space-y-2">
+          <TeamSelect
+            label={label}
+            value={primaries[role].value}
+            onChange={primaries[role].onChange}
+            members={teamMembers}
+          />
+          {extras.filter((e) => e.role === role).map((e) => (
+            <div key={e.key} className="flex items-center gap-2">
+              <div className="flex-1">
+                <TeamSelect
+                  value={e.teamId}
+                  onChange={(id) => updateExtra(e.key, id)}
+                  members={teamMembers}
+                  ariaLabel={`${label} adicional`}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => removeExtra(e.key)}
+                className="text-gray-400 hover:text-red-500 p-2 rounded-lg hover:bg-gray-50 flex-shrink-0"
+                aria-label={`Remover ${label} adicional`}
+                title="Remover"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      ))}
+
+      {pickingRole ? (
+        <div className="rounded-xl border border-dashed border-gray-200 p-2">
+          <p className="text-xs text-gray-500 mb-2 px-1">Que função quer adicionar?</p>
+          <div className="flex flex-wrap gap-2">
+            {ROLE_LABELS.map(({ role, label }) => (
+              <button
+                key={role}
+                type="button"
+                onClick={() => addExtra(role)}
+                className="text-xs font-semibold px-3 py-1.5 rounded-full border border-gray-200 text-gray-700 hover:bg-gray-50"
+              >
+                {label}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => setPickingRole(false)}
+              className="text-xs text-gray-400 px-2 py-1.5 hover:underline"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setPickingRole(true)}
+          className="w-full flex items-center justify-center gap-1 border border-dashed border-gray-300 text-[#667470] text-xs font-semibold py-2 rounded-xl hover:bg-gray-50 transition-colors"
+        >
+          <span className="text-base leading-none">+</span> Adicionar membro
+        </button>
+      )}
+
       {error && (
         <p className="text-xs text-red-500 font-medium px-1">{error}</p>
       )}
@@ -160,10 +254,10 @@ function PhoneIcon() {
   );
 }
 
-function TeamRow({ label, value, phone }: { label: string; value: string; phone?: string }) {
+function TeamRow({ label, value, phone }: { label?: string; value: string; phone?: string }) {
   return (
-    <div>
-      <p className="text-xs text-gray-500 mb-1">{label}</p>
+    <div className={label ? undefined : "mt-1"}>
+      {label && <p className="text-xs text-gray-500 mb-1">{label}</p>}
       <div className="flex items-center gap-2">
         <p className="text-sm text-gray-800 font-medium flex-1">{value}</p>
         {phone && value !== "—" && (
@@ -186,16 +280,19 @@ function TeamSelect({
   value,
   onChange,
   members,
+  ariaLabel,
 }: {
-  label: string;
+  label?: string;
   value: string;
   onChange: (id: string) => void;
   members: TeamMember[];
+  ariaLabel?: string;
 }) {
   return (
     <div>
-      <label className="text-xs text-gray-500 mb-1 block">{label}</label>
+      {label && <label className="text-xs text-gray-500 mb-1 block">{label}</label>}
       <select
+        aria-label={ariaLabel ?? label}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#667470]/30 bg-white"
