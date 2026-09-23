@@ -227,28 +227,44 @@ function uniqueTeamMembers(tours: Tour[], teamMap?: Record<string, string>): { v
   return Array.from(names, ([value, label]) => ({ value, label })).sort((a, b) => a.label.localeCompare(b.label));
 }
 
+// Lowercase and strip accents so "antao" matches "Antão".
+function normalize(s: string): string {
+  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
 function MultiSelectDropdown({
   label,
   options,
   selected,
   onChange,
+  searchable = false,
 }: {
   label: string;
   options: { value: string; label: string }[];
   selected: string[];
   onChange: (values: string[]) => void;
+  searchable?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
     function handleClickOutside(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+        setSearch("");
+      }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [open]);
+
+  const needle = normalize(search.trim());
+  const visibleOptions = needle
+    ? options.filter((o) => normalize(o.label).includes(needle))
+    : options;
 
   function toggle(value: string) {
     onChange(
@@ -269,7 +285,10 @@ function MultiSelectDropdown({
     <div className="relative" ref={ref}>
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => {
+          setOpen((o) => !o);
+          setSearch("");
+        }}
         className={`flex items-center gap-1.5 text-sm rounded-xl px-3 py-2 transition-colors ${
           selected.length > 0
             ? "bg-white text-[#32373c]"
@@ -283,10 +302,22 @@ function MultiSelectDropdown({
       </button>
       {open && (
         <div className="absolute z-10 mt-1 min-w-[10rem] bg-white text-[#32373c] rounded-xl shadow-lg border border-gray-100 py-1 max-h-64 overflow-y-auto">
-          {options.length === 0 ? (
-            <p className="px-3 py-1.5 text-sm text-gray-400">Sem opções</p>
+          {searchable && (
+            <div className="sticky top-0 bg-white px-2 pt-1 pb-1.5 border-b border-gray-100">
+              <input
+                type="text"
+                autoFocus
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Pesquisar…"
+                className="w-full text-sm rounded-lg bg-gray-50 px-2.5 py-1.5 outline-none focus:ring-1 focus:ring-gray-300"
+              />
+            </div>
+          )}
+          {visibleOptions.length === 0 ? (
+            <p className="px-3 py-1.5 text-sm text-gray-400">{options.length === 0 ? "Sem opções" : "Sem resultados"}</p>
           ) : (
-            options.map((opt) => (
+            visibleOptions.map((opt) => (
               <label
                 key={opt.value}
                 className="flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-gray-50 cursor-pointer"
@@ -417,6 +448,7 @@ export function TourTabs({
           <MultiSelectDropdown
             label="Equipa"
             options={teamOptions}
+            searchable
             selected={filters.team}
             onChange={(values) => setFilters((f) => ({ ...f, team: values }))}
           />
