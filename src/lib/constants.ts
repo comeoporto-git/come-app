@@ -8,6 +8,22 @@ export const PARTNER_SPLIT_DATE = "2025-10-01";
 export const OWNERSHIP_BEFORE: Record<string, number> = { "António": 50, "Bernardo": 50, "Manel": 0 };
 export const OWNERSHIP_AFTER: Record<string, number> = { "António": 40, "Bernardo": 40, "Manel": 20 };
 
+// Payment methods for expenses paid personally by a partner — reimbursed like
+// "Pelo Guia" (shows up in Transferências em Falta). `whoPaid` is stored in pago_por.
+export const PARTNER_PAYMENT_METHODS = [
+  { method: "Pago pelo Bernardo Providência", whoPaid: "Bernardo", name: "Bernardo Providência" },
+  { method: "Pago pelo António Antunes",      whoPaid: "António",  name: "António Antunes" },
+  { method: "Pago pelo Manuel Antunes",       whoPaid: "Manel",    name: "Manuel Antunes" },
+] as const;
+
+export function partnerPaymentByMethod(method: string | null | undefined) {
+  return PARTNER_PAYMENT_METHODS.find((p) => p.method === method);
+}
+
+export function partnerPaymentByWhoPaid(whoPaid: string | null | undefined) {
+  return PARTNER_PAYMENT_METHODS.find((p) => p.whoPaid === whoPaid);
+}
+
 export function ownershipForDate(date: string | null | undefined): Record<string, number> {
   return date && date < PARTNER_SPLIT_DATE ? OWNERSHIP_BEFORE : OWNERSHIP_AFTER;
 }

@@ -6,7 +6,7 @@
 
 import { createClient } from "@supabase/supabase-js";
 import { unstable_cache } from "next/cache";
-import { PARTNERS, PARTNER_SPLIT_DATE } from "@/lib/constants";
+import { PARTNERS, PARTNER_SPLIT_DATE, PARTNER_PAYMENT_METHODS, partnerPaymentByMethod } from "@/lib/constants";
 
 export const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -1513,7 +1513,7 @@ export async function getGuideExpenses(): Promise<Transaction[]> {
         "metodo_pagamento.eq.Pelo Chef",
         "metodo_pagamento.eq.Pelo Driver",
         "metodo_pagamento.eq.Pelo Logistics",
-        "metodo_pagamento.eq.Pago pelo Bernardo Providência",
+        ...PARTNER_PAYMENT_METHODS.map((p) => `metodo_pagamento.eq.${p.method}`),
         "metodo_pagamento.eq.Honorários",
         "status.eq.Pending Payment",
       ].join(","))
@@ -1543,8 +1543,9 @@ export async function getGuideExpenses(): Promise<Transaction[]> {
           || "";
         return { ...t, tourName, paidByName: t.supplier, payeeIban };
       }
-      if (t.paymentMethod === "Pago pelo Bernardo Providência") {
-        return { ...t, tourName, paidByName: "Bernardo Providência", payeeIban: ibanByName["bernardo providência"] ?? "" };
+      const partner = partnerPaymentByMethod(t.paymentMethod);
+      if (partner) {
+        return { ...t, tourName, paidByName: partner.name, payeeIban: ibanByName[partner.name.toLowerCase()] ?? "" };
       }
       if (!sale) return { ...t, tourName };
       const memberId = t.paymentMethod === "Pelo Chef"      ? sale.chef_id

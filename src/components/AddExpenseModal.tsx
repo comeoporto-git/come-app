@@ -6,7 +6,7 @@ import { logExpenseAction, finishPendingExpenseAction, createFornecedorAction } 
 import type { Transaction, Fornecedor } from "@/lib/notion";
 import { normalizeImage } from "@/lib/image";
 import { useRouter } from "next/navigation";
-import { PARTNERS, ownershipForDate } from "@/lib/constants";
+import { PARTNERS, PARTNER_PAYMENT_METHODS, ownershipForDate, partnerPaymentByMethod } from "@/lib/constants";
 
 type Mode = "chef-choose" | "admin-choose" | "honorarios" | "choose" | "scan" | "manual" | "review";
 
@@ -249,7 +249,7 @@ export function AddExpenseModal({
                  : effectivePaymentMethod === "Pelo Chef" ? "Chef"
                  : effectivePaymentMethod === "Pelo Driver" ? "Driver"
                  : effectivePaymentMethod === "Pelo Logistics" ? "Logistics"
-                 : effectivePaymentMethod === "Pago pelo Bernardo Providência" ? "Bernardo"
+                 : partnerPaymentByMethod(effectivePaymentMethod) ? partnerPaymentByMethod(effectivePaymentMethod)!.whoPaid
                  : "Company",
           paymentMethod: effectivePaymentMethod,
           status: isHonorarios ? "Pending Receipt"
@@ -304,7 +304,7 @@ export function AddExpenseModal({
                : effectivePaymentMethod === "Pelo Chef" ? "Chef"
                : effectivePaymentMethod === "Pelo Driver" ? "Driver"
                : effectivePaymentMethod === "Pelo Logistics" ? "Logistics"
-               : effectivePaymentMethod === "Pago pelo Bernardo Providência" ? "Bernardo"
+               : partnerPaymentByMethod(effectivePaymentMethod) ? partnerPaymentByMethod(effectivePaymentMethod)!.whoPaid
                : "Company",
         paymentMethod: effectivePaymentMethod,
         status: "Pending Receipt",
@@ -603,7 +603,9 @@ export function AddExpenseModal({
                     <option value="Pelo Chef">Pelo Chef</option>
                     <option value="Pelo Driver">Pelo Driver</option>
                     <option value="Pelo Logistics">Pelo Logistics</option>
-                    <option value="Pago pelo Bernardo Providência">Pago pelo Bernardo Providência</option>
+                    {PARTNER_PAYMENT_METHODS.map((p) => (
+                      <option key={p.method} value={p.method}>{p.method}</option>
+                    ))}
                   </select>
                 </div>
               )}
