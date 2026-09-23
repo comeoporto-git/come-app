@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { Transaction, Fornecedor } from "@/lib/notion";
 import { AddExpenseModal } from "./AddExpenseModal";
 import { EditExpenseModal } from "./EditExpenseModal";
+import { partnerPaymentByWhoPaid } from "@/lib/constants";
 
 const STATUS_COLORS: Record<string, string> = {
   Paid: "bg-green-100 text-green-700",
@@ -78,14 +79,14 @@ export function ExpenseList({
                 {(tx.whoPaid === "Logistics" && logisticsName) && (
                   <p className="text-xs font-medium text-[#667470]">Pago por: {logisticsName}</p>
                 )}
-                {tx.whoPaid === "Bernardo" && (
-                  <p className="text-xs font-medium text-[#667470]">Pago por: Bernardo Providência</p>
+                {partnerPaymentByWhoPaid(tx.whoPaid) && (
+                  <p className="text-xs font-medium text-[#667470]">Pago por: {partnerPaymentByWhoPaid(tx.whoPaid)!.name}</p>
                 )}
               </div>
               <div className="text-right shrink-0">
                 <p className="text-sm font-semibold text-gray-900">€{Math.abs(tx.totalCost).toFixed(2)}</p>
                 {(() => {
-                  const isGuideEtc = tx.whoPaid === "Guide" || tx.whoPaid === "Chef" || tx.whoPaid === "Driver" || tx.whoPaid === "Logistics" || tx.whoPaid === "Bernardo";
+                  const isGuideEtc = tx.whoPaid === "Guide" || tx.whoPaid === "Chef" || tx.whoPaid === "Driver" || tx.whoPaid === "Logistics" || !!partnerPaymentByWhoPaid(tx.whoPaid);
                   // "Pending Payment" with no receipt yet = receipt still needed first
                   const noReceipt = !tx.invoiceId && !tx.invoiceImageUrl;
                   const displayStatus = (tx.status === "Pending Payment" && noReceipt)

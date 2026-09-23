@@ -4,7 +4,7 @@ import { useState, useRef } from "react";
 import { editExpenseAction, deleteExpenseAction, createFornecedorAction } from "@/actions/transactions";
 import type { Transaction, Fornecedor } from "@/lib/notion";
 import { useRouter } from "next/navigation";
-import { PARTNERS, ownershipForDate } from "@/lib/constants";
+import { PARTNERS, PARTNER_PAYMENT_METHODS, ownershipForDate, partnerPaymentByMethod } from "@/lib/constants";
 
 type FormState = {
   supplier: string;
@@ -210,7 +210,7 @@ export function EditExpenseModal({
                : form.paymentMethod === "Pelo Chef" ? "Chef"
                : form.paymentMethod === "Pelo Driver" ? "Driver"
                : form.paymentMethod === "Pelo Logistics" ? "Logistics"
-               : form.paymentMethod === "Pago pelo Bernardo Providência" ? "Bernardo"
+               : partnerPaymentByMethod(form.paymentMethod) ? partnerPaymentByMethod(form.paymentMethod)!.whoPaid
                : "Company",
         paymentMethod: form.paymentMethod,
         socioPessoal: form.socioPessoal || null,
@@ -388,7 +388,9 @@ export function EditExpenseModal({
                   <option value="Pelo Chef">Pelo Chef</option>
                   <option value="Pelo Driver">Pelo Driver</option>
                   <option value="Pelo Logistics">Pelo Logistics</option>
-                  <option value="Pago pelo Bernardo Providência">Pago pelo Bernardo Providência</option>
+                  {PARTNER_PAYMENT_METHODS.map((p) => (
+                    <option key={p.method} value={p.method}>{p.method}</option>
+                  ))}
                 </select>
               </div>
             )}
