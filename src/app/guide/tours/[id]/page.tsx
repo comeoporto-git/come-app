@@ -76,6 +76,8 @@ function computeCategoryBreakdown(
     .sort((a, b) => b.total - a.total);
 }
 
+const TEAM_SLOT_ROLES: ReadonlyArray<TeamSlotRole> = ["Guide", "Chef", "Driver", "Logistics"];
+
 const EXTRA_ROLE_LABEL: Record<TeamSlotRole, string> = {
   Guide: "Guia", Chef: "Chef", Driver: "Driver", Logistics: "Logistics",
 };
@@ -168,12 +170,29 @@ async function TourPageContent({
 
   const transactions = canSeeFinancials ? txResult.expenses : txResult.expenses;
   const earnings     = canSeeFinancials ? txResult.earnings : [];
-  // Derive chefMember/guideMember from the already-fetched team list — no extra Notion call needed
-  const chefMember   = isChef ? (teamMembers.find((m) => m.email === email) ?? null) : null;
-  const guideMember  = role === "Guide" ? (teamMembers.find((m) => m.email === email) ?? null) : null;
-  const driverMember = isDriver ? (teamMembers.find((m) => m.email === email) ?? null) : null;
-
   if (!tour) notFound();
+
+  // The role this person fills on THIS service decides which expense form they get
+  // (e.g. a Guide booked as a second Chef logs "Pelo Chef" / "Chef Fee"). Falls back
+  // to their account role when they aren't assigned, and never changes Admin/Super Guide.
+  const me = TEAM_SLOT_ROLES.includes(role as TeamSlotRole)
+    ? (teamMembers.find((m) => m.email === email) ?? null)
+    : null;
+  const myServiceRoles: TeamSlotRole[] = me ? [
+    ...(tour.guideId === me.id ? ["Guide" as const] : []),
+    ...(tour.chefId === me.id ? ["Chef" as const] : []),
+    ...(tour.driverId === me.id ? ["Driver" as const] : []),
+    ...(tour.logisticsId === me.id ? ["Logistics" as const] : []),
+    ...tour.extraTeam.filter((m) => m.teamId === me.id).map((m) => m.role),
+  ] : [];
+  const expenseRole = myServiceRoles.length === 0 || myServiceRoles.includes(role as TeamSlotRole)
+    ? role
+    : myServiceRoles[0];
+  const myName = me?.name;
+  const memberNames = Object.fromEntries(teamMembers.map((m) => [m.id, m.name]));
+  const extraTeamForExpenses = tour.extraTeam
+    .filter((m) => m.name)
+    .map((m) => ({ name: m.name, role: EXPENSE_ROLE_LABEL[m.role] }));
 
   const steps = tour.service ? await getServiceSteps(tour.service) : [];
   const restaurants = tour.service ? await getServiceRestaurants(tour.service) : [];
@@ -502,21 +521,22 @@ async function TourPageContent({
                   <AddExpenseButton
                     tourId={id}
                     fornecedores={fornecedores}
-                    userRole={role}
-                    chefName={chefMember?.name}
-                    guideName={guideMember?.name}
-                    driverName={driverMember?.name}
+                    userRole={expenseRole}
+                    chefName={myName}
+                    guideName={myName}
+                    driverName={myName}
+                    logisticsName={myName}
                     tourTeam={[
                       tour.guideName ? { name: tour.guideName, role: "Guia" } : null,
                       tour.chefName  ? { name: tour.chefName,  role: "Chef" } : null,
                       tour.driverName ? { name: tour.driverName, role: "Motorista" } : null,
                       tour.logisticsName ? { name: tour.logisticsName, role: "Logistics" } : null,
-                      ...tour.extraTeam.map((m) => m.name ? { name: m.name, role: EXPENSE_ROLE_LABEL[m.role] } : null),
+                      ...extraTeamForExpenses,
                     ].filter(Boolean) as { name: string; role: string }[]}
                   />
                 )}
               </div>
-              <ExpenseList transactions={transactions} tourId={id} isClosed={isClosed} fornecedores={fornecedores} guideName={tour.guideName} chefName={tour.chefName} driverName={tour.driverName} logisticsName={tour.logisticsName} userRole={role} />
+              <ExpenseList transactions={transactions} tourId={id} isClosed={isClosed} fornecedores={fornecedores} guideName={tour.guideName} chefName={tour.chefName} driverName={tour.driverName} logisticsName={tour.logisticsName} memberNames={memberNames} extraTeam={extraTeamForExpenses} userRole={role} />
             </section>
 
             {/* Close Tour — only admins */}

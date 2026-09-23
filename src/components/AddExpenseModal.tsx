@@ -32,6 +32,7 @@ export function AddExpenseModal({
   chefName,
   guideName,
   driverName,
+  logisticsName,
   tourTeam = [],
   onClose,
 }: {
@@ -42,6 +43,7 @@ export function AddExpenseModal({
   chefName?: string;
   guideName?: string;
   driverName?: string;
+  logisticsName?: string;
   tourTeam?: { name: string; role: string }[];
   onClose: () => void;
 }) {
@@ -50,10 +52,11 @@ export function AddExpenseModal({
   const isChef = userRole === "Chef";
   const isGuide = userRole === "Guide";
   const isDriver = userRole === "Driver";
-  // Chef/Guide/Driver share the "despesa do serviço" vs "fatura de serviço" (own fee) choice
-  const isTeamMemberWithFee = isChef || isGuide || isDriver;
+  const isLogistics = userRole === "Logistics";
+  // Every team role shares the "despesa do serviço" vs "fatura de serviço" (own fee) choice
+  const isTeamMemberWithFee = isChef || isGuide || isDriver || isLogistics;
 
-  // Chef/Guide/Driver: start with a type choice; Admin: start with the honorários choice; others go straight to choose/scan
+  // Team roles: start with a type choice; Admin: start with the honorários choice; others go straight to choose/scan
   // tourId=null means standalone (not tied to a tour) — skip honorários flow
   const initialMode: Mode = pendingTransaction ? "scan" : isTeamMemberWithFee ? "chef-choose" : (isSuperGuide && tourId !== null) ? "admin-choose" : "choose";
 
@@ -225,6 +228,8 @@ export function AddExpenseModal({
           ? (chefExpenseType === "service-invoice" ? "Guide Fee" : "Pelo Guia")
           : isDriver
           ? (chefExpenseType === "service-invoice" ? "Driver Fee" : "Pelo Driver")
+          : isLogistics
+          ? (chefExpenseType === "service-invoice" ? "Logistics Fee" : "Pelo Logistics")
           : isHonorarios ? "Honorários"
           : paymentMethod;
 
@@ -285,6 +290,8 @@ export function AddExpenseModal({
         ? (chefExpenseType === "service-invoice" ? "Guide Fee" : "Pelo Guia")
         : isDriver
         ? (chefExpenseType === "service-invoice" ? "Driver Fee" : "Pelo Driver")
+        : isLogistics
+        ? (chefExpenseType === "service-invoice" ? "Logistics Fee" : "Pelo Logistics")
         : paymentMethod;
 
       const selectedFornecedor = fornecedores.find(
@@ -417,7 +424,7 @@ export function AddExpenseModal({
                 onClick={() => {
                   setChefExpenseType("service-invoice");
                   // Pre-fill supplier with the member's own name
-                  const memberName = isGuide ? guideName : isDriver ? driverName : chefName;
+                  const memberName = isGuide ? guideName : isDriver ? driverName : isLogistics ? logisticsName : chefName;
                   if (memberName) {
                     setForm((f) => ({ ...f, supplier: memberName }));
                   }
