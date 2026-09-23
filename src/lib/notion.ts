@@ -103,7 +103,7 @@ export type Transaction = {
   txType?: "Earning" | "Expense";
   socioPessoal?: string | null;
   socioTransferenciaFeita?: boolean;
-  /** Team member who paid a "Pelo …"/"Chef Fee" expense — set when a team member logs it themselves. */
+  /** Team member who paid a "Pelo …" expense or issued a "… Fee" invoice — set when they log it themselves. */
   paidByTeamId?: string | null;
 };
 

@@ -166,7 +166,10 @@ export async function markNoInvoiceNeededAction(
   revalidatePath("/super-guide/invoices");
 }
 
-const SELF_PAID_METHODS = ["Pelo Guia", "Pelo Chef", "Pelo Driver", "Pelo Logistics", "Chef Fee"];
+const SELF_PAID_METHODS = [
+  "Pelo Guia", "Pelo Chef", "Pelo Driver", "Pelo Logistics",
+  "Guide Fee", "Chef Fee", "Driver Fee", "Logistics Fee",
+];
 
 export async function logExpenseAction(
   data: Omit<Transaction, "id" | "accountantVerified">
@@ -301,7 +304,9 @@ export async function editExpenseAction(
     session.user.role !== "Guide" &&
     session.user.role !== "Admin" &&
     session.user.role !== "Super Guide" &&
-    session.user.role !== "Chef"
+    session.user.role !== "Chef" &&
+    session.user.role !== "Driver" &&
+    session.user.role !== "Logistics"
   ) {
     throw new Error("Forbidden");
   }
@@ -443,7 +448,9 @@ export async function deleteExpenseAction(
     session.user.role !== "Guide" &&
     session.user.role !== "Admin" &&
     session.user.role !== "Super Guide" &&
-    session.user.role !== "Chef"
+    session.user.role !== "Chef" &&
+    session.user.role !== "Driver" &&
+    session.user.role !== "Logistics"
   ) {
     throw new Error("Forbidden");
   }

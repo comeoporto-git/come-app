@@ -26,6 +26,8 @@ export function ExpenseList({
   chefName,
   driverName,
   logisticsName,
+  memberNames = {},
+  extraTeam = [],
   userRole = "Guide",
 }: {
   transactions: Transaction[];
@@ -36,6 +38,10 @@ export function ExpenseList({
   chefName?: string;
   driverName?: string;
   logisticsName?: string;
+  /** Team member id → name, to show who actually paid when a service has several people per role. */
+  memberNames?: Record<string, string>;
+  /** Extra people on the service beyond the primary slots, with a display role. */
+  extraTeam?: { name: string; role: string }[];
   userRole?: string;
 }) {
   const [pendingToFinish, setPendingToFinish] = useState<Transaction | null>(null);
@@ -43,12 +49,16 @@ export function ExpenseList({
   const [converting, setConverting] = useState<Transaction | null>(null);
   const isAdmin = userRole === "Admin";
 
-  const payerName = (tx: Transaction): string | undefined =>
-    tx.whoPaid === "Guide" ? guideName
-    : tx.whoPaid === "Chef" ? chefName
-    : tx.whoPaid === "Driver" ? driverName
-    : tx.whoPaid === "Logistics" ? logisticsName
-    : partnerPaymentByWhoPaid(tx.whoPaid)?.name;
+  const payerName = (tx: Transaction): string | undefined => {
+    const isTeamPaid = tx.whoPaid === "Guide" || tx.whoPaid === "Chef" || tx.whoPaid === "Driver" || tx.whoPaid === "Logistics";
+    // The person who logged it, if known — the role slot can't tell two chefs apart.
+    if (isTeamPaid && tx.paidByTeamId && memberNames[tx.paidByTeamId]) return memberNames[tx.paidByTeamId];
+    return tx.whoPaid === "Guide" ? guideName
+      : tx.whoPaid === "Chef" ? chefName
+      : tx.whoPaid === "Driver" ? driverName
+      : tx.whoPaid === "Logistics" ? logisticsName
+      : partnerPaymentByWhoPaid(tx.whoPaid)?.name;
+  };
 
   if (transactions.length === 0) {
     return (
@@ -78,20 +88,8 @@ export function ExpenseList({
                   )}
                 </div>
                 <p className="text-xs text-gray-400">{tx.date ?? "—"}</p>
-                {(tx.whoPaid === "Guide" && guideName) && (
-                  <p className="text-xs font-medium text-[#667470]">Pago por: {guideName}</p>
-                )}
-                {(tx.whoPaid === "Chef" && chefName) && (
-                  <p className="text-xs font-medium text-[#667470]">Pago por: {chefName}</p>
-                )}
-                {(tx.whoPaid === "Driver" && driverName) && (
-                  <p className="text-xs font-medium text-[#667470]">Pago por: {driverName}</p>
-                )}
-                {(tx.whoPaid === "Logistics" && logisticsName) && (
-                  <p className="text-xs font-medium text-[#667470]">Pago por: {logisticsName}</p>
-                )}
-                {partnerPaymentByWhoPaid(tx.whoPaid) && (
-                  <p className="text-xs font-medium text-[#667470]">Pago por: {partnerPaymentByWhoPaid(tx.whoPaid)!.name}</p>
+                {payerName(tx) && (
+                  <p className="text-xs font-medium text-[#667470]">Pago por: {payerName(tx)}</p>
                 )}
               </div>
               <div className="text-right shrink-0">
@@ -176,6 +174,7 @@ export function ExpenseList({
             chefName ? { name: chefName, role: "Chef" } : null,
             driverName ? { name: driverName, role: "Motorista" } : null,
             logisticsName ? { name: logisticsName, role: "Logistics" } : null,
+            ...extraTeam,
           ].filter(Boolean) as { name: string; role: string }[]}
           onClose={() => setConverting(null)}
         />
