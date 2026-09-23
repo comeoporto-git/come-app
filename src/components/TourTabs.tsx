@@ -206,7 +206,8 @@ function uniqueValues(tours: Tour[], key: "status" | "serviceType"): string[] {
 
 // Everyone assigned to the service, whatever their role (guide, chef, driver, logistics).
 function tourMemberIds(t: Tour): string[] {
-  return [t.guideId, t.chefId, t.driverId, t.logisticsId].filter((id): id is string => !!id);
+  return [t.guideId, t.chefId, t.driverId, t.logisticsId, ...t.extraTeam.map((m) => m.teamId)]
+    .filter((id): id is string => !!id);
 }
 
 function uniqueTeamMembers(tours: Tour[], teamMap?: Record<string, string>): { value: string; label: string }[] {
@@ -219,6 +220,7 @@ function uniqueTeamMembers(tours: Tour[], teamMap?: Record<string, string>): { v
       [t.chefId, t.chefName],
       [t.driverId, t.driverName],
       [t.logisticsId, t.logisticsName],
+      ...t.extraTeam.map((m): [string, string] => [m.teamId, m.name]),
     ];
     for (const [id, name] of roleNames) {
       if (id && !names.has(id)) names.set(id, teamMap?.[id] ?? (name || id));

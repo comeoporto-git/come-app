@@ -12,7 +12,7 @@ import {
   getServiceRestaurants,
   deleteSale,
 } from "@/lib/notion";
-import type { Fornecedor, Transaction } from "@/lib/notion";
+import type { Fornecedor, TeamSlotRole, Transaction } from "@/lib/notion";
 import { categoriaBadgeClass } from "@/lib/fornecedor-categories";
 import { getOpenStatusForDate, isRowClosed, formatDayHours } from "@/lib/restaurantOpenStatus";
 import { WEEKDAY_LABELS } from "@/lib/constants";
@@ -75,6 +75,13 @@ function computeCategoryBreakdown(
     .map(([label, total]) => ({ label, total }))
     .sort((a, b) => b.total - a.total);
 }
+
+const EXTRA_ROLE_LABEL: Record<TeamSlotRole, string> = {
+  Guide: "Guia", Chef: "Chef", Driver: "Driver", Logistics: "Logistics",
+};
+const EXPENSE_ROLE_LABEL: Record<TeamSlotRole, string> = {
+  Guide: "Guia", Chef: "Chef", Driver: "Motorista", Logistics: "Logistics",
+};
 
 // ── Shell (renders immediately, only needs auth cookie) ───────────────────────
 
@@ -304,6 +311,7 @@ async function TourPageContent({
                     logisticsId={tour.logisticsId}
                     logisticsName={tour.logisticsName}
                     logisticsPhone={teamMembers.find(m => m.id === tour.logisticsId)?.phone}
+                    extraTeam={tour.extraTeam}
                     teamMembers={teamMembers}
                   />
                 ) : (
@@ -328,6 +336,14 @@ async function TourPageContent({
                       name={tour.logisticsName || "—"}
                       phone={teamMembers.find(m => m.id === tour.logisticsId)?.phone}
                     />
+                    {tour.extraTeam.map((m) => (
+                      <TeamMemberField
+                        key={`${m.role}-${m.teamId}`}
+                        label={EXTRA_ROLE_LABEL[m.role]}
+                        name={m.name || "—"}
+                        phone={teamMembers.find(t => t.id === m.teamId)?.phone}
+                      />
+                    ))}
                   </div>
                 )}
               </div>
@@ -495,6 +511,7 @@ async function TourPageContent({
                       tour.chefName  ? { name: tour.chefName,  role: "Chef" } : null,
                       tour.driverName ? { name: tour.driverName, role: "Motorista" } : null,
                       tour.logisticsName ? { name: tour.logisticsName, role: "Logistics" } : null,
+                      ...tour.extraTeam.map((m) => m.name ? { name: m.name, role: EXPENSE_ROLE_LABEL[m.role] } : null),
                     ].filter(Boolean) as { name: string; role: string }[]}
                   />
                 )}

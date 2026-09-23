@@ -16,7 +16,7 @@ import {
   getFornecedores,
   supabase,
 } from "@/lib/notion";
-import type { Transaction, Fornecedor } from "@/lib/notion";
+import type { Transaction, Fornecedor, TeamSlotRole } from "@/lib/notion";
 import { revalidatePath, updateTag } from "next/cache";
 import { auth } from "@/lib/auth";
 import { notifyInvoiceAdded } from "@/lib/notifications";
@@ -34,13 +34,18 @@ export async function updateTourTeamAction(
   chefId: string | null,
   driverId: string | null,
   logisticsId: string | null,
+  extraTeam: { teamId: string; role: TeamSlotRole }[] = [],
 ): Promise<{ error?: string }> {
   const session = await requireAuth();
   if (session.user.role !== "Super Guide" && session.user.role !== "Admin") {
     return { error: "Forbidden: apenas Super Guide ou Admin podem editar a equipa" };
   }
+  const validRoles: TeamSlotRole[] = ["Guide", "Chef", "Driver", "Logistics"];
+  if (extraTeam.some((m) => !validRoles.includes(m.role))) {
+    return { error: "Função inválida" };
+  }
   try {
-    await updateTourTeam(tourId, guideId, chefId, driverId, logisticsId);
+    await updateTourTeam(tourId, guideId, chefId, driverId, logisticsId, extraTeam);
     revalidatePath(`/guide/tours/${tourId}`);
     return {};
   } catch (err) {
@@ -161,6 +166,8 @@ export async function markNoInvoiceNeededAction(
   revalidatePath("/super-guide/invoices");
 }
 
+const SELF_PAID_METHODS = ["Pelo Guia", "Pelo Chef", "Pelo Driver", "Pelo Logistics", "Chef Fee"];
+
 export async function logExpenseAction(
   data: Omit<Transaction, "id" | "accountantVerified">
 ): Promise<{ id?: string; error?: string }> {
@@ -177,7 +184,13 @@ export async function logExpenseAction(
     ) {
       return { error: "Forbidden" };
     }
-    const id = await createTransaction(data);
+    // A service can have several chefs/drivers/…, so record which team member
+    // paid out of pocket — taken from the session, never from the client.
+    const selfPaid = SELF_PAID_METHODS.includes(data.paymentMethod) && role !== "Admin" && role !== "Super Guide";
+    const id = await createTransaction({
+      ...data,
+      paidByTeamId: selfPaid ? (session.user.notionId || null) : null,
+    });
     if (data.tourId) {
       revalidatePath(`/guide/tours/${data.tourId}`);
     } else {

@@ -49,6 +49,8 @@ export type Tour = {
   driverName: string;
   logisticsId: string | null;
   logisticsName: string;
+  /** Extra people beyond the one primary slot per role (e.g. a second chef). */
+  extraTeam: ExtraTeamMember[];
   teamId: string | null;
   expensesClosed: boolean;
   serviceEquipa: string[];
@@ -57,6 +59,10 @@ export type Tour = {
   endTime: string | null;
   expectedRevenue?: number;
 };
+
+export type TeamSlotRole = "Guide" | "Chef" | "Driver" | "Logistics";
+
+export type ExtraTeamMember = { teamId: string; name: string; role: TeamSlotRole };
 
 export type TourWithMissingStaff = Tour & { missingRoles: string[] };
 
@@ -97,6 +103,8 @@ export type Transaction = {
   txType?: "Earning" | "Expense";
   socioPessoal?: string | null;
   socioTransferenciaFeita?: boolean;
+  /** Team member who paid a "Pelo …"/"Chef Fee" expense — set when a team member logs it themselves. */
+  paidByTeamId?: string | null;
 };
 
 export type Fornecedor = {
@@ -150,6 +158,10 @@ function mapSaleRow(row: any): Tour {
     driverName:    row.driver?.name  ?? "",
     logisticsId:   row.logistics_id  ?? null,
     logisticsName: row.logistics?.name ?? "",
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    extraTeam: ((row.sale_team_members ?? []) as any[])
+      .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)))
+      .map((m) => ({ teamId: m.team_id, name: m.member?.name ?? "", role: m.role as TeamSlotRole })),
     teamId:        row.guide_id      ?? null,
     expensesClosed: row.expenses_closed === "Closed",
     serviceEquipa: row.services?.equipa ?? [],
@@ -190,6 +202,7 @@ function mapTransactionRow(row: any): Transaction {
     txType:             (row.type as "Earning" | "Expense" | undefined) ?? undefined,
     socioPessoal:            row.socio_pessoal ?? null,
     socioTransferenciaFeita: row.socio_transferencia_feita ?? false,
+    paidByTeamId:            row.paid_by_team_id ?? null,
   };
 }
 
@@ -201,7 +214,8 @@ const SALE_SELECT = `
   guide:team!sales_guide_id_fkey(name),
   chef:team!sales_chef_id_fkey(name),
   driver:team!sales_driver_id_fkey(name),
-  logistics:team!sales_logistics_id_fkey(name)
+  logistics:team!sales_logistics_id_fkey(name),
+  sale_team_members(team_id, role, created_at, member:team(name))
 `.trim();
 
 const TX_SELECT = `*, type, sales!transactions_sale_id_fkey(notion_id, guide_id, chef_id, driver_id)`;
@@ -220,12 +234,13 @@ function in30Days(): string {
 
 function getMissingStaffRoles(tour: Tour): string[] {
   const missing: string[] = [];
+  const hasExtra = (role: TeamSlotRole) => tour.extraTeam.some((m) => m.role === role);
   for (const role of tour.serviceEquipa) {
     const r = role.toLowerCase();
-    if ((r.includes("guia") || r.includes("guide")) && !tour.guideId) missing.push(role);
-    else if (r.includes("chef") && !tour.chefId) missing.push(role);
-    else if ((r.includes("driver") || r.includes("condutor")) && !tour.driverId) missing.push(role);
-    else if (r.includes("logist") && !tour.logisticsId) missing.push(role);
+    if ((r.includes("guia") || r.includes("guide")) && !tour.guideId && !hasExtra("Guide")) missing.push(role);
+    else if (r.includes("chef") && !tour.chefId && !hasExtra("Chef")) missing.push(role);
+    else if ((r.includes("driver") || r.includes("condutor")) && !tour.driverId && !hasExtra("Driver")) missing.push(role);
+    else if (r.includes("logist") && !tour.logisticsId && !hasExtra("Logistics")) missing.push(role);
   }
   return missing;
 }
@@ -976,15 +991,28 @@ export async function getServicesWithMissingStaff(): Promise<TourWithMissingStaf
   } catch { return []; }
 }
 
+// Sales where the member was added as an extra team member (sale_team_members).
+async function getExtraSaleIdsForMember(memberId: string): Promise<string[]> {
+  const { data } = await supabase.from("sale_team_members").select("sale_id").eq("team_id", memberId);
+  return Array.from(new Set((data ?? []).map((r) => r.sale_id as string)));
+}
+
+function personSlotFilter(memberId: string, extraSaleIds: string[]): string {
+  const slots = [`guide_id.eq.${memberId}`, `chef_id.eq.${memberId}`, `driver_id.eq.${memberId}`, `logistics_id.eq.${memberId}`];
+  if (extraSaleIds.length > 0) slots.push(`id.in.(${extraSaleIds.join(",")})`);
+  return slots.join(",");
+}
+
 // Any tour where the person is assigned in ANY role slot (guide, chef, driver,
 // logistics) — a team member's `role` field only picks their default dashboard
 // view, it doesn't limit which slots they can be booked into on a given sale.
 export async function getToursForPerson(email: string): Promise<Tour[]> {
   const member = await getTeamMemberByEmail(email);
   if (!member) return [];
+  const extraSaleIds = await getExtraSaleIdsForMember(member.id);
   const { data } = await supabase.from("sales")
     .select(SALE_SELECT)
-    .or(`guide_id.eq.${member.id},chef_id.eq.${member.id},driver_id.eq.${member.id},logistics_id.eq.${member.id}`)
+    .or(personSlotFilter(member.id, extraSaleIds))
     .gte("date", today0())
     .or("expenses_closed.is.null,expenses_closed.neq.Closed")
     .order("date");
@@ -994,9 +1022,10 @@ export async function getToursForPerson(email: string): Promise<Tour[]> {
 export async function getPastToursForPerson(email: string): Promise<Tour[]> {
   const member = await getTeamMemberByEmail(email);
   if (!member) return [];
+  const extraSaleIds = await getExtraSaleIdsForMember(member.id);
   const { data } = await supabase.from("sales")
     .select(SALE_SELECT)
-    .or(`guide_id.eq.${member.id},chef_id.eq.${member.id},driver_id.eq.${member.id},logistics_id.eq.${member.id}`)
+    .or(personSlotFilter(member.id, extraSaleIds))
     .lt("date", today0())
     .order("date", { ascending: false })
     .limit(30);
@@ -1079,6 +1108,7 @@ export async function updateTourTeam(
   chefId: string | null,
   driverId: string | null,
   logisticsId: string | null,
+  extraTeam: { teamId: string; role: TeamSlotRole }[] = [],
 ): Promise<void> {
   const { error } = await supabase.from("sales").update({
     guide_id:     guideId      ?? null,
@@ -1087,6 +1117,19 @@ export async function updateTourTeam(
     logistics_id: logisticsId  ?? null,
   }).eq("id", tourId);
   if (error) throw new Error(`updateTourTeam: ${error.message}`);
+
+  // Replace the extra members wholesale — the editor always submits the full list.
+  const { error: delError } = await supabase.from("sale_team_members").delete().eq("sale_id", tourId);
+  if (delError) throw new Error(`updateTourTeam (extras): ${delError.message}`);
+  const unique = new Map<string, { sale_id: string; team_id: string; role: TeamSlotRole }>();
+  for (const m of extraTeam) {
+    if (m.teamId) unique.set(`${m.teamId}|${m.role}`, { sale_id: tourId, team_id: m.teamId, role: m.role });
+  }
+  const rows = Array.from(unique.values());
+  if (rows.length > 0) {
+    const { error: insError } = await supabase.from("sale_team_members").insert(rows);
+    if (insError) throw new Error(`updateTourTeam (extras): ${insError.message}`);
+  }
 }
 
 const SALE_SELECT_WITH_PRICES = `
@@ -1096,7 +1139,8 @@ const SALE_SELECT_WITH_PRICES = `
   guide:team!sales_guide_id_fkey(name),
   chef:team!sales_chef_id_fkey(name),
   driver:team!sales_driver_id_fkey(name),
-  logistics:team!sales_logistics_id_fkey(name)
+  logistics:team!sales_logistics_id_fkey(name),
+  sale_team_members(team_id, role, created_at, member:team(name))
 `.trim();
 
 type YearPriceRow = { year: number; pax_2_3: number | null; pax_4_6: number | null; pax_7_plus: number | null };
@@ -1307,7 +1351,8 @@ async function buildPaidByNameResolver(): Promise<
 
   return (tx: Transaction, sale: SaleRef) => {
     let paidByName: string | undefined;
-    if (sale) {
+    if (tx.paidByTeamId) paidByName = memberById[tx.paidByTeamId];
+    if (!paidByName && sale) {
       const memberId = tx.whoPaid === "Chef"   ? sale.chef_id
                      : tx.whoPaid === "Driver" ? sale.driver_id
                      : tx.whoPaid === "Guide"  ? sale.guide_id
@@ -1547,11 +1592,14 @@ export async function getGuideExpenses(): Promise<Transaction[]> {
       if (partner) {
         return { ...t, tourName, paidByName: partner.name, payeeIban: ibanByName[partner.name.toLowerCase()] ?? "" };
       }
-      if (!sale) return { ...t, tourName };
-      const memberId = t.paymentMethod === "Pelo Chef"      ? sale.chef_id
-                     : t.paymentMethod === "Pelo Driver"    ? sale.driver_id
-                     : t.paymentMethod === "Pelo Logistics" ? sale.logistics_id
-                     : sale.guide_id;
+      if (!sale && !t.paidByTeamId) return { ...t, tourName };
+      // The person who logged it wins over the sale's role slot, which can't tell
+      // apart two chefs (or drivers, …) on the same service.
+      const memberId = t.paidByTeamId
+                     ?? (t.paymentMethod === "Pelo Chef"      ? sale.chef_id
+                       : t.paymentMethod === "Pelo Driver"    ? sale.driver_id
+                       : t.paymentMethod === "Pelo Logistics" ? sale.logistics_id
+                       : sale.guide_id);
       const member = memberId ? memberById[memberId] : undefined;
       return { ...t, tourName, paidByName: member?.name ?? "", payeeIban: member?.iban ?? "" };
     });
@@ -1581,6 +1629,7 @@ export async function createTransaction(
     id_banco:         data.bankReference  || null,
     precisa_fatura:   data.precisaDeFatura || null,
     socio_pessoal:    data.socioPessoal   ?? null,
+    paid_by_team_id:  data.paidByTeamId   ?? null,
   }).select("id").single();
   if (error) throw new Error(`createTransaction: ${error.message}`);
   return row.id;
