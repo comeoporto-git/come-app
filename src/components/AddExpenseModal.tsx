@@ -7,6 +7,7 @@ import type { Transaction, Fornecedor } from "@/lib/notion";
 import { normalizeImage } from "@/lib/image";
 import { useRouter } from "next/navigation";
 import { PARTNERS, PARTNER_PAYMENT_METHODS, ownershipForDate, partnerPaymentByMethod } from "@/lib/constants";
+import { WhoPaidPicker, peopleForMethod, type ServicePerson } from "./WhoPaidPicker";
 
 type Mode = "chef-choose" | "admin-choose" | "honorarios" | "choose" | "scan" | "manual" | "review";
 
@@ -34,6 +35,7 @@ export function AddExpenseModal({
   driverName,
   logisticsName,
   tourTeam = [],
+  roster = [],
   onClose,
 }: {
   tourId: string | null;
@@ -45,6 +47,8 @@ export function AddExpenseModal({
   driverName?: string;
   logisticsName?: string;
   tourTeam?: { name: string; role: string }[];
+  /** Everyone on the service by role — lets Admin/Super Guide say which chef/guide/… paid. */
+  roster?: ServicePerson[];
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -75,6 +79,15 @@ export function AddExpenseModal({
     : userRole === "Logistics" ? "Pelo Logistics"
     : "Pelo Guia";
   const [paymentMethod, setPaymentMethod] = useState<string>(defaultPaymentMethod);
+  const [paidBy, setPaidBy] = useState<string>("");
+  // Which team member paid, when Admin/Super Guide log a "Pelo …" expense for a role
+  // with several people on the service. Defaults to the role's primary person.
+  const payerFor = (method: string): string | undefined => {
+    if (!isSuperGuide) return undefined;
+    const people = peopleForMethod(method, roster);
+    if (people.length < 2) return undefined;
+    return people.find((p) => p.teamId === paidBy)?.teamId ?? people[0].teamId;
+  };
   const [socioPessoal, setSocioPessoal] = useState<string>("");
   const [honorariosMember, setHonorariosMember] = useState<string>("");
   const [needsInvoice, setNeedsInvoice] = useState(false);
@@ -266,6 +279,7 @@ export function AddExpenseModal({
           invoiceImageUrl,
           precisaDeFatura: needsInvoice ? "Sim" : undefined,
           socioPessoal: socioPessoal || null,
+          paidByTeamId: payerFor(effectivePaymentMethod),
         });
         if (logResult?.error) throw new Error(logResult.error);
       }
@@ -318,6 +332,7 @@ export function AddExpenseModal({
         tourId,
         bankReference: "",
         precisaDeFatura: needsInvoice ? "Sim" : undefined,
+        paidByTeamId: payerFor(effectivePaymentMethod),
       });
       router.refresh();
       onClose();
@@ -615,6 +630,14 @@ export function AddExpenseModal({
                     ))}
                   </select>
                 </div>
+              )}
+              {isSuperGuide && !honorariosMember && (
+                <WhoPaidPicker
+                  paymentMethod={paymentMethod}
+                  roster={roster}
+                  value={payerFor(paymentMethod) ?? ""}
+                  onChange={setPaidBy}
+                />
               )}
 
               {/* Despesa pessoal de sócio — needs redistribution to the other partners */}

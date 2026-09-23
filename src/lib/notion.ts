@@ -1663,6 +1663,7 @@ export async function updateTransaction(
   if (data.precisaDeFatura   !== undefined) updates.precisa_fatura      = data.precisaDeFatura || null;
   if (data.contaPagamento    !== undefined) updates.conta_pagamento     = data.contaPagamento || null;
   if (data.socioPessoal      !== undefined) updates.socio_pessoal       = data.socioPessoal || null;
+  if (data.paidByTeamId      !== undefined) updates.paid_by_team_id     = data.paidByTeamId || null;
   await supabase.from("transactions").update(updates).eq("id", pageId);
 }
 

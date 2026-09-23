@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { Transaction, Fornecedor } from "@/lib/notion";
 import { AddExpenseModal } from "./AddExpenseModal";
 import { EditExpenseModal } from "./EditExpenseModal";
+import type { ServicePerson } from "./WhoPaidPicker";
 import { partnerPaymentByWhoPaid } from "@/lib/constants";
 import { convertExpenseToHonorarioAction } from "@/actions/transactions";
 import { useRouter } from "next/navigation";
@@ -28,6 +29,7 @@ export function ExpenseList({
   logisticsName,
   memberNames = {},
   extraTeam = [],
+  roster = [],
   userRole = "Guide",
 }: {
   transactions: Transaction[];
@@ -42,6 +44,8 @@ export function ExpenseList({
   memberNames?: Record<string, string>;
   /** Extra people on the service beyond the primary slots, with a display role. */
   extraTeam?: { name: string; role: string }[];
+  /** Everyone on the service by role, for the Admin "Quem pagou?" picker when editing. */
+  roster?: ServicePerson[];
   userRole?: string;
 }) {
   const [pendingToFinish, setPendingToFinish] = useState<Transaction | null>(null);
@@ -186,6 +190,7 @@ export function ExpenseList({
           tourId={tourId}
           fornecedores={fornecedores}
           userRole={userRole}
+          roster={roster}
           onClose={() => setEditing(null)}
         />
       )}

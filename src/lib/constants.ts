@@ -36,3 +36,11 @@ export const WEEKDAY_LABELS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta
 // Roles a task can be assigned to (tasks.role). Admin/Super Guide tasks are
 // hidden from every other role — see getTasksForSale.
 export const TASK_ROLE_OPTIONS = ["Admin", "Guide", "Super Guide", "Chef", "Driver", "Logistics"] as const;
+
+// "Pelo …" payment methods → the service role whose member paid out of pocket.
+export const TEAM_PAYMENT_METHOD_ROLE: Record<string, "Guide" | "Chef" | "Driver" | "Logistics"> = {
+  "Pelo Guia": "Guide",
+  "Pelo Chef": "Chef",
+  "Pelo Driver": "Driver",
+  "Pelo Logistics": "Logistics",
+};

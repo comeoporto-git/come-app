@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { AddExpenseModal } from "./AddExpenseModal";
 import type { Fornecedor } from "@/lib/notion";
+import type { ServicePerson } from "./WhoPaidPicker";
 
 export function AddExpenseButton({
   tourId,
@@ -13,6 +14,7 @@ export function AddExpenseButton({
   driverName,
   logisticsName,
   tourTeam = [],
+  roster = [],
 }: {
   tourId: string;
   fornecedores: Fornecedor[];
@@ -22,6 +24,7 @@ export function AddExpenseButton({
   driverName?: string;
   logisticsName?: string;
   tourTeam?: { name: string; role: string }[];
+  roster?: ServicePerson[];
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -42,6 +45,7 @@ export function AddExpenseButton({
           driverName={driverName}
           logisticsName={logisticsName}
           tourTeam={tourTeam}
+          roster={roster}
           onClose={() => setOpen(false)}
         />
       )}
