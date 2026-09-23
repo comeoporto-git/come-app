@@ -5,6 +5,8 @@ import type { Transaction, Fornecedor } from "@/lib/notion";
 import { AddExpenseModal } from "./AddExpenseModal";
 import { EditExpenseModal } from "./EditExpenseModal";
 import { partnerPaymentByWhoPaid } from "@/lib/constants";
+import { convertExpenseToHonorarioAction } from "@/actions/transactions";
+import { useRouter } from "next/navigation";
 
 const STATUS_COLORS: Record<string, string> = {
   Paid: "bg-green-100 text-green-700",
@@ -38,6 +40,15 @@ export function ExpenseList({
 }) {
   const [pendingToFinish, setPendingToFinish] = useState<Transaction | null>(null);
   const [editing, setEditing] = useState<Transaction | null>(null);
+  const [converting, setConverting] = useState<Transaction | null>(null);
+  const isAdmin = userRole === "Admin";
+
+  const payerName = (tx: Transaction): string | undefined =>
+    tx.whoPaid === "Guide" ? guideName
+    : tx.whoPaid === "Chef" ? chefName
+    : tx.whoPaid === "Driver" ? driverName
+    : tx.whoPaid === "Logistics" ? logisticsName
+    : partnerPaymentByWhoPaid(tx.whoPaid)?.name;
 
   if (transactions.length === 0) {
     return (
@@ -126,6 +137,15 @@ export function ExpenseList({
               </button>
             )}
 
+            {isAdmin && tx.paymentMethod !== "Honorários" && (
+              <button
+                onClick={(e) => { e.stopPropagation(); setConverting(tx); }}
+                className="mt-1 block text-xs text-[#667470] font-semibold hover:underline"
+              >
+                ⇄ Converter em Honorário
+              </button>
+            )}
+
             {tx.accountantVerified && (
               <p className="text-xs text-green-600 font-medium">✓ Verificado pelo contabilista</p>
             )}
@@ -146,6 +166,21 @@ export function ExpenseList({
         />
       )}
 
+      {converting && (
+        <ConvertToHonorarioModal
+          transaction={converting}
+          tourId={tourId}
+          defaultMember={payerName(converting)}
+          team={[
+            guideName ? { name: guideName, role: "Guia" } : null,
+            chefName ? { name: chefName, role: "Chef" } : null,
+            driverName ? { name: driverName, role: "Motorista" } : null,
+            logisticsName ? { name: logisticsName, role: "Logistics" } : null,
+          ].filter(Boolean) as { name: string; role: string }[]}
+          onClose={() => setConverting(null)}
+        />
+      )}
+
       {editing && (
         <EditExpenseModal
           transaction={editing}
@@ -156,5 +191,102 @@ export function ExpenseList({
         />
       )}
     </>
+  );
+}
+
+function ConvertToHonorarioModal({
+  transaction,
+  tourId,
+  defaultMember,
+  team,
+  onClose,
+}: {
+  transaction: Transaction;
+  tourId: string;
+  defaultMember?: string;
+  team: { name: string; role: string }[];
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  // Payer first (the member who uploaded the receipt), then the rest of the team
+  const options = [
+    ...(defaultMember && !team.some((m) => m.name === defaultMember)
+      ? [{ name: defaultMember, role: "Pagou a despesa" }]
+      : []),
+    ...team,
+  ].filter((m, i, arr) => arr.findIndex((o) => o.name === m.name) === i);
+  const [member, setMember] = useState(defaultMember ?? options[0]?.name ?? "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleConfirm() {
+    setSaving(true);
+    setError("");
+    const result = await convertExpenseToHonorarioAction(transaction.id, tourId, member);
+    if (result.error) {
+      setError(result.error);
+      setSaving(false);
+      return;
+    }
+    router.refresh();
+    onClose();
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="w-full max-w-sm bg-white rounded-2xl p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
+        <div>
+          <h3 className="text-base font-semibold text-[#32373c]">Converter em Honorário</h3>
+          <p className="text-xs text-gray-500 mt-1">
+            {transaction.supplier} · €{Math.abs(transaction.totalCost).toFixed(2)}
+          </p>
+        </div>
+
+        {options.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-2">Nenhum membro atribuído a este serviço.</p>
+        ) : (
+          <div className="space-y-2">
+            <p className="text-sm text-gray-500">Honorários de:</p>
+            {options.map((m) => (
+              <button
+                key={m.name}
+                type="button"
+                onClick={() => setMember(m.name)}
+                className={`w-full flex items-center justify-between p-3 rounded-xl border-2 text-left transition-colors ${
+                  member === m.name ? "border-[#667470] bg-[#667470]/5" : "border-gray-200 bg-gray-50 hover:bg-gray-100"
+                }`}
+              >
+                <span className="text-sm font-semibold text-[#32373c]">{m.name}</span>
+                <span className="text-xs text-gray-500">{m.role}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        <p className="text-xs text-gray-400">
+          O fornecedor passa a ser o membro da equipa e o pagamento fica a cargo da COME (Honorários).
+        </p>
+
+        {error && <p className="text-sm text-red-600">{error}</p>}
+
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={handleConfirm}
+            disabled={saving || !member}
+            className="flex-1 py-2.5 rounded-xl bg-[#32373c] text-white text-sm font-semibold disabled:opacity-50"
+          >
+            {saving ? "A converter…" : "Converter"}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

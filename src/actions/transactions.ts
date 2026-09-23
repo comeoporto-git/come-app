@@ -319,6 +319,45 @@ export async function editExpenseAction(
   revalidatePath("/admin/socios");
 }
 
+// Admin-only fix for receipts a guide/chef logged as a "Despesa do Serviço"
+// when it was actually their honorários invoice. Mirrors how honorários are
+// created in AddExpenseModal: the team member is the supplier, the company pays,
+// and there is no Fornecedor record.
+export async function convertExpenseToHonorarioAction(
+  transactionId: string,
+  tourId: string,
+  memberName: string,
+): Promise<{ error?: string }> {
+  const session = await requireAuth();
+  if (session.user.role !== "Admin") return { error: "Forbidden" };
+  if (!memberName.trim()) return { error: "Membro da equipa em falta" };
+  try {
+    const { data: row } = await supabase
+      .from("transactions")
+      .select("id_fatura, fatura_url, transferencia_feita, metodo_pagamento")
+      .eq("id", transactionId)
+      .maybeSingle();
+    if (!row) return { error: "Despesa não encontrada" };
+    if (row.metodo_pagamento === "Honorários") return {};
+    const hasReceipt = !!(row.id_fatura || row.fatura_url);
+    await updateTransaction(transactionId, {
+      supplier: memberName.trim(),
+      fornecedorId: null,
+      whoPaid: "Company",
+      paymentMethod: "Honorários",
+      // Already transferred to the member → keep the current status so it
+      // doesn't re-enter the payments queue.
+      ...(row.transferencia_feita ? {} : { status: hasReceipt ? "Pending Payment" : "Pending Receipt" }),
+    });
+    revalidatePath(`/guide/tours/${tourId}`);
+    revalidatePath("/admin/transferencias");
+    revalidatePath("/admin/em-falta");
+    return {};
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
 export async function closeTourAction(tourId: string): Promise<void> {
   const session = await requireAuth();
   if (session.user.role !== "Guide" && session.user.role !== "Admin" && session.user.role !== "Super Guide") {
