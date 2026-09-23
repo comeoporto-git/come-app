@@ -180,7 +180,7 @@ function filterTours(
   const q = query.trim().toLowerCase();
   return tours.filter((t) => {
     if (filters.status.length && !filters.status.includes(t.status)) return false;
-    if (filters.team.length && !filters.team.includes(t.teamId ?? "")) return false;
+    if (filters.team.length && !tourMemberIds(t).some((id) => filters.team.includes(id))) return false;
     if (filters.serviceType.length && !filters.serviceType.includes(t.serviceType)) return false;
     if (!q) return true;
     const guideName = teamMap?.[t.teamId ?? ""] ?? "";
@@ -204,12 +204,27 @@ function uniqueValues(tours: Tour[], key: "status" | "serviceType"): string[] {
   return Array.from(set).sort((a, b) => a.localeCompare(b));
 }
 
-function uniqueTeamIds(tours: Tour[]): string[] {
-  const set = new Set<string>();
+// Everyone assigned to the service, whatever their role (guide, chef, driver, logistics).
+function tourMemberIds(t: Tour): string[] {
+  return [t.guideId, t.chefId, t.driverId, t.logisticsId].filter((id): id is string => !!id);
+}
+
+function uniqueTeamMembers(tours: Tour[], teamMap?: Record<string, string>): { value: string; label: string }[] {
+  // Start from the full team roster so every member is selectable, then add anyone
+  // assigned on a service who isn't in the roster.
+  const names = new Map<string, string>(Object.entries(teamMap ?? {}));
   for (const t of tours) {
-    if (t.teamId) set.add(t.teamId);
+    const roleNames: [string | null, string][] = [
+      [t.guideId, t.guideName],
+      [t.chefId, t.chefName],
+      [t.driverId, t.driverName],
+      [t.logisticsId, t.logisticsName],
+    ];
+    for (const [id, name] of roleNames) {
+      if (id && !names.has(id)) names.set(id, teamMap?.[id] ?? (name || id));
+    }
   }
-  return Array.from(set);
+  return Array.from(names, ([value, label]) => ({ value, label })).sort((a, b) => a.label.localeCompare(b.label));
 }
 
 function MultiSelectDropdown({
@@ -317,7 +332,7 @@ export function TourTabs({
   const allTours = [...upcoming, ...past];
   const statusOptions      = uniqueValues(allTours, "status");
   const serviceTypeOptions = uniqueValues(allTours, "serviceType");
-  const teamIdOptions      = uniqueTeamIds(allTours);
+  const teamOptions        = uniqueTeamMembers(allTours, teamMap);
 
   const activeFilters = showFilters ? filters : EMPTY_FILTERS;
   const hideCancelled = showFilters && !showCancelled;
@@ -401,7 +416,7 @@ export function TourTabs({
 
           <MultiSelectDropdown
             label="Equipa"
-            options={teamIdOptions.map((id) => ({ value: id, label: teamMap?.[id] ?? id }))}
+            options={teamOptions}
             selected={filters.team}
             onChange={(values) => setFilters((f) => ({ ...f, team: values }))}
           />
