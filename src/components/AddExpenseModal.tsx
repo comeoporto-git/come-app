@@ -171,6 +171,18 @@ export function AddExpenseModal({
     });
   }
 
+  // Resolve the typed/AI-scanned supplier to a Fornecedor record, creating one
+  // if no match exists — otherwise the expense is saved with only a free-text
+  // name and never shows up under Fornecedores.
+  async function resolveFornecedorId(name: string): Promise<string | null> {
+    const trimmed = name.trim();
+    if (!trimmed) return null;
+    const existing = fornecedores.find((f) => f.name.toLowerCase() === trimmed.toLowerCase());
+    if (existing) return existing.id;
+    const created = await handleCreateFornecedor(trimmed);
+    return created.id;
+  }
+
   async function handleCreateFornecedor(name: string): Promise<Fornecedor> {
     const newF = await createFornecedorAction(name);
     setFornecedores((prev) => [...prev, newF].sort((a, b) => a.name.localeCompare(b.name)));
@@ -228,12 +240,9 @@ export function AddExpenseModal({
           : isHonorarios ? "Honorários"
           : paymentMethod;
 
-        const selectedFornecedor = fornecedores.find(
-          (f) => f.name.toLowerCase() === form.supplier.toLowerCase()
-        );
         // Honorários and service invoices have no Fornecedor record
         const effectiveFornecedorId =
-          (chefExpenseType === "service-invoice" || isHonorarios) ? null : (selectedFornecedor?.id ?? null);
+          (chefExpenseType === "service-invoice" || isHonorarios) ? null : await resolveFornecedorId(form.supplier);
 
         const logResult = await logExpenseAction({
           supplier: form.supplier,
@@ -287,12 +296,9 @@ export function AddExpenseModal({
         ? (chefExpenseType === "service-invoice" ? "Driver Fee" : "Pelo Driver")
         : paymentMethod;
 
-      const selectedFornecedor = fornecedores.find(
-        (f) => f.name.toLowerCase() === form.supplier.toLowerCase()
-      );
       await logExpenseAction({
         supplier: form.supplier,
-        fornecedorId: chefExpenseType === "service-invoice" ? null : (selectedFornecedor?.id ?? null),
+        fornecedorId: chefExpenseType === "service-invoice" ? null : await resolveFornecedorId(form.supplier),
         date: form.date,
         invoiceId: "",
         taxFree: 0,
