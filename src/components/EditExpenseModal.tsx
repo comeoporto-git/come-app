@@ -5,6 +5,7 @@ import { editExpenseAction, deleteExpenseAction, createFornecedorAction } from "
 import type { Transaction, Fornecedor } from "@/lib/notion";
 import { useRouter } from "next/navigation";
 import { PARTNERS, PARTNER_PAYMENT_METHODS, ownershipForDate, partnerPaymentByMethod } from "@/lib/constants";
+import { WhoPaidPicker, peopleForMethod, type ServicePerson } from "./WhoPaidPicker";
 
 type FormState = {
   supplier: string;
@@ -27,15 +28,35 @@ export function EditExpenseModal({
   tourId,
   fornecedores: initialFornecedores = [],
   userRole = "Guide",
+  roster = [],
   onClose,
 }: {
   transaction: Transaction;
   tourId: string;
   fornecedores?: Fornecedor[];
   userRole?: string;
+  /** Everyone on the service by role — lets Admin/Super Guide say which chef/guide/… paid. */
+  roster?: ServicePerson[];
   onClose: () => void;
 }) {
   const router = useRouter();
+  const canChoosePayer = userRole === "Admin" || userRole === "Super Guide";
+  const [paidBy, setPaidBy] = useState<string>(transaction.paidByTeamId ?? "");
+
+  // Payer shown in "Quem pagou?" — only when the role has several people on the service.
+  function pickedPayer(): string | undefined {
+    const people = peopleForMethod(form.paymentMethod, roster);
+    if (people.length < 2) return undefined;
+    return people.find((p) => p.teamId === paidBy)?.teamId ?? people[0].teamId;
+  }
+
+  // What to store: the picked person; otherwise keep whoever was recorded, unless the
+  // method changed (then the old payer no longer applies and the role's slot is used).
+  function payerToSave(): string | null | undefined {
+    const picked = pickedPayer();
+    if (picked) return picked;
+    return form.paymentMethod === transaction.paymentMethod ? undefined : null;
+  }
   // Local fornecedor list (grows if user creates a new one)
   const [fornecedores, setFornecedores] = useState<Fornecedor[]>(initialFornecedores);
   const [creatingFornecedor, setCreatingFornecedor] = useState(false);
@@ -214,6 +235,7 @@ export function EditExpenseModal({
                : "Company",
         paymentMethod: form.paymentMethod,
         socioPessoal: form.socioPessoal || null,
+        ...(canChoosePayer ? { paidByTeamId: payerToSave() } : {}),
         originalStatus: transaction.status,
         ...(invoiceImageUrl ? { invoiceImageUrl } : {}),
       });
@@ -393,6 +415,15 @@ export function EditExpenseModal({
                   ))}
                 </select>
               </div>
+            )}
+            {canChoosePayer && (
+              <WhoPaidPicker
+                paymentMethod={form.paymentMethod}
+                roster={roster}
+                value={pickedPayer() ?? ""}
+                onChange={setPaidBy}
+                className="input"
+              />
             )}
 
             {/* Despesa pessoal de sócio — needs redistribution to the other partners */}

@@ -21,6 +21,7 @@ import { revalidatePath, updateTag } from "next/cache";
 import { auth } from "@/lib/auth";
 import { notifyInvoiceAdded } from "@/lib/notifications";
 import { analyzeInvoice } from "@/actions/invoice";
+import { TEAM_PAYMENT_METHOD_ROLE } from "@/lib/constants";
 
 async function requireAuth() {
   const session = await auth();
@@ -188,12 +189,13 @@ export async function logExpenseAction(
       return { error: "Forbidden" };
     }
     // A service can have several chefs/drivers/…, so record which team member
-    // paid out of pocket — taken from the session, never from the client.
-    const selfPaid = SELF_PAID_METHODS.includes(data.paymentMethod) && role !== "Admin" && role !== "Super Guide";
-    const id = await createTransaction({
-      ...data,
-      paidByTeamId: selfPaid ? (session.user.notionId || null) : null,
-    });
+    // paid out of pocket. Team members are always recorded as themselves (from the
+    // session); Admin/Super Guide may name who paid via "Quem pagou?".
+    const isManager = role === "Admin" || role === "Super Guide";
+    const paidByTeamId = !SELF_PAID_METHODS.includes(data.paymentMethod) ? null
+      : isManager ? (TEAM_PAYMENT_METHOD_ROLE[data.paymentMethod] ? (data.paidByTeamId ?? null) : null)
+      : (session.user.notionId || null);
+    const id = await createTransaction({ ...data, paidByTeamId });
     if (data.tourId) {
       revalidatePath(`/guide/tours/${data.tourId}`);
     } else {
@@ -295,6 +297,8 @@ export async function editExpenseAction(
     whoPaid: string;
     paymentMethod: string;
     socioPessoal?: string | null;
+    /** Admin/Super Guide only: who paid a "Pelo …" expense; null clears it, undefined leaves it. */
+    paidByTeamId?: string | null;
     invoiceImageUrl?: string;
     originalStatus?: string;
   }
@@ -310,6 +314,13 @@ export async function editExpenseAction(
   ) {
     throw new Error("Forbidden");
   }
+  // Only Admin/Super Guide choose who paid. Moving an expense to a company/partner
+  // method drops the team payer; fee invoices ("Chef Fee", …) keep who issued them.
+  const isManager = session.user.role === "Admin" || session.user.role === "Super Guide";
+  const paidByUpdate: string | null | undefined = !isManager ? undefined
+    : !SELF_PAID_METHODS.includes(data.paymentMethod) ? null
+    : TEAM_PAYMENT_METHOD_ROLE[data.paymentMethod] ? data.paidByTeamId
+    : undefined;
   // Editing can supply the missing invoice number/receipt for an expense that
   // was logged as "Pending Receipt" — reflect that in status the same way
   // finishPendingExpenseAction does, instead of leaving it stuck as pending.
@@ -330,6 +341,7 @@ export async function editExpenseAction(
     whoPaid: data.whoPaid,
     paymentMethod: data.paymentMethod,
     socioPessoal: data.socioPessoal,
+    ...(paidByUpdate !== undefined ? { paidByTeamId: paidByUpdate } : {}),
     ...(data.invoiceImageUrl ? { invoiceImageUrl: data.invoiceImageUrl } : {}),
     ...(newStatus ? { status: newStatus } : {}),
   });

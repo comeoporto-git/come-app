@@ -23,6 +23,7 @@ import { closeTourAction } from "@/actions/transactions";
 import { ExpenseList } from "@/components/ExpenseList";
 import { AddExpenseButton } from "@/components/AddExpenseButton";
 import { TeamPicker } from "@/components/TeamPicker";
+import type { ServicePerson } from "@/components/WhoPaidPicker";
 import { ServiceInfoEditor } from "@/components/ServiceInfoEditor";
 import { MapsLink } from "@/components/MapsLink";
 import { DeleteSaleButton } from "@/components/DeleteSaleButton";
@@ -151,7 +152,6 @@ async function TourPageContent({
   backHref: string;
 }) {
   const isChef = role === "Chef";
-  const isDriver = role === "Driver";
   const canEditTeam = role === "Super Guide" || role === "Admin";
   const canSeeFinancials = role === "Super Guide" || role === "Admin";
 
@@ -190,6 +190,18 @@ async function TourPageContent({
     : myServiceRoles[0];
   const myName = me?.name;
   const memberNames = Object.fromEntries(teamMembers.map((m) => [m.id, m.name]));
+  // Everyone on the service by role, primary slot first — feeds "Quem pagou?" for Admin/Super Guide.
+  const roster: ServicePerson[] = [
+    ...([
+      [tour.guideId, tour.guideName, "Guide"],
+      [tour.chefId, tour.chefName, "Chef"],
+      [tour.driverId, tour.driverName, "Driver"],
+      [tour.logisticsId, tour.logisticsName, "Logistics"],
+    ] as [string | null, string, TeamSlotRole][])
+      .filter(([teamId]) => !!teamId)
+      .map(([teamId, name, role]) => ({ teamId: teamId!, name: name || memberNames[teamId!] || "—", role })),
+    ...tour.extraTeam.map((m) => ({ teamId: m.teamId, name: m.name || memberNames[m.teamId] || "—", role: m.role })),
+  ];
   const extraTeamForExpenses = tour.extraTeam
     .filter((m) => m.name)
     .map((m) => ({ name: m.name, role: EXPENSE_ROLE_LABEL[m.role] }));
@@ -526,6 +538,7 @@ async function TourPageContent({
                     guideName={myName}
                     driverName={myName}
                     logisticsName={myName}
+                    roster={roster}
                     tourTeam={[
                       tour.guideName ? { name: tour.guideName, role: "Guia" } : null,
                       tour.chefName  ? { name: tour.chefName,  role: "Chef" } : null,
@@ -536,7 +549,7 @@ async function TourPageContent({
                   />
                 )}
               </div>
-              <ExpenseList transactions={transactions} tourId={id} isClosed={isClosed} fornecedores={fornecedores} guideName={tour.guideName} chefName={tour.chefName} driverName={tour.driverName} logisticsName={tour.logisticsName} memberNames={memberNames} extraTeam={extraTeamForExpenses} userRole={role} />
+              <ExpenseList transactions={transactions} tourId={id} isClosed={isClosed} fornecedores={fornecedores} guideName={tour.guideName} chefName={tour.chefName} driverName={tour.driverName} logisticsName={tour.logisticsName} memberNames={memberNames} extraTeam={extraTeamForExpenses} roster={roster} userRole={role} />
             </section>
 
             {/* Close Tour — only admins */}
