@@ -614,9 +614,10 @@ export async function createSaleTask(saleId: string, data: {
   role: string | null;
   priority: string | null;
   dueDate: string | null;
-}): Promise<void> {
+}): Promise<string> {
+  const id = crypto.randomUUID();
   const { error } = await supabase.from("tasks").insert({
-    id:               crypto.randomUUID(),
+    id,
     sale_id:          saleId,
     name:             data.name,
     task_description: data.description || null,
@@ -626,6 +627,32 @@ export async function createSaleTask(saleId: string, data: {
     status:           "To do",
   });
   if (error) throw new Error(`createSaleTask: ${error.message}`);
+  return id;
+}
+
+export async function updateSaleTask(saleId: string, taskId: string, data: {
+  name: string;
+  description: string;
+  role: string | null;
+  priority: string | null;
+  dueDate: string | null;
+}): Promise<void> {
+  const { data: task } = await supabase.from("tasks").select("sale_id").eq("id", taskId).single();
+  if (!task || task.sale_id !== saleId) throw new Error("updateSaleTask: task not found for this sale");
+
+  const { error } = await supabase.from("tasks").update({
+    name:             data.name,
+    task_description: data.description || null,
+    role:             data.role || null,
+    priority:         data.priority || null,
+    due_date:         data.dueDate || null,
+  }).eq("id", taskId);
+  if (error) throw new Error(`updateSaleTask: ${error.message}`);
+}
+
+export async function deleteSaleTask(saleId: string, taskId: string): Promise<void> {
+  const { error } = await supabase.from("tasks").delete().eq("id", taskId).eq("sale_id", saleId);
+  if (error) throw new Error(`deleteSaleTask: ${error.message}`);
 }
 
 export async function updateServiceCore(id: string, data: {

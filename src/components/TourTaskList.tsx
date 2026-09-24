@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import type { SaleTask } from "@/lib/notion";
 import { TASK_ROLE_OPTIONS } from "@/lib/constants";
-import { updateTaskStatusAction, addSaleTaskAction } from "@/actions/tasks";
+import { updateTaskStatusAction, addSaleTaskAction, updateSaleTaskAction, deleteSaleTaskAction } from "@/actions/tasks";
 
 const STATUS_ORDER = ["To do", "In Progress", "Done"];
 const STATUS_LABELS: Record<string, string> = { "To do": "Por fazer", "In Progress": "Em curso", "Done": "Concluída" };
@@ -50,6 +50,12 @@ export function TourTaskList({
   const [pending, startTransition] = useTransition();
   const [errorId, setErrorId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  function replaceItems(next: SaleTask[]) {
+    setItems(next);
+    onTasksChange?.(next);
+  }
 
   const doneCount = items.filter((t) => t.status === "Done").length;
 
@@ -76,7 +82,7 @@ export function TourTaskList({
         <div className="flex items-center gap-3">
           {items.length > 0 && <span className="text-xs text-gray-400">{doneCount}/{items.length}</span>}
           {canManage && !adding && (
-            <button type="button" onClick={() => setAdding(true)} className="text-xs text-[#667470] hover:text-[#32373c] font-medium">
+            <button type="button" onClick={() => { setEditingId(null); setAdding(true); }} className="text-xs text-[#667470] hover:text-[#32373c] font-medium">
               + Adicionar
             </button>
           )}
@@ -89,6 +95,25 @@ export function TourTaskList({
           {items.map((task) => {
             const status = task.status ?? "To do";
             const isDone = status === "Done";
+            if (canManage && editingId === task.id) {
+              return (
+                <li key={task.id} className="px-4 py-3">
+                  <TaskForm
+                    tourId={tourId}
+                    task={task}
+                    onSaved={(updated) => {
+                      replaceItems(items.map((t) => (t.id === updated.id ? updated : t)));
+                      setEditingId(null);
+                    }}
+                    onDeleted={() => {
+                      replaceItems(items.filter((t) => t.id !== task.id));
+                      setEditingId(null);
+                    }}
+                    onCancel={() => setEditingId(null)}
+                  />
+                </li>
+              );
+            }
             return (
               <li key={task.id} className="px-4 py-3 flex items-start gap-3">
                 <button
@@ -135,6 +160,19 @@ export function TourTaskList({
                   </div>
                   {errorId === task.id && <p className="text-xs text-red-500 font-medium mt-1">Erro ao guardar, tenta novamente</p>}
                 </div>
+                {canManage && (
+                  <button
+                    type="button"
+                    onClick={() => { setAdding(false); setEditingId(task.id); }}
+                    aria-label="Editar tarefa"
+                    className="shrink-0 p-1 -m-1 text-gray-300 hover:text-[#667470] transition-colors"
+                  >
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 20h9" />
+                      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+                    </svg>
+                  </button>
+                )}
               </li>
             );
           })}
@@ -142,12 +180,10 @@ export function TourTaskList({
       )}
       {canManage && adding && (
         <div className="px-4 py-3 border-t border-gray-50">
-          <NewTaskForm
+          <TaskForm
             tourId={tourId}
-            onCreated={(task) => {
-              const next = [...items, task];
-              setItems(next);
-              onTasksChange?.(next);
+            onSaved={(task) => {
+              replaceItems([...items, task]);
               setAdding(false);
             }}
             onCancel={() => setAdding(false)}
@@ -158,58 +194,85 @@ export function TourTaskList({
   );
 }
 
-function NewTaskForm({
-  tourId, onCreated, onCancel,
+function TaskForm({
+  tourId, task, onSaved, onDeleted, onCancel,
 }: {
   tourId: string;
-  onCreated: (task: SaleTask) => void;
+  /** When set, the form edits this task; otherwise it creates a new one. */
+  task?: SaleTask;
+  onSaved: (task: SaleTask) => void;
+  onDeleted?: () => void;
   onCancel: () => void;
 }) {
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [role, setRole] = useState("");
-  const [priority, setPriority] = useState("");
-  const [dueDate, setDueDate] = useState("");
+  const [name, setName] = useState(task?.name ?? "");
+  const [description, setDescription] = useState(task?.description ?? "");
+  const [role, setRole] = useState(task?.role ?? "");
+  const [priority, setPriority] = useState(task?.priority ?? "");
+  const [dueDate, setDueDate] = useState(task?.dueDate ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleSave() {
     setSaving(true);
     setError(null);
-    const result = await addSaleTaskAction(tourId, {
+    const data = {
       name,
       description,
       role: role || null,
       priority: priority || null,
       dueDate: dueDate || null,
-    });
+    };
+    const result: { id?: string; error?: string } = task
+      ? await updateSaleTaskAction(tourId, task.id, data)
+      : await addSaleTaskAction(tourId, data);
     setSaving(false);
     if (result.error) {
       setError(result.error);
       return;
     }
-    onCreated({
-      id: crypto.randomUUID(),
+    const fields = {
       name: name.trim(),
       description: description.trim(),
-      status: "To do",
-      priority: priority || null,
-      categoria: [],
-      dueDate: dueDate || null,
-      fileUrl: null,
       role: role || null,
-      teamMemberId: null,
-      teamMemberName: null,
-    });
+      priority: priority || null,
+      dueDate: dueDate || null,
+    };
+    if (task) {
+      onSaved({ ...task, ...fields });
+    } else {
+      onSaved({
+        id: result.id ?? crypto.randomUUID(),
+        ...fields,
+        status: "To do",
+        categoria: [],
+        fileUrl: null,
+        teamMemberId: null,
+        teamMemberName: null,
+      });
+    }
+  }
+
+  async function handleDelete() {
+    if (!task || !confirm(`Eliminar a tarefa "${task.name}"?`)) return;
+    setSaving(true);
+    setError(null);
+    const result = await deleteSaleTaskAction(tourId, task.id);
+    setSaving(false);
+    if (result.error) {
+      setError(result.error);
+      return;
+    }
+    onDeleted?.();
   }
 
   return (
     <div className="space-y-2">
-      <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome da tarefa" className={inputCls} />
+      <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome da tarefa" className={inputCls} autoFocus={!!task} />
       <textarea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Descrição (opcional)" className={`${inputCls} resize-none`} />
       <div className="grid grid-cols-3 gap-2">
         <select value={role} onChange={(e) => setRole(e.target.value)} className={`${inputCls} bg-white`}>
-          <option value="">Sem função</option>
+          {/* Tasks without a role aren't listed, so an existing task must keep one. */}
+          {!task && <option value="">Sem função</option>}
           {TASK_ROLE_OPTIONS.map((r) => <option key={r} value={r}>{r}</option>)}
         </select>
         <select value={priority} onChange={(e) => setPriority(e.target.value)} className={`${inputCls} bg-white`}>
@@ -228,6 +291,11 @@ function NewTaskForm({
         <button onClick={onCancel} disabled={saving} className="border border-gray-200 text-gray-600 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-gray-50 transition-colors">
           Cancelar
         </button>
+        {task && (
+          <button onClick={handleDelete} disabled={saving} className="ml-auto text-red-500 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-red-50 disabled:opacity-50 transition-colors">
+            Eliminar
+          </button>
+        )}
       </div>
     </div>
   );
