@@ -5,8 +5,10 @@ import Link from "next/link";
 import type { Tour, TaskCount } from "@/lib/notion";
 import { roleNames } from "@/lib/tourTeam";
 import { useServiceTasks, ServiceTaskBadge, ServiceTaskPanel } from "@/components/ServiceCardTasks";
+import { ServiceCalendar } from "@/components/ServiceCalendar";
 
 type Tab = "upcoming" | "past";
+type View = "list" | "calendar";
 
 const STATUS_COLORS: Record<string, string> = {
   Confirmed: "bg-green-100 text-green-700",
@@ -347,6 +349,7 @@ function MultiSelectDropdown({
 }
 
 export function TourTabs({
+  today = [],
   upcoming,
   past,
   teamMap,
@@ -355,6 +358,8 @@ export function TourTabs({
   taskCounts,
   canManageTasks = false,
 }: {
+  /** Today's services — rendered separately above the list, but included in the calendar. */
+  today?: Tour[];
   upcoming: Tour[];
   past: Tour[];
   teamMap?: Record<string, string>;
@@ -367,6 +372,7 @@ export function TourTabs({
   const [query, setQuery]   = useState("");
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [showCancelled, setShowCancelled] = useState(false);
+  const [view, setView] = useState<View>("list");
 
   const allTours = [...upcoming, ...past];
   const statusOptions      = uniqueValues(allTours, "status");
@@ -384,6 +390,8 @@ export function TourTabs({
   const visibleUpcoming = filterTours(baseUpcoming, query, activeFilters, teamMap);
   const visiblePast     = filterTours(basePast,     query, activeFilters, teamMap);
 
+  const calendarTours = filterTours(excludeCancelledIfHidden([...today, ...upcoming, ...past]), query, activeFilters, teamMap);
+
   const duplicateUpcoming = getDuplicateDates(baseUpcoming);
   const duplicatePast     = getDuplicateDates(basePast);
 
@@ -393,6 +401,7 @@ export function TourTabs({
   return (
     <div className="space-y-4">
       {/* Filter buttons */}
+      {view === "list" && (
       <div className="flex gap-2">
         <button
           onClick={() => setTab("upcoming")}
@@ -415,6 +424,7 @@ export function TourTabs({
           Anteriores{basePast.length > 0 ? ` · ${basePast.length}` : ""}
         </button>
       </div>
+      )}
 
       {/* Search box */}
       <div className="relative">
@@ -443,9 +453,32 @@ export function TourTabs({
         )}
       </div>
 
-      {/* Filters */}
+      {/* Filters + view toggle */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex bg-white/15 rounded-xl p-0.5" role="group" aria-label="Vista">
+          {([
+            ["list", "Lista", <path key="p" d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />],
+            ["calendar", "Calendário", <g key="g"><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></g>],
+          ] as const).map(([value, label, icon]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setView(value)}
+              aria-pressed={view === value}
+              className={`flex items-center gap-1.5 text-sm rounded-[10px] px-3 py-1.5 transition-colors ${
+                view === value ? "bg-white text-[#32373c] shadow-sm" : "text-white/80 hover:text-white"
+              }`}
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                {icon}
+              </svg>
+              {label}
+            </button>
+          ))}
+        </div>
+
       {showFilters && (
-        <div className="flex flex-wrap items-center gap-2">
+        <>
           <MultiSelectDropdown
             label="Status"
             options={statusOptions.map((s) => ({ value: s, label: s }))}
@@ -486,11 +519,14 @@ export function TourTabs({
               Limpar filtros
             </button>
           )}
-        </div>
+        </>
       )}
+      </div>
 
-      {/* List */}
-      {tab === "upcoming" ? (
+      {/* List / calendar */}
+      {view === "calendar" ? (
+        <ServiceCalendar tours={calendarTours} />
+      ) : tab === "upcoming" ? (
         visibleUpcoming.length === 0 ? (
           <p className="text-sm text-white/50 text-center py-8">
             {query ? "Sem resultados" : "Sem serviços futuros"}

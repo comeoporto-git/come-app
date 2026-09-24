@@ -111,6 +111,7 @@ export default async function GuideDashboard() {
         {/* Tabs: Próximas / Anteriores */}
         <section>
           <TourTabs
+            today={todays}
             upcoming={upcoming}
             past={pastTours}
             teamMap={isSuperGuide ? teamMap : undefined}
