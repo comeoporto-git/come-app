@@ -1,7 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import Link from "next/link";
+import { useMemo, useState, type ReactNode } from "react";
 import type { Tour } from "@/lib/notion";
 
 const WEEKDAYS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
@@ -42,7 +41,14 @@ function dayKey(year: number, month: number, day: number): string {
 
 const MAX_CHIPS = 3;
 
-export function ServiceCalendar({ tours }: { tours: Tour[] }) {
+export function ServiceCalendar({
+  tours,
+  renderTour,
+}: {
+  tours: Tour[];
+  /** Renders a service in the selected-day list — the same card as the list view. */
+  renderTour: (tour: Tour, dayTours: Tour[]) => ReactNode;
+}) {
   const todayKey = lisbonDay(new Date().toISOString());
   const [year, setYear]   = useState(() => Number(todayKey.slice(0, 4)));
   const [month, setMonth] = useState(() => Number(todayKey.slice(5, 7)) - 1);
@@ -191,38 +197,8 @@ export function ServiceCalendar({ tours }: { tours: Tour[] }) {
           {selectedTours.length === 0 ? (
             <p className="text-sm text-white/50 py-4 text-center">Sem serviços neste dia</p>
           ) : (
-            <ul className="flex flex-col gap-2">
-              {selectedTours.map((t) => (
-                <li key={t.id}>
-                  <Link
-                    href={`/guide/tours/${t.id}`}
-                    className={`flex items-center justify-between gap-3 bg-white rounded-xl px-4 py-3 shadow-sm text-[#32373c] hover:bg-gray-50 transition-colors ${isCancelled(t) ? "opacity-60" : ""}`}
-                  >
-                    <div className="min-w-0">
-                      <p className="text-xs text-gray-400">{t.saleId}</p>
-                      <p className="text-sm font-semibold truncate">
-                        {t.startTime && <span>{t.startTime}{t.endTime ? ` - ${t.endTime}` : ""} · </span>}
-                        {t.serviceName || "—"}
-                      </p>
-                      {(t.guideName || t.numGuests > 0) && (
-                        <p className="text-xs text-gray-400">
-                          {t.guideName ? `🧭 ${t.guideName}` : ""}
-                          {t.guideName && t.numGuests > 0 ? " · " : ""}
-                          {t.numGuests > 0 ? `${t.numGuests} pax` : ""}
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex flex-col items-end gap-1 shrink-0">
-                      {t.serviceType && (
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${TYPE_CHIPS[typeIndex(t.serviceType)]}`}>
-                          {t.serviceType}
-                        </span>
-                      )}
-                      {isCancelled(t) && <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-red-100 text-red-700">{t.status}</span>}
-                    </div>
-                  </Link>
-                </li>
-              ))}
+            <ul className="flex flex-col gap-4">
+              {selectedTours.map((t) => renderTour(t, selectedTours))}
             </ul>
           )}
         </div>

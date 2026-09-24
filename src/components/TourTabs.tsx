@@ -53,6 +53,11 @@ function dateKey(iso: string | null): string {
   });
 }
 
+/** YYYY-MM-DD in Lisbon time — sortable, unlike dateKey. */
+function lisbonDayKey(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-CA", { timeZone: "Europe/Lisbon" });
+}
+
 function getDuplicateDates(tours: Tour[]): Set<string> {
   const counts = new Map<string, number>();
   for (const t of tours) {
@@ -525,7 +530,21 @@ export function TourTabs({
 
       {/* List / calendar */}
       {view === "calendar" ? (
-        <ServiceCalendar tours={calendarTours} />
+        <ServiceCalendar
+          tours={calendarTours}
+          renderTour={(tour, dayTours) => (
+            <TourCard
+              key={tour.id}
+              tour={tour}
+              past={!!tour.date && lisbonDayKey(tour.date) < lisbonDayKey(new Date().toISOString())}
+              guideName={teamMap?.[tour.teamId ?? ""]}
+              isMyTour={!!currentUserId && tour.teamId === currentUserId}
+              hasDuplicate={dayTours.filter((t) => t.status !== "Cancelled" && t.status !== "Canceled").length > 1}
+              taskCount={taskCounts?.[tour.id]}
+              canManageTasks={canManageTasks}
+            />
+          )}
+        />
       ) : tab === "upcoming" ? (
         visibleUpcoming.length === 0 ? (
           <p className="text-sm text-white/50 text-center py-8">
