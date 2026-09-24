@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import type { Tour, TaskCount } from "@/lib/notion";
+import { roleNames } from "@/lib/tourTeam";
 import { useServiceTasks, ServiceTaskBadge, ServiceTaskPanel } from "@/components/ServiceCardTasks";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -42,6 +43,10 @@ export function TodayServiceCard({
   canManageTasks: boolean;
 }) {
   const isCancelled = tour.status === "Cancelled" || tour.status === "Canceled";
+  const guides    = roleNames(tour, "Guide", guideName);
+  const chefs     = roleNames(tour, "Chef", chefName);
+  const drivers   = roleNames(tour, "Driver", driverName);
+  const logistics = roleNames(tour, "Logistics", logisticsName);
   const { expanded, tasks, loading, count, toggle, updateTasks } = useServiceTasks(
     tour.id,
     taskCount ?? { done: 0, total: 0 },
@@ -64,19 +69,19 @@ export function TodayServiceCard({
               {tour.startTime && <span> {tour.startTime}{tour.endTime ? ` - ${tour.endTime}` : ""}</span>}
             </p>
             {tour.serviceName && <p className="text-xs opacity-60">{tour.serviceName}</p>}
-            {guideName ? (
+            {guides ? (
               <p className={`text-xs ${isMyTour ? "font-bold" : "opacity-50"}`}>
-                🧭 {guideName}{tour.numGuests > 0 ? ` · ${tour.numGuests} pax` : ""}
+                🧭 {guides}{tour.numGuests > 0 ? ` · ${tour.numGuests} pax` : ""}
               </p>
             ) : tour.numGuests > 0 ? (
               <p className="text-xs opacity-50">{tour.numGuests} pax</p>
             ) : null}
-            {(chefName || driverName || logisticsName) && (
+            {(chefs || drivers || logistics) && (
               <p className="text-xs opacity-50">
                 {[
-                  chefName ? `🧑‍🍳 ${chefName}` : null,
-                  driverName ? `🚗 ${driverName}` : null,
-                  logisticsName ? `📦 ${logisticsName}` : null,
+                  chefs ? `🧑‍🍳 ${chefs}` : null,
+                  drivers ? `🚗 ${drivers}` : null,
+                  logistics ? `📦 ${logistics}` : null,
                 ].filter(Boolean).join("  ·  ")}
               </p>
             )}

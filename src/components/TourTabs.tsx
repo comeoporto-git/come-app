@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { Tour, TaskCount } from "@/lib/notion";
+import { roleNames } from "@/lib/tourTeam";
 import { useServiceTasks, ServiceTaskBadge, ServiceTaskPanel } from "@/components/ServiceCardTasks";
 
 type Tab = "upcoming" | "past";
@@ -82,6 +83,10 @@ function TourCard({
 }) {
   const ts = typeStyle(tour.serviceType);
   const isCanceled = tour.status === "Cancelled";
+  const guides    = roleNames(tour, "Guide", guideName);
+  const chefs     = roleNames(tour, "Chef", tour.chefName);
+  const drivers   = roleNames(tour, "Driver", tour.driverName);
+  const logistics = roleNames(tour, "Logistics", tour.logisticsName);
   const { expanded, tasks, loading, count, toggle, updateTasks } = useServiceTasks(
     tour.id,
     taskCount ?? { done: 0, total: 0 },
@@ -116,19 +121,19 @@ function TourCard({
             {tour.serviceName && (
               <p className="text-xs text-gray-600">{tour.serviceName}</p>
             )}
-            {guideName && guideName !== "—" ? (
+            {guides ? (
               <p className={`text-xs ${isMyTour ? "text-[#32373c] font-bold" : "text-gray-400"}`}>
-                🧭 {guideName}{tour.numGuests > 0 ? ` · ${tour.numGuests} pax` : ""}
+                🧭 {guides}{tour.numGuests > 0 ? ` · ${tour.numGuests} pax` : ""}
               </p>
             ) : tour.numGuests > 0 ? (
               <p className="text-xs text-gray-400">{tour.numGuests} pax</p>
             ) : null}
-            {(tour.chefName || tour.driverName || tour.logisticsName) && (
+            {(chefs || drivers || logistics) && (
               <p className="text-xs text-gray-400">
                 {[
-                  tour.chefName ? `🧑‍🍳 ${tour.chefName}` : null,
-                  tour.driverName ? `🚗 ${tour.driverName}` : null,
-                  tour.logisticsName ? `📦 ${tour.logisticsName}` : null,
+                  chefs ? `🧑‍🍳 ${chefs}` : null,
+                  drivers ? `🚗 ${drivers}` : null,
+                  logistics ? `📦 ${logistics}` : null,
                 ].filter(Boolean).join("  ·  ")}
               </p>
             )}
@@ -191,7 +196,8 @@ function filterTours(
       guideName.toLowerCase().includes(q) ||
       (t.chefName ?? "").toLowerCase().includes(q) ||
       (t.driverName ?? "").toLowerCase().includes(q) ||
-      (t.logisticsName ?? "").toLowerCase().includes(q)
+      (t.logisticsName ?? "").toLowerCase().includes(q) ||
+      t.extraTeam.some((m) => m.name.toLowerCase().includes(q))
     );
   });
 }
