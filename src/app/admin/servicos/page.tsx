@@ -58,6 +58,7 @@ export default async function AdminToursPage() {
         {/* Tabs: Próximas / Anteriores */}
         <section>
           <TourTabs
+            today={todays}
             upcoming={upcoming}
             past={pastTours}
             teamMap={teamMap}

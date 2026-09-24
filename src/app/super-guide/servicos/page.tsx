@@ -79,7 +79,7 @@ export default async function SuperGuideServicosPage() {
         )}
 
         <section>
-          <TourTabs upcoming={upcoming} past={pastTours} teamMap={teamMap} taskCounts={taskCounts} canManageTasks />
+          <TourTabs today={todays} upcoming={upcoming} past={pastTours} teamMap={teamMap} taskCounts={taskCounts} canManageTasks />
         </section>
       </main>
     </div>
