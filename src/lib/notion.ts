@@ -9,6 +9,7 @@ import { unstable_cache } from "next/cache";
 import {
   PARTNERS, PARTNER_SPLIT_DATE, PARTNER_PAYMENT_METHODS, partnerPaymentByMethod,
   REGISTRATION_TICKET_TYPES, REGISTRATION_PAYMENT_STATUSES, REGISTRATION_INVOICE_STATUSES,
+  PRIVILEGED_TASK_ROLES,
 } from "@/lib/constants";
 
 export const supabase = createClient(
@@ -521,9 +522,6 @@ export type SaleTask = {
 };
 
 const TASK_STATUS_OPTIONS = ["To do", "In Progress", "Done"] as const;
-
-// Roles whose tasks are hidden from anyone who isn't Admin/Super Guide.
-const PRIVILEGED_TASK_ROLES = ["Admin", "Super Guide"];
 
 /**
  * Tasks for a booking. Only tasks created through the role-assignment

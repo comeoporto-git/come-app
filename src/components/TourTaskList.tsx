@@ -24,6 +24,9 @@ const ROLE_COLORS: Record<string, string> = {
   Chef:        "bg-red-50 text-red-600 border-red-100",
   Driver:      "bg-slate-100 text-slate-600 border-slate-200",
   Logistics:   "bg-orange-50 text-orange-600 border-orange-100",
+  Bernardo:    "bg-indigo-50 text-indigo-600 border-indigo-100",
+  "António":   "bg-indigo-50 text-indigo-600 border-indigo-100",
+  Manel:       "bg-indigo-50 text-indigo-600 border-indigo-100",
 };
 
 const inputCls = "w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-[#32373c] bg-white placeholder:text-gray-400 focus:outline-none focus:border-[#667470] transition-colors";
