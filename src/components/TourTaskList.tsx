@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import type { SaleTask } from "@/lib/notion";
 import { TASK_ROLE_OPTIONS } from "@/lib/constants";
 import { updateTaskStatusAction, addSaleTaskAction, updateSaleTaskAction, deleteSaleTaskAction, reorderSaleTasksAction } from "@/actions/tasks";
@@ -54,9 +54,12 @@ export function TourTaskList({
   const [errorId, setErrorId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [dragIndex, setDragIndex] = useState<number | null>(null);
-  const [dragStartItems, setDragStartItems] = useState<SaleTask[] | null>(null);
+  const [dragId, setDragId] = useState<string | null>(null);
   const [reorderError, setReorderError] = useState<string | null>(null);
+  const rowRefs = useRef(new Map<string, HTMLLIElement>());
+  const dragStartRef = useRef<SaleTask[] | null>(null);
+  // Swallows the click that follows a drag release, so it doesn't open the editor.
+  const justDraggedRef = useRef(false);
 
   function replaceItems(next: SaleTask[]) {
     setItems(next);
@@ -78,33 +81,69 @@ export function TourTaskList({
     });
   }
 
-  function move(index: number, delta: -1 | 1) {
-    const target = index + delta;
-    if (target < 0 || target >= items.length) return;
-    const next = [...items];
-    const [moved] = next.splice(index, 1);
-    next.splice(target, 0, moved);
-    persistOrder(next, items);
-  }
+  // Pointer-based drag (works for mouse and touch). Listeners live on the
+  // window because reordering moves the row in the DOM, which would drop
+  // pointer capture on the handle.
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
 
-  function handleDragOver(e: React.DragEvent, overIndex: number) {
+  useEffect(() => {
+    if (dragId === null) return;
+
+    function onMove(e: PointerEvent) {
+      const y = e.clientY;
+      // Scroll the page when dragging near the top/bottom edge of the viewport.
+      const edge = 80;
+      if (y < edge) window.scrollBy(0, -12);
+      else if (y > window.innerHeight - edge) window.scrollBy(0, 12);
+
+      const current = itemsRef.current;
+      const from = current.findIndex((t) => t.id === dragId);
+      const over = current.findIndex((t) => {
+        const rect = rowRefs.current.get(t.id)?.getBoundingClientRect();
+        return rect ? y >= rect.top && y <= rect.bottom : false;
+      });
+      if (from === -1 || over === -1 || over === from) return;
+      const next = [...current];
+      const [moved] = next.splice(from, 1);
+      next.splice(over, 0, moved);
+      itemsRef.current = next;
+      setItems(next);
+    }
+
+    function onEnd() {
+      setDragId(null);
+      justDraggedRef.current = true;
+      setTimeout(() => { justDraggedRef.current = false; }, 0);
+      const previous = dragStartRef.current;
+      dragStartRef.current = null;
+      const next = itemsRef.current;
+      if (!previous || previous.every((t, i) => t.id === next[i]?.id)) return;
+      persistOrder(next, previous);
+    }
+
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onEnd);
+    window.addEventListener("pointercancel", onEnd);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onEnd);
+      window.removeEventListener("pointercancel", onEnd);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dragId]);
+
+  function handleDragStart(e: React.PointerEvent, id: string) {
+    if (!canReorder || pending) return;
     e.preventDefault();
-    if (dragIndex === null || dragIndex === overIndex) return;
-    setItems((prev) => {
-      const next = [...prev];
-      const [moved] = next.splice(dragIndex, 1);
-      next.splice(overIndex, 0, moved);
-      return next;
-    });
-    setDragIndex(overIndex);
+    dragStartRef.current = items;
+    setDragId(id);
   }
 
-  function handleDragEnd() {
-    const previous = dragStartItems;
-    setDragIndex(null);
-    setDragStartItems(null);
-    if (!previous || previous.every((t, i) => t.id === items[i]?.id)) return;
-    persistOrder(items, previous);
+  function startEditing(id: string) {
+    if (justDraggedRef.current) return;
+    setAdding(false);
+    setEditingId(id);
   }
 
   const doneCount = items.filter((t) => t.status === "Done").length;
@@ -143,7 +182,7 @@ export function TourTaskList({
         <div className="px-4 py-6 text-center text-sm text-gray-400">Nenhuma tarefa associada a este serviço</div>
       ) : (
         <ul className="divide-y divide-gray-50">
-          {items.map((task, i) => {
+          {items.map((task) => {
             const status = task.status ?? "To do";
             const isDone = status === "Done";
             if (canManage && editingId === task.id) {
@@ -168,25 +207,18 @@ export function TourTaskList({
             return (
               <li
                 key={task.id}
-                draggable={canReorder}
-                onDragStart={() => { setDragStartItems(items); setDragIndex(i); }}
-                onDragOver={(e) => handleDragOver(e, i)}
-                onDrop={(e) => e.preventDefault()}
-                onDragEnd={handleDragEnd}
-                className={`px-4 py-3 flex items-start gap-3 transition-opacity ${dragIndex === i ? "opacity-40" : ""}`}
+                ref={(el) => {
+                  if (el) rowRefs.current.set(task.id, el);
+                  else rowRefs.current.delete(task.id);
+                }}
+                onClick={canManage && dragId === null ? () => startEditing(task.id) : undefined}
+                className={`px-4 py-3 flex items-start gap-3 transition-colors ${
+                  dragId === task.id ? "bg-gray-50 shadow-inner relative z-10" : ""
+                } ${canManage && dragId === null ? "cursor-pointer hover:bg-gray-50/60" : ""}`}
               >
-                {canReorder && (
-                  <span
-                    className="hidden md:block shrink-0 mt-1 text-gray-300 hover:text-gray-400 cursor-grab active:cursor-grabbing select-none"
-                    title="Arrastar para reordenar"
-                    aria-hidden="true"
-                  >
-                    <svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor"><circle cx="2" cy="2" r="1.5" /><circle cx="8" cy="2" r="1.5" /><circle cx="2" cy="8" r="1.5" /><circle cx="8" cy="8" r="1.5" /><circle cx="2" cy="14" r="1.5" /><circle cx="8" cy="14" r="1.5" /></svg>
-                  </span>
-                )}
                 <button
                   type="button"
-                  onClick={() => toggle(task)}
+                  onClick={(e) => { e.stopPropagation(); toggle(task); }}
                   disabled={pending}
                   aria-label={`Marcar tarefa como ${STATUS_LABELS[nextStatus(status)]}`}
                   className={`w-5 h-5 rounded-full border-2 shrink-0 mt-0.5 flex items-center justify-center transition-colors disabled:opacity-50 ${
@@ -207,7 +239,7 @@ export function TourTaskList({
                   <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
                     <button
                       type="button"
-                      onClick={() => toggle(task)}
+                      onClick={(e) => { e.stopPropagation(); toggle(task); }}
                       disabled={pending}
                       className={`text-xs px-2 py-0.5 rounded-full font-medium disabled:opacity-50 ${STATUS_COLORS[status] ?? "bg-gray-100 text-gray-500"}`}
                     >
@@ -228,41 +260,20 @@ export function TourTaskList({
                   </div>
                   {errorId === task.id && <p className="text-xs text-red-500 font-medium mt-1">Erro ao guardar, tenta novamente</p>}
                 </div>
-                {/* ↑↓ for touch screens, where drag-and-drop isn't available */}
                 {canReorder && items.length > 1 && (
-                  <div className="md:hidden flex flex-col shrink-0 -my-1">
-                    <button
-                      type="button"
-                      onClick={() => move(i, -1)}
-                      disabled={pending || i === 0}
-                      aria-label="Mover tarefa para cima"
-                      className="p-1 text-gray-300 hover:text-[#667470] disabled:opacity-30 transition-colors"
-                    >
-                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m18 15-6-6-6 6" /></svg>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => move(i, 1)}
-                      disabled={pending || i === items.length - 1}
-                      aria-label="Mover tarefa para baixo"
-                      className="p-1 text-gray-300 hover:text-[#667470] disabled:opacity-30 transition-colors"
-                    >
-                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>
-                    </button>
-                  </div>
-                )}
-                {canManage && (
-                  <button
-                    type="button"
-                    onClick={() => { setAdding(false); setEditingId(task.id); }}
-                    aria-label="Editar tarefa"
-                    className="shrink-0 p-1 -m-1 text-gray-300 hover:text-[#667470] transition-colors"
+                  <span
+                    role="button"
+                    tabIndex={-1}
+                    onPointerDown={(e) => handleDragStart(e, task.id)}
+                    onClick={(e) => e.stopPropagation()}
+                    title="Arrastar para reordenar"
+                    aria-label="Arrastar para reordenar"
+                    className={`shrink-0 -my-1 -mr-2 p-2 text-gray-300 hover:text-gray-400 select-none touch-none ${
+                      dragId === task.id ? "cursor-grabbing text-[#667470]" : "cursor-grab"
+                    }`}
                   >
-                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M12 20h9" />
-                      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
-                    </svg>
-                  </button>
+                    <svg width="12" height="18" viewBox="0 0 10 16" fill="currentColor"><circle cx="2" cy="2" r="1.5" /><circle cx="8" cy="2" r="1.5" /><circle cx="2" cy="8" r="1.5" /><circle cx="8" cy="8" r="1.5" /><circle cx="2" cy="14" r="1.5" /><circle cx="8" cy="14" r="1.5" /></svg>
+                  </span>
                 )}
               </li>
             );
