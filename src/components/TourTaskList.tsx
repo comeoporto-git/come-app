@@ -177,6 +177,18 @@ export function TourTaskList({
           )}
         </div>
       </div>
+      {canManage && adding && (
+        <div className="px-4 py-3 border-b border-gray-50">
+          <TaskForm
+            tourId={tourId}
+            onSaved={(task) => {
+              replaceItems([...items, task]);
+              setAdding(false);
+            }}
+            onCancel={() => setAdding(false)}
+          />
+        </div>
+      )}
       {reorderError && <p className="px-4 pt-3 text-xs text-red-500 font-medium">{reorderError}</p>}
       {items.length === 0 && !adding ? (
         <div className="px-4 py-6 text-center text-sm text-gray-400">Nenhuma tarefa associada a este serviço</div>
@@ -279,18 +291,6 @@ export function TourTaskList({
             );
           })}
         </ul>
-      )}
-      {canManage && adding && (
-        <div className="px-4 py-3 border-t border-gray-50">
-          <TaskForm
-            tourId={tourId}
-            onSaved={(task) => {
-              replaceItems([...items, task]);
-              setAdding(false);
-            }}
-            onCancel={() => setAdding(false)}
-          />
-        </div>
       )}
     </section>
   );
