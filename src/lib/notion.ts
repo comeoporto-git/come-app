@@ -772,22 +772,10 @@ export async function createSaleRegistrations(saleId: string, items: SaleRegistr
   return rows.map((r) => r.id);
 }
 
-/** With `includePayment: false` the stored payment status/method/date are left untouched. */
-export async function updateSaleRegistration(
-  saleId: string,
-  registrationId: string,
-  data: SaleRegistrationInput,
-  { includePayment = true }: { includePayment?: boolean } = {},
-): Promise<void> {
-  const row: Partial<ReturnType<typeof registrationToRow>> = registrationToRow(data);
-  if (!includePayment) {
-    delete row.payment_status;
-    delete row.payment_method;
-    delete row.payment_date;
-  }
+export async function updateSaleRegistration(saleId: string, registrationId: string, data: SaleRegistrationInput): Promise<void> {
   const { data: updated, error } = await supabase
     .from("sale_registrations")
-    .update(row)
+    .update(registrationToRow(data))
     .eq("id", registrationId)
     .eq("sale_id", saleId)
     .select("id");

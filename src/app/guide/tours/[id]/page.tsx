@@ -210,11 +210,9 @@ async function TourPageContent({
 
   const steps = tour.service ? await getServiceSteps(tour.service) : [];
   const restaurants = tour.service ? await getServiceRestaurants(tour.service) : [];
-  const isEvent = tour.serviceType === EVENT_SERVICE_TYPE;
-  const showPayment = role === "Admin";
-  // Payment details never leave the server for anyone but Admin.
-  const registrations = (isEvent ? await getRegistrationsForSale(id) : [])
-    .map((r) => showPayment ? r : { ...r, paymentStatus: "Não Feito" as const, paymentMethod: "", paymentDate: null });
+  // Event registrations are Admin only.
+  const showRegistrations = role === "Admin" && tour.serviceType === EVENT_SERVICE_TYPE;
+  const registrations = showRegistrations ? await getRegistrationsForSale(id) : [];
   const tourDate = tour.date ? new Date(`${tour.date}T12:00:00`) : null;
 
   const totalSpent = transactions.reduce((s, t) => s + t.totalCost, 0); // negative values
@@ -390,15 +388,13 @@ async function TourPageContent({
             {/* Tasks */}
             <TourTaskList tourId={id} tasks={tasks} canManage={canEditTeam} />
 
-            {/* Registrations — event services only; managed by Admin / Super Guide, payment details Admin only */}
-            {isEvent && (
+            {/* Registrations — event services only, Admin only */}
+            {showRegistrations && (
               <EventRegistrations
                 tourId={id}
                 saleRef={tour.saleId}
                 registrations={registrations}
                 numGuests={tour.numGuests}
-                canManage={canEditTeam}
-                showPayment={showPayment}
               />
             )}
 
