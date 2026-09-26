@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import type { SaleTask } from "@/lib/notion";
 import { TASK_ROLE_OPTIONS } from "@/lib/constants";
-import { updateTaskStatusAction, addSaleTaskAction, updateSaleTaskAction, deleteSaleTaskAction } from "@/actions/tasks";
+import { updateTaskStatusAction, addSaleTaskAction, updateSaleTaskAction, deleteSaleTaskAction, reorderSaleTasksAction } from "@/actions/tasks";
 
 const STATUS_ORDER = ["To do", "In Progress", "Done"];
 const STATUS_LABELS: Record<string, string> = { "To do": "Por fazer", "In Progress": "Em curso", "Done": "Concluída" };
@@ -24,6 +24,9 @@ const ROLE_COLORS: Record<string, string> = {
   Chef:        "bg-red-50 text-red-600 border-red-100",
   Driver:      "bg-slate-100 text-slate-600 border-slate-200",
   Logistics:   "bg-orange-50 text-orange-600 border-orange-100",
+  Bernardo:    "bg-indigo-50 text-indigo-600 border-indigo-100",
+  "António":   "bg-indigo-50 text-indigo-600 border-indigo-100",
+  Manel:       "bg-indigo-50 text-indigo-600 border-indigo-100",
 };
 
 const inputCls = "w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-[#32373c] bg-white placeholder:text-gray-400 focus:outline-none focus:border-[#667470] transition-colors";
@@ -51,10 +54,57 @@ export function TourTaskList({
   const [errorId, setErrorId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [dragStartItems, setDragStartItems] = useState<SaleTask[] | null>(null);
+  const [reorderError, setReorderError] = useState<string | null>(null);
 
   function replaceItems(next: SaleTask[]) {
     setItems(next);
     onTasksChange?.(next);
+  }
+
+  const canReorder = canManage && editingId === null;
+
+  // Saves the new order; restores `previous` if the server rejects it.
+  function persistOrder(next: SaleTask[], previous: SaleTask[]) {
+    setReorderError(null);
+    replaceItems(next);
+    startTransition(async () => {
+      const result = await reorderSaleTasksAction(tourId, next.map((t) => t.id));
+      if (result.error) {
+        setReorderError("Erro ao reordenar, tenta novamente");
+        replaceItems(previous);
+      }
+    });
+  }
+
+  function move(index: number, delta: -1 | 1) {
+    const target = index + delta;
+    if (target < 0 || target >= items.length) return;
+    const next = [...items];
+    const [moved] = next.splice(index, 1);
+    next.splice(target, 0, moved);
+    persistOrder(next, items);
+  }
+
+  function handleDragOver(e: React.DragEvent, overIndex: number) {
+    e.preventDefault();
+    if (dragIndex === null || dragIndex === overIndex) return;
+    setItems((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(dragIndex, 1);
+      next.splice(overIndex, 0, moved);
+      return next;
+    });
+    setDragIndex(overIndex);
+  }
+
+  function handleDragEnd() {
+    const previous = dragStartItems;
+    setDragIndex(null);
+    setDragStartItems(null);
+    if (!previous || previous.every((t, i) => t.id === items[i]?.id)) return;
+    persistOrder(items, previous);
   }
 
   const doneCount = items.filter((t) => t.status === "Done").length;
@@ -88,11 +138,12 @@ export function TourTaskList({
           )}
         </div>
       </div>
+      {reorderError && <p className="px-4 pt-3 text-xs text-red-500 font-medium">{reorderError}</p>}
       {items.length === 0 && !adding ? (
         <div className="px-4 py-6 text-center text-sm text-gray-400">Nenhuma tarefa associada a este serviço</div>
       ) : (
         <ul className="divide-y divide-gray-50">
-          {items.map((task) => {
+          {items.map((task, i) => {
             const status = task.status ?? "To do";
             const isDone = status === "Done";
             if (canManage && editingId === task.id) {
@@ -115,7 +166,24 @@ export function TourTaskList({
               );
             }
             return (
-              <li key={task.id} className="px-4 py-3 flex items-start gap-3">
+              <li
+                key={task.id}
+                draggable={canReorder}
+                onDragStart={() => { setDragStartItems(items); setDragIndex(i); }}
+                onDragOver={(e) => handleDragOver(e, i)}
+                onDrop={(e) => e.preventDefault()}
+                onDragEnd={handleDragEnd}
+                className={`px-4 py-3 flex items-start gap-3 transition-opacity ${dragIndex === i ? "opacity-40" : ""}`}
+              >
+                {canReorder && (
+                  <span
+                    className="hidden md:block shrink-0 mt-1 text-gray-300 hover:text-gray-400 cursor-grab active:cursor-grabbing select-none"
+                    title="Arrastar para reordenar"
+                    aria-hidden="true"
+                  >
+                    <svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor"><circle cx="2" cy="2" r="1.5" /><circle cx="8" cy="2" r="1.5" /><circle cx="2" cy="8" r="1.5" /><circle cx="8" cy="8" r="1.5" /><circle cx="2" cy="14" r="1.5" /><circle cx="8" cy="14" r="1.5" /></svg>
+                  </span>
+                )}
                 <button
                   type="button"
                   onClick={() => toggle(task)}
@@ -160,6 +228,29 @@ export function TourTaskList({
                   </div>
                   {errorId === task.id && <p className="text-xs text-red-500 font-medium mt-1">Erro ao guardar, tenta novamente</p>}
                 </div>
+                {/* ↑↓ for touch screens, where drag-and-drop isn't available */}
+                {canReorder && items.length > 1 && (
+                  <div className="md:hidden flex flex-col shrink-0 -my-1">
+                    <button
+                      type="button"
+                      onClick={() => move(i, -1)}
+                      disabled={pending || i === 0}
+                      aria-label="Mover tarefa para cima"
+                      className="p-1 text-gray-300 hover:text-[#667470] disabled:opacity-30 transition-colors"
+                    >
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m18 15-6-6-6 6" /></svg>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => move(i, 1)}
+                      disabled={pending || i === items.length - 1}
+                      aria-label="Mover tarefa para baixo"
+                      className="p-1 text-gray-300 hover:text-[#667470] disabled:opacity-30 transition-colors"
+                    >
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>
+                    </button>
+                  </div>
+                )}
                 {canManage && (
                   <button
                     type="button"

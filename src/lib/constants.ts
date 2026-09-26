@@ -33,15 +33,20 @@ export const SERVICE_TEAM_ROLES = ["Guia", "Chef", "Copa", "Driver", "Logistics"
 
 export const WEEKDAY_LABELS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"] as const;
 
-// Roles a task can be assigned to (tasks.role). Admin/Super Guide tasks are
-// hidden from every other role — see getTasksForSale.
-export const TASK_ROLE_OPTIONS = ["Admin", "Guide", "Super Guide", "Chef", "Driver", "Logistics"] as const;
+// Who a task can be assigned to (tasks.role / service_tasks.role): a role or
+// one of the partners. Admin, Super Guide and partner tasks are hidden from
+// every other role — see PRIVILEGED_TASK_ROLES / getTasksForSale.
+export const TASK_PARTNER_OPTIONS = ["Bernardo", "António", "Manel"] as const;
+export const TASK_ROLE_OPTIONS = ["Admin", "Guide", "Super Guide", "Chef", "Driver", "Logistics", ...TASK_PARTNER_OPTIONS] as const;
+export const PRIVILEGED_TASK_ROLES: ReadonlyArray<string> = ["Admin", "Super Guide", ...TASK_PARTNER_OPTIONS];
 
 // Participant registrations on event services (services.type = EVENT_SERVICE_TYPE).
 export const EVENT_SERVICE_TYPE = "Evento";
 export const REGISTRATION_TICKET_TYPES = ["Bilhete", "Convite"] as const;
 export const REGISTRATION_PAYMENT_STATUSES = ["Feito", "Não Feito"] as const;
 export const REGISTRATION_INVOICE_STATUSES = ["Feito", "Não Feito", "Não precisa"] as const;
+// Price of one "Bilhete" (€). Convites are free.
+export const REGISTRATION_TICKET_PRICE = 20;
 // Suggestions only — the payment method field stays free text.
 export const REGISTRATION_PAYMENT_METHODS = ["Website - Cartão", "MB Way - António", "MB Way - Manel", "Transferência", "Dinheiro"] as const;
 

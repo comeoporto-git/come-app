@@ -7,6 +7,7 @@ import {
   REGISTRATION_PAYMENT_STATUSES,
   REGISTRATION_INVOICE_STATUSES,
   REGISTRATION_PAYMENT_METHODS,
+  REGISTRATION_TICKET_PRICE,
 } from "@/lib/constants";
 import {
   addSaleRegistrationsAction,
@@ -79,19 +80,27 @@ function toInput(r: SaleRegistration): SaleRegistrationInput {
   };
 }
 
+function ticketValue(r: SaleRegistration): number {
+  return r.ticketType === "Bilhete" ? REGISTRATION_TICKET_PRICE : 0;
+}
+
+function formatEuros(value: number): string {
+  return `€${value.toLocaleString("pt-PT")}`;
+}
+
 function csvCell(value: string): string {
   return /[",;\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
 }
 
-function exportCsv(items: SaleRegistration[], filename: string, showPayment: boolean) {
+function exportCsv(items: SaleRegistration[], filename: string) {
   const header = [
-    "#", "Nome", "Tipo",
-    ...(showPayment ? ["Pagamento", "Método de Pagamento", "Data do Pagamento"] : []),
+    "#", "Nome", "Tipo", "Valor (€)",
+    "Pagamento", "Método de Pagamento", "Data do Pagamento",
     "Fatura Enviada", "Restrições Alimentares", "Email", "Telefone", "Notas",
   ];
   const lines = items.map((r, i) => [
-    String(i + 1), r.name, r.ticketType,
-    ...(showPayment ? [r.ticketType === "Convite" ? "" : r.paymentStatus, r.paymentMethod, r.paymentDate ?? ""] : []),
+    String(i + 1), r.name, r.ticketType, String(ticketValue(r)),
+    r.ticketType === "Convite" ? "" : r.paymentStatus, r.paymentMethod, r.paymentDate ?? "",
     r.invoiceStatus, r.dietaryRestrictions, r.email, r.phone, r.notes,
   ].map(csvCell).join(","));
   // BOM so Excel opens accents correctly.
@@ -105,15 +114,12 @@ function exportCsv(items: SaleRegistration[], filename: string, showPayment: boo
 }
 
 export function EventRegistrations({
-  tourId, saleRef, registrations, numGuests, canManage, showPayment,
+  tourId, saleRef, registrations, numGuests,
 }: {
   tourId: string;
   saleRef: string;
   registrations: SaleRegistration[];
   numGuests: number;
-  canManage: boolean;
-  /** Payment status/method/date — Admin only. */
-  showPayment: boolean;
 }) {
   const [items, setItems] = useState(registrations);
   const [pending, startTransition] = useTransition();
@@ -122,13 +128,19 @@ export function EventRegistrations({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
+  // The participant list starts collapsed; the summary stays visible.
+  const [expanded, setExpanded] = useState(false);
 
   const stats = useMemo(() => {
     const bilhetes = items.filter((r) => r.ticketType === "Bilhete");
+    const paid = bilhetes.filter((r) => r.paymentStatus === "Feito").length;
     return {
       bilhetes: bilhetes.length,
       convites: items.length - bilhetes.length,
-      paid: bilhetes.filter((r) => r.paymentStatus === "Feito").length,
+      paid,
+      totalValue: bilhetes.length * REGISTRATION_TICKET_PRICE,
+      paidValue: paid * REGISTRATION_TICKET_PRICE,
+      pendingValue: (bilhetes.length - paid) * REGISTRATION_TICKET_PRICE,
       invoicePending: items.filter((r) => r.invoiceStatus === "Não Feito").length,
       dietary: items.filter((r) => r.dietaryRestrictions).length,
     };
@@ -181,113 +193,131 @@ export function EventRegistrations({
           Inscrições
           <span className="ml-2 text-gray-400 font-normal">
             {items.length}{numGuests > 0 ? ` / ${numGuests} pax` : ""}
+            {` · ${formatEuros(REGISTRATION_TICKET_PRICE)}/bilhete`}
           </span>
         </h2>
-        {canManage && (
-          <div className="flex items-center gap-3">
-            {items.length > 0 && (
-              <button
-                type="button"
-                onClick={() => exportCsv(items, `Participantes - ${saleRef || tourId}.csv`, showPayment)}
-                className="text-xs text-gray-400 hover:text-[#32373c] font-medium"
-              >
-                Exportar
+        <div className="flex items-center gap-3">
+          {items.length > 0 && (
+            <button
+              type="button"
+              onClick={() => exportCsv(items, `Participantes - ${saleRef || tourId}.csv`)}
+              className="text-xs text-gray-400 hover:text-[#32373c] font-medium"
+            >
+              Exportar
+            </button>
+          )}
+          {mode === "idle" && (
+            <>
+              <button type="button" onClick={() => { setEditingId(null); setMode("bulk"); }} className="text-xs text-[#667470] hover:text-[#32373c] font-medium">
+                Colar lista
               </button>
-            )}
-            {mode === "idle" && (
-              <>
-                <button type="button" onClick={() => { setEditingId(null); setMode("bulk"); }} className="text-xs text-[#667470] hover:text-[#32373c] font-medium">
-                  Colar lista
-                </button>
-                <button type="button" onClick={() => { setEditingId(null); setMode("add"); }} className="text-xs text-[#667470] hover:text-[#32373c] font-medium">
-                  + Adicionar
-                </button>
-              </>
-            )}
-          </div>
-        )}
+              <button type="button" onClick={() => { setEditingId(null); setMode("add"); }} className="text-xs text-[#667470] hover:text-[#32373c] font-medium">
+                + Adicionar
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
-      {canManage && items.length > 0 && (
+      {items.length > 0 && (
         <div className="px-4 py-3 border-b border-gray-50 space-y-3">
-          <div className={`grid gap-2 ${showPayment ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-3"}`}>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             <Stat label="Bilhetes" value={String(stats.bilhetes)} />
             <Stat label="Convites" value={String(stats.convites)} />
-            {showPayment && (
-              <Stat
-                label="Pagos"
-                value={`${stats.paid}/${stats.bilhetes}`}
-                color={stats.paid === stats.bilhetes ? "text-emerald-600" : "text-red-500"}
-              />
-            )}
+            <Stat
+              label="Pagos"
+              value={`${stats.paid}/${stats.bilhetes}`}
+              color={stats.paid === stats.bilhetes ? "text-emerald-600" : "text-red-500"}
+            />
             <Stat
               label="Faturas por enviar"
               value={String(stats.invoicePending)}
               color={stats.invoicePending === 0 ? "text-emerald-600" : "text-amber-600"}
             />
           </div>
-          <div className="flex flex-wrap items-center gap-1.5">
-            {(Object.keys(FILTER_LABELS) as Filter[]).filter((f) => showPayment || f !== "unpaid").map((f) => (
-              <button
-                key={f}
-                type="button"
-                onClick={() => setFilter(f)}
-                className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors ${
-                  filter === f ? "bg-[#32373c] text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-                }`}
-              >
-                {FILTER_LABELS[f]}
-                {f === "unpaid" && ` (${stats.bilhetes - stats.paid})`}
-                {f === "invoice" && ` (${stats.invoicePending})`}
-                {f === "dietary" && ` (${stats.dietary})`}
-              </button>
-            ))}
-            {items.length > 10 && (
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Procurar nome…"
-                className="ml-auto border border-gray-200 rounded-full px-3 py-1 text-xs text-[#32373c] placeholder:text-gray-400 focus:outline-none focus:border-[#667470] w-36"
-              />
-            )}
+          <div className="grid grid-cols-3 gap-2">
+            <Stat label="Total" value={formatEuros(stats.totalValue)} />
+            <Stat label="Recebido" value={formatEuros(stats.paidValue)} color="text-emerald-600" />
+            <Stat
+              label="Por receber"
+              value={formatEuros(stats.pendingValue)}
+              color={stats.pendingValue === 0 ? "text-emerald-600" : "text-red-500"}
+            />
           </div>
+          {expanded && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              {(Object.keys(FILTER_LABELS) as Filter[]).map((f) => (
+                <button
+                  key={f}
+                  type="button"
+                  onClick={() => setFilter(f)}
+                  className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors ${
+                    filter === f ? "bg-[#32373c] text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                  }`}
+                >
+                  {FILTER_LABELS[f]}
+                  {f === "unpaid" && ` (${stats.bilhetes - stats.paid})`}
+                  {f === "invoice" && ` (${stats.invoicePending})`}
+                  {f === "dietary" && ` (${stats.dietary})`}
+                </button>
+              ))}
+              {items.length > 10 && (
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Procurar nome…"
+                  className="ml-auto border border-gray-200 rounded-full px-3 py-1 text-xs text-[#32373c] placeholder:text-gray-400 focus:outline-none focus:border-[#667470] w-36"
+                />
+              )}
+            </div>
+          )}
         </div>
       )}
 
-      {canManage && mode === "add" && (
+      {mode === "add" && (
         <div className="px-4 py-3 border-b border-gray-50">
           <RegistrationForm
             tourId={tourId}
-            showPayment={showPayment}
-            onSaved={(reg) => { setItems([...items, reg]); setMode("idle"); }}
+            onSaved={(reg) => { setItems([...items, reg]); setMode("idle"); setExpanded(true); }}
             onCancel={() => setMode("idle")}
           />
         </div>
       )}
 
-      {canManage && mode === "bulk" && (
+      {mode === "bulk" && (
         <div className="px-4 py-3 border-b border-gray-50">
           <BulkAddForm
             tourId={tourId}
-            onSaved={(regs) => { setItems([...items, ...regs]); setMode("idle"); }}
+            onSaved={(regs) => { setItems([...items, ...regs]); setMode("idle"); setExpanded(true); }}
             onCancel={() => setMode("idle")}
           />
         </div>
+      )}
+
+      {items.length > 0 && (
+        <button
+          type="button"
+          onClick={() => { setExpanded(!expanded); setEditingId(null); }}
+          aria-expanded={expanded}
+          className={`w-full px-4 py-2.5 text-xs font-semibold text-[#667470] hover:bg-gray-50 flex items-center justify-center gap-1.5 transition-colors ${expanded ? "border-b border-gray-50" : ""}`}
+        >
+          {expanded ? "Esconder participantes" : `Mostrar participantes (${items.length})`}
+          <svg className={`w-3.5 h-3.5 transition-transform ${expanded ? "rotate-180" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>
+        </button>
       )}
 
       {items.length === 0 ? (
         mode === "idle" && <div className="px-4 py-6 text-center text-sm text-gray-400">Ainda sem inscrições neste evento</div>
-      ) : visible.length === 0 ? (
+      ) : !expanded ? null : visible.length === 0 ? (
         <div className="px-4 py-6 text-center text-sm text-gray-400">Nenhuma inscrição corresponde ao filtro</div>
       ) : (
         <ul className="divide-y divide-gray-50">
           {visible.map(({ r, n }) => {
-            if (canManage && editingId === r.id) {
+            if (editingId === r.id) {
               return (
                 <li key={r.id} className="px-4 py-3">
                   <RegistrationForm
                     tourId={tourId}
-                    showPayment={showPayment}
                     registration={r}
                     onSaved={(updated) => { setItems(items.map((x) => (x.id === updated.id ? updated : x))); setEditingId(null); }}
                     onDeleted={() => { setItems(items.filter((x) => x.id !== r.id)); setEditingId(null); }}
@@ -305,7 +335,7 @@ export function EventRegistrations({
                     <span className={`text-xs border px-1.5 py-0.5 rounded-md font-medium ${TICKET_COLORS[r.ticketType]}`}>
                       {r.ticketType}
                     </span>
-                    {showPayment && r.ticketType === "Bilhete" && (
+                    {r.ticketType === "Bilhete" && (
                       <button
                         type="button"
                         onClick={() => togglePayment(r)}
@@ -316,42 +346,38 @@ export function EventRegistrations({
                         {r.paymentStatus === "Feito" ? "Pago" : "Por pagar"}
                       </button>
                     )}
-                    {canManage && (
-                      <button
-                        type="button"
-                        onClick={() => cycleInvoice(r)}
-                        disabled={pending}
-                        title="Alternar estado da fatura"
-                        className={`text-xs px-2 py-0.5 rounded-full font-medium disabled:opacity-50 ${INVOICE_COLORS[r.invoiceStatus]}`}
-                      >
-                        Fatura: {r.invoiceStatus}
-                      </button>
-                    )}
-                    {showPayment && r.paymentMethod && <span className="text-xs text-gray-400">{r.paymentMethod}</span>}
-                    {showPayment && r.paymentDate && <span className="text-xs text-gray-400">{formatDate(r.paymentDate)}</span>}
+                    <button
+                      type="button"
+                      onClick={() => cycleInvoice(r)}
+                      disabled={pending}
+                      title="Alternar estado da fatura"
+                      className={`text-xs px-2 py-0.5 rounded-full font-medium disabled:opacity-50 ${INVOICE_COLORS[r.invoiceStatus]}`}
+                    >
+                      Fatura: {r.invoiceStatus}
+                    </button>
+                    {r.paymentMethod && <span className="text-xs text-gray-400">{r.paymentMethod}</span>}
+                    {r.paymentDate && <span className="text-xs text-gray-400">{formatDate(r.paymentDate)}</span>}
                   </div>
                   {r.dietaryRestrictions && (
                     <p className="text-xs font-bold text-red-600 mt-1.5 whitespace-pre-line">🍽️ {r.dietaryRestrictions}</p>
                   )}
-                  {canManage && (r.email || r.phone) && (
+                  {(r.email || r.phone) && (
                     <p className="text-xs text-gray-400 mt-1">{[r.email, r.phone].filter(Boolean).join(" · ")}</p>
                   )}
-                  {canManage && r.notes && <p className="text-xs text-gray-500 mt-1 whitespace-pre-line">{r.notes}</p>}
+                  {r.notes && <p className="text-xs text-gray-500 mt-1 whitespace-pre-line">{r.notes}</p>}
                   {errorId === r.id && <p className="text-xs text-red-500 font-medium mt-1">Erro ao guardar, tenta novamente</p>}
                 </div>
-                {canManage && (
-                  <button
-                    type="button"
-                    onClick={() => { setMode("idle"); setEditingId(r.id); }}
-                    aria-label="Editar inscrição"
-                    className="shrink-0 p-1 -m-1 text-gray-300 hover:text-[#667470] transition-colors"
-                  >
-                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M12 20h9" />
-                      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
-                    </svg>
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={() => { setMode("idle"); setEditingId(r.id); }}
+                  aria-label="Editar inscrição"
+                  className="shrink-0 p-1 -m-1 text-gray-300 hover:text-[#667470] transition-colors"
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 20h9" />
+                    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+                  </svg>
+                </button>
               </li>
             );
           })}
@@ -371,10 +397,9 @@ function Stat({ label, value, color = "text-[#32373c]" }: { label: string; value
 }
 
 function RegistrationForm({
-  tourId, showPayment, registration, onSaved, onDeleted, onCancel,
+  tourId, registration, onSaved, onDeleted, onCancel,
 }: {
   tourId: string;
-  showPayment: boolean;
   /** When set, the form edits this registration; otherwise it creates a new one. */
   registration?: SaleRegistration;
   onSaved: (registration: SaleRegistration) => void;
@@ -438,7 +463,7 @@ function RegistrationForm({
           {REGISTRATION_TICKET_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
         </select>
       </div>
-      {showPayment && !isInvite && (
+      {!isInvite && (
         <div className="grid grid-cols-3 gap-2">
           <select value={data.paymentStatus} onChange={(e) => setPaymentStatus(e.target.value as SaleRegistrationInput["paymentStatus"])} className={inputCls} aria-label="Pagamento">
             {REGISTRATION_PAYMENT_STATUSES.map((s) => <option key={s} value={s}>{s === "Feito" ? "Pago" : "Por pagar"}</option>)}
