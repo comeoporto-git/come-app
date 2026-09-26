@@ -45,12 +45,12 @@ function formatDate(iso: string | null, startTime: string | null): string {
 }
 
 // Buckets expense transactions by their fornecedor's category, falling back
-// to the tour's team role (Guia/Chef/Motorista/Logistics) when a transaction
+// to the tour's team role (Guia/Chef/Motorista/Logistics/Decorador) when a transaction
 // was paid directly to a team member rather than to a fornecedor.
 function computeCategoryBreakdown(
   transactions: Transaction[],
   fornecedores: Fornecedor[],
-  team: { guideName?: string | null; chefName?: string | null; driverName?: string | null; logisticsName?: string | null },
+  team: { guideName?: string | null; chefName?: string | null; driverName?: string | null; logisticsName?: string | null; decoradorName?: string | null },
 ): { label: string; total: number }[] {
   const categoriaById = new Map(fornecedores.map((f) => [f.id, f.categoria]));
   const teamRoles = [
@@ -58,6 +58,7 @@ function computeCategoryBreakdown(
     team.chefName ? { name: team.chefName, label: "Chef" } : null,
     team.driverName ? { name: team.driverName, label: "Motorista" } : null,
     team.logisticsName ? { name: team.logisticsName, label: "Logistics" } : null,
+    team.decoradorName ? { name: team.decoradorName, label: "Decorador" } : null,
   ]
     .filter(Boolean)
     .map((r) => ({ name: r!.name.trim().toLowerCase(), label: r!.label }));
@@ -79,18 +80,18 @@ function computeCategoryBreakdown(
     .sort((a, b) => b.total - a.total);
 }
 
-const TEAM_SLOT_ROLES: ReadonlyArray<TeamSlotRole> = ["Guide", "Chef", "Driver", "Logistics"];
+const TEAM_SLOT_ROLES: ReadonlyArray<TeamSlotRole> = ["Guide", "Chef", "Driver", "Logistics", "Decorador"];
 
 const EXTRA_ROLE_LABEL: Record<TeamSlotRole, string> = {
-  Guide: "Guia", Chef: "Chef", Driver: "Driver", Logistics: "Logistics",
+  Guide: "Guia", Chef: "Chef", Driver: "Driver", Logistics: "Logistics", Decorador: "Decorador",
 };
 const EXPENSE_ROLE_LABEL: Record<TeamSlotRole, string> = {
-  Guide: "Guia", Chef: "Chef", Driver: "Motorista", Logistics: "Logistics",
+  Guide: "Guia", Chef: "Chef", Driver: "Motorista", Logistics: "Logistics", Decorador: "Decorador",
 };
 
 // ── Shell (renders immediately, only needs auth cookie) ───────────────────────
 
-const ALLOWED_ROLES: ReadonlyArray<string> = ["Guide", "Super Guide", "Admin", "Chef", "Driver", "Logistics"];
+const ALLOWED_ROLES: ReadonlyArray<string> = ["Guide", "Super Guide", "Admin", "Chef", "Driver", "Logistics", "Decorador"];
 
 export default async function TourDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -185,6 +186,7 @@ async function TourPageContent({
     ...(tour.chefId === me.id ? ["Chef" as const] : []),
     ...(tour.driverId === me.id ? ["Driver" as const] : []),
     ...(tour.logisticsId === me.id ? ["Logistics" as const] : []),
+    ...(tour.decoradorId === me.id ? ["Decorador" as const] : []),
     ...tour.extraTeam.filter((m) => m.teamId === me.id).map((m) => m.role),
   ] : [];
   const expenseRole = myServiceRoles.length === 0 || myServiceRoles.includes(role as TeamSlotRole)
@@ -199,6 +201,7 @@ async function TourPageContent({
       [tour.chefId, tour.chefName, "Chef"],
       [tour.driverId, tour.driverName, "Driver"],
       [tour.logisticsId, tour.logisticsName, "Logistics"],
+      [tour.decoradorId, tour.decoradorName, "Decorador"],
     ] as [string | null, string, TeamSlotRole][])
       .filter(([teamId]) => !!teamId)
       .map(([teamId, name, role]) => ({ teamId: teamId!, name: name || memberNames[teamId!] || "—", role })),
@@ -347,6 +350,9 @@ async function TourPageContent({
                     logisticsId={tour.logisticsId}
                     logisticsName={tour.logisticsName}
                     logisticsPhone={teamMembers.find(m => m.id === tour.logisticsId)?.phone}
+                    decoradorId={tour.decoradorId}
+                    decoradorName={tour.decoradorName}
+                    decoradorPhone={teamMembers.find(m => m.id === tour.decoradorId)?.phone}
                     extraTeam={tour.extraTeam}
                     teamMembers={teamMembers}
                   />
@@ -371,6 +377,11 @@ async function TourPageContent({
                       label="Logistics"
                       name={tour.logisticsName || "—"}
                       phone={teamMembers.find(m => m.id === tour.logisticsId)?.phone}
+                    />
+                    <TeamMemberField
+                      label="Decorador"
+                      name={tour.decoradorName || "—"}
+                      phone={teamMembers.find(m => m.id === tour.decoradorId)?.phone}
                     />
                     {tour.extraTeam.map((m) => (
                       <TeamMemberField
@@ -553,18 +564,20 @@ async function TourPageContent({
                     guideName={myName}
                     driverName={myName}
                     logisticsName={myName}
+                    decoradorName={myName}
                     roster={roster}
                     tourTeam={[
                       tour.guideName ? { name: tour.guideName, role: "Guia" } : null,
                       tour.chefName  ? { name: tour.chefName,  role: "Chef" } : null,
                       tour.driverName ? { name: tour.driverName, role: "Motorista" } : null,
                       tour.logisticsName ? { name: tour.logisticsName, role: "Logistics" } : null,
+                      tour.decoradorName ? { name: tour.decoradorName, role: "Decorador" } : null,
                       ...extraTeamForExpenses,
                     ].filter(Boolean) as { name: string; role: string }[]}
                   />
                 )}
               </div>
-              <ExpenseList transactions={transactions} tourId={id} isClosed={isClosed} fornecedores={fornecedores} guideName={tour.guideName} chefName={tour.chefName} driverName={tour.driverName} logisticsName={tour.logisticsName} memberNames={memberNames} extraTeam={extraTeamForExpenses} roster={roster} userRole={role} />
+              <ExpenseList transactions={transactions} tourId={id} isClosed={isClosed} fornecedores={fornecedores} guideName={tour.guideName} chefName={tour.chefName} driverName={tour.driverName} logisticsName={tour.logisticsName} decoradorName={tour.decoradorName} memberNames={memberNames} extraTeam={extraTeamForExpenses} roster={roster} userRole={role} />
             </section>
 
             {/* Close Tour — only admins */}

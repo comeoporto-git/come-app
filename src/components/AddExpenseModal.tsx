@@ -34,6 +34,7 @@ export function AddExpenseModal({
   guideName,
   driverName,
   logisticsName,
+  decoradorName,
   tourTeam = [],
   roster = [],
   onClose,
@@ -46,6 +47,7 @@ export function AddExpenseModal({
   guideName?: string;
   driverName?: string;
   logisticsName?: string;
+  decoradorName?: string;
   tourTeam?: { name: string; role: string }[];
   /** Everyone on the service by role — lets Admin/Super Guide say which chef/guide/… paid. */
   roster?: ServicePerson[];
@@ -57,8 +59,9 @@ export function AddExpenseModal({
   const isGuide = userRole === "Guide";
   const isDriver = userRole === "Driver";
   const isLogistics = userRole === "Logistics";
+  const isDecorador = userRole === "Decorador";
   // Every team role shares the "despesa do serviço" vs "fatura de serviço" (own fee) choice
-  const isTeamMemberWithFee = isChef || isGuide || isDriver || isLogistics;
+  const isTeamMemberWithFee = isChef || isGuide || isDriver || isLogistics || isDecorador;
 
   // Team roles: start with a type choice; Admin: start with the honorários choice; others go straight to choose/scan
   // tourId=null means standalone (not tied to a tour) — skip honorários flow
@@ -77,6 +80,7 @@ export function AddExpenseModal({
   const defaultPaymentMethod = isSuperGuide ? "Cartão COME"
     : userRole === "Driver" ? "Pelo Driver"
     : userRole === "Logistics" ? "Pelo Logistics"
+    : userRole === "Decorador" ? "Pelo Decorador"
     : "Pelo Guia";
   const [paymentMethod, setPaymentMethod] = useState<string>(defaultPaymentMethod);
   const [paidBy, setPaidBy] = useState<string>("");
@@ -243,6 +247,8 @@ export function AddExpenseModal({
           ? (chefExpenseType === "service-invoice" ? "Driver Fee" : "Pelo Driver")
           : isLogistics
           ? (chefExpenseType === "service-invoice" ? "Logistics Fee" : "Pelo Logistics")
+          : isDecorador
+          ? (chefExpenseType === "service-invoice" ? "Decorador Fee" : "Pelo Decorador")
           : isHonorarios ? "Honorários"
           : paymentMethod;
 
@@ -267,6 +273,7 @@ export function AddExpenseModal({
                  : effectivePaymentMethod === "Pelo Chef" ? "Chef"
                  : effectivePaymentMethod === "Pelo Driver" ? "Driver"
                  : effectivePaymentMethod === "Pelo Logistics" ? "Logistics"
+                 : effectivePaymentMethod === "Pelo Decorador" ? "Decorador"
                  : partnerPaymentByMethod(effectivePaymentMethod) ? partnerPaymentByMethod(effectivePaymentMethod)!.whoPaid
                  : "Company",
           paymentMethod: effectivePaymentMethod,
@@ -306,6 +313,8 @@ export function AddExpenseModal({
         ? (chefExpenseType === "service-invoice" ? "Driver Fee" : "Pelo Driver")
         : isLogistics
         ? (chefExpenseType === "service-invoice" ? "Logistics Fee" : "Pelo Logistics")
+        : isDecorador
+        ? (chefExpenseType === "service-invoice" ? "Decorador Fee" : "Pelo Decorador")
         : paymentMethod;
 
       const selectedFornecedor = fornecedores.find(
@@ -325,6 +334,7 @@ export function AddExpenseModal({
                : effectivePaymentMethod === "Pelo Chef" ? "Chef"
                : effectivePaymentMethod === "Pelo Driver" ? "Driver"
                : effectivePaymentMethod === "Pelo Logistics" ? "Logistics"
+               : effectivePaymentMethod === "Pelo Decorador" ? "Decorador"
                : partnerPaymentByMethod(effectivePaymentMethod) ? partnerPaymentByMethod(effectivePaymentMethod)!.whoPaid
                : "Company",
         paymentMethod: effectivePaymentMethod,
@@ -439,7 +449,7 @@ export function AddExpenseModal({
                 onClick={() => {
                   setChefExpenseType("service-invoice");
                   // Pre-fill supplier with the member's own name
-                  const memberName = isGuide ? guideName : isDriver ? driverName : isLogistics ? logisticsName : chefName;
+                  const memberName = isGuide ? guideName : isDriver ? driverName : isLogistics ? logisticsName : isDecorador ? decoradorName : chefName;
                   if (memberName) {
                     setForm((f) => ({ ...f, supplier: memberName }));
                   }
@@ -625,6 +635,7 @@ export function AddExpenseModal({
                     <option value="Pelo Chef">Pelo Chef</option>
                     <option value="Pelo Driver">Pelo Driver</option>
                     <option value="Pelo Logistics">Pelo Logistics</option>
+                    <option value="Pelo Decorador">Pelo Decorador</option>
                     {PARTNER_PAYMENT_METHODS.map((p) => (
                       <option key={p.method} value={p.method}>{p.method}</option>
                     ))}

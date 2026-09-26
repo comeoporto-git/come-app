@@ -31,7 +31,7 @@ export default async function GuideDashboard() {
   const currentNotionId = session.user?.notionId ?? "";
 
   // Super Guide sees every tour; everyone else sees every tour they're
-  // assigned to in ANY role slot (guide, chef, driver, logistics) — a
+  // assigned to in ANY role slot (guide, chef, driver, logistics, decorador) — a
   // person's `role` only picks their default view, not what they can be
   // booked as.
   const [tours, pastTours, teamMembers] = await Promise.all([

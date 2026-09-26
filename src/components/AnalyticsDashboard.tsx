@@ -810,6 +810,7 @@ export function AnalyticsDashboard({
         t.chefName ? { name: t.chefName, label: "Chef" } : null,
         t.driverName ? { name: t.driverName, label: "Motorista" } : null,
         t.logisticsName ? { name: t.logisticsName, label: "Logistics" } : null,
+        t.decoradorName ? { name: t.decoradorName, label: "Decorador" } : null,
       ]
         .filter(Boolean)
         .map((r) => ({ name: r!.name.trim().toLowerCase(), label: r!.label }));

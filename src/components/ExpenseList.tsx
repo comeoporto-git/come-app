@@ -27,6 +27,7 @@ export function ExpenseList({
   chefName,
   driverName,
   logisticsName,
+  decoradorName,
   memberNames = {},
   extraTeam = [],
   roster = [],
@@ -40,6 +41,7 @@ export function ExpenseList({
   chefName?: string;
   driverName?: string;
   logisticsName?: string;
+  decoradorName?: string;
   /** Team member id → name, to show who actually paid when a service has several people per role. */
   memberNames?: Record<string, string>;
   /** Extra people on the service beyond the primary slots, with a display role. */
@@ -54,13 +56,14 @@ export function ExpenseList({
   const isAdmin = userRole === "Admin";
 
   const payerName = (tx: Transaction): string | undefined => {
-    const isTeamPaid = tx.whoPaid === "Guide" || tx.whoPaid === "Chef" || tx.whoPaid === "Driver" || tx.whoPaid === "Logistics";
+    const isTeamPaid = tx.whoPaid === "Guide" || tx.whoPaid === "Chef" || tx.whoPaid === "Driver" || tx.whoPaid === "Logistics" || tx.whoPaid === "Decorador";
     // The person who logged it, if known — the role slot can't tell two chefs apart.
     if (isTeamPaid && tx.paidByTeamId && memberNames[tx.paidByTeamId]) return memberNames[tx.paidByTeamId];
     return tx.whoPaid === "Guide" ? guideName
       : tx.whoPaid === "Chef" ? chefName
       : tx.whoPaid === "Driver" ? driverName
       : tx.whoPaid === "Logistics" ? logisticsName
+      : tx.whoPaid === "Decorador" ? decoradorName
       : partnerPaymentByWhoPaid(tx.whoPaid)?.name;
   };
 
@@ -99,7 +102,7 @@ export function ExpenseList({
               <div className="text-right shrink-0">
                 <p className="text-sm font-semibold text-gray-900">€{Math.abs(tx.totalCost).toFixed(2)}</p>
                 {(() => {
-                  const isGuideEtc = tx.whoPaid === "Guide" || tx.whoPaid === "Chef" || tx.whoPaid === "Driver" || tx.whoPaid === "Logistics" || !!partnerPaymentByWhoPaid(tx.whoPaid);
+                  const isGuideEtc = tx.whoPaid === "Guide" || tx.whoPaid === "Chef" || tx.whoPaid === "Driver" || tx.whoPaid === "Logistics" || tx.whoPaid === "Decorador" || !!partnerPaymentByWhoPaid(tx.whoPaid);
                   // "Pending Payment" with no receipt yet = receipt still needed first
                   const noReceipt = !tx.invoiceId && !tx.invoiceImageUrl;
                   const displayStatus = (tx.status === "Pending Payment" && noReceipt)
@@ -178,6 +181,7 @@ export function ExpenseList({
             chefName ? { name: chefName, role: "Chef" } : null,
             driverName ? { name: driverName, role: "Motorista" } : null,
             logisticsName ? { name: logisticsName, role: "Logistics" } : null,
+            decoradorName ? { name: decoradorName, role: "Decorador" } : null,
             ...extraTeam,
           ].filter(Boolean) as { name: string; role: string }[]}
           onClose={() => setConverting(null)}

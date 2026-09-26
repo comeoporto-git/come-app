@@ -231,6 +231,7 @@ export function EditExpenseModal({
                : form.paymentMethod === "Pelo Chef" ? "Chef"
                : form.paymentMethod === "Pelo Driver" ? "Driver"
                : form.paymentMethod === "Pelo Logistics" ? "Logistics"
+               : form.paymentMethod === "Pelo Decorador" ? "Decorador"
                : partnerPaymentByMethod(form.paymentMethod) ? partnerPaymentByMethod(form.paymentMethod)!.whoPaid
                : "Company",
         paymentMethod: form.paymentMethod,
@@ -410,6 +411,7 @@ export function EditExpenseModal({
                   <option value="Pelo Chef">Pelo Chef</option>
                   <option value="Pelo Driver">Pelo Driver</option>
                   <option value="Pelo Logistics">Pelo Logistics</option>
+                  <option value="Pelo Decorador">Pelo Decorador</option>
                   {PARTNER_PAYMENT_METHODS.map((p) => (
                     <option key={p.method} value={p.method}>{p.method}</option>
                   ))}

@@ -48,6 +48,7 @@ export function PermissionsMatrix({ features, roles, permissions, defaults }: Pr
     "Chef":        "text-red-600",
     "Driver":      "text-slate-600",
     "Logistics":   "text-cyan-600",
+    "Decorador":   "text-pink-600",
   };
 
   return (

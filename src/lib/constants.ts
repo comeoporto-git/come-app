@@ -29,7 +29,7 @@ export function ownershipForDate(date: string | null | undefined): Record<string
 }
 
 // Roles that can be required team members on a service (services.equipa).
-export const SERVICE_TEAM_ROLES = ["Guia", "Chef", "Copa", "Driver", "Logistics"] as const;
+export const SERVICE_TEAM_ROLES = ["Guia", "Chef", "Copa", "Driver", "Logistics", "Decorador"] as const;
 
 export const WEEKDAY_LABELS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"] as const;
 
@@ -37,7 +37,7 @@ export const WEEKDAY_LABELS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta
 // one of the partners. Admin, Super Guide and partner tasks are hidden from
 // every other role — see PRIVILEGED_TASK_ROLES / getTasksForSale.
 export const TASK_PARTNER_OPTIONS = ["Bernardo", "António", "Manel"] as const;
-export const TASK_ROLE_OPTIONS = ["Admin", "Guide", "Super Guide", "Chef", "Driver", "Logistics", ...TASK_PARTNER_OPTIONS] as const;
+export const TASK_ROLE_OPTIONS = ["Admin", "Guide", "Super Guide", "Chef", "Driver", "Logistics", "Decorador", ...TASK_PARTNER_OPTIONS] as const;
 export const PRIVILEGED_TASK_ROLES: ReadonlyArray<string> = ["Admin", "Super Guide", ...TASK_PARTNER_OPTIONS];
 
 // Participant registrations on event services (services.type = EVENT_SERVICE_TYPE).
@@ -51,9 +51,10 @@ export const REGISTRATION_TICKET_PRICE = 20;
 export const REGISTRATION_PAYMENT_METHODS = ["Website - Cartão", "MB Way - António", "MB Way - Manel", "Transferência", "Dinheiro"] as const;
 
 // "Pelo …" payment methods → the service role whose member paid out of pocket.
-export const TEAM_PAYMENT_METHOD_ROLE: Record<string, "Guide" | "Chef" | "Driver" | "Logistics"> = {
+export const TEAM_PAYMENT_METHOD_ROLE: Record<string, "Guide" | "Chef" | "Driver" | "Logistics" | "Decorador"> = {
   "Pelo Guia": "Guide",
   "Pelo Chef": "Chef",
   "Pelo Driver": "Driver",
   "Pelo Logistics": "Logistics",
+  "Pelo Decorador": "Decorador",
 };

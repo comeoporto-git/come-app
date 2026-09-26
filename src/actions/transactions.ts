@@ -35,18 +35,19 @@ export async function updateTourTeamAction(
   chefId: string | null,
   driverId: string | null,
   logisticsId: string | null,
+  decoradorId: string | null,
   extraTeam: { teamId: string; role: TeamSlotRole }[] = [],
 ): Promise<{ error?: string }> {
   const session = await requireAuth();
   if (session.user.role !== "Super Guide" && session.user.role !== "Admin") {
     return { error: "Forbidden: apenas Super Guide ou Admin podem editar a equipa" };
   }
-  const validRoles: TeamSlotRole[] = ["Guide", "Chef", "Driver", "Logistics"];
+  const validRoles: TeamSlotRole[] = ["Guide", "Chef", "Driver", "Logistics", "Decorador"];
   if (extraTeam.some((m) => !validRoles.includes(m.role))) {
     return { error: "Função inválida" };
   }
   try {
-    await updateTourTeam(tourId, guideId, chefId, driverId, logisticsId, extraTeam);
+    await updateTourTeam(tourId, guideId, chefId, driverId, logisticsId, decoradorId, extraTeam);
     revalidatePath(`/guide/tours/${tourId}`);
     return {};
   } catch (err) {
@@ -168,8 +169,8 @@ export async function markNoInvoiceNeededAction(
 }
 
 const SELF_PAID_METHODS = [
-  "Pelo Guia", "Pelo Chef", "Pelo Driver", "Pelo Logistics",
-  "Guide Fee", "Chef Fee", "Driver Fee", "Logistics Fee",
+  "Pelo Guia", "Pelo Chef", "Pelo Driver", "Pelo Logistics", "Pelo Decorador",
+  "Guide Fee", "Chef Fee", "Driver Fee", "Logistics Fee", "Decorador Fee",
 ];
 
 export async function logExpenseAction(
@@ -184,7 +185,8 @@ export async function logExpenseAction(
       role !== "Super Guide" &&
       role !== "Chef" &&
       role !== "Driver" &&
-      role !== "Logistics"
+      role !== "Logistics" &&
+      role !== "Decorador"
     ) {
       return { error: "Forbidden" };
     }
@@ -202,7 +204,7 @@ export async function logExpenseAction(
       revalidatePath("/admin");
     }
     if (data.socioPessoal) revalidatePath("/admin/socios");
-    if (role === "Guide" || role === "Chef" || role === "Driver" || role === "Logistics") {
+    if (role === "Guide" || role === "Chef" || role === "Driver" || role === "Logistics" || role === "Decorador") {
       notifyInvoiceAdded({
         guideName: session.user.name ?? session.user.email ?? "Guia",
         supplier: data.supplier,
@@ -243,7 +245,8 @@ export async function finishPendingExpenseAction(
       role !== "Super Guide" &&
       role !== "Chef" &&
       role !== "Driver" &&
-      role !== "Logistics"
+      role !== "Logistics" &&
+      role !== "Decorador"
     ) {
       return { error: "Forbidden" };
     }
@@ -264,7 +267,7 @@ export async function finishPendingExpenseAction(
       ...(invoiceImageUrl ? { invoiceImageUrl } : {}),
     });
     revalidatePath(`/guide/tours/${tourId}`);
-    if (supplier && (role === "Guide" || role === "Chef" || role === "Driver" || role === "Logistics")) {
+    if (supplier && (role === "Guide" || role === "Chef" || role === "Driver" || role === "Logistics" || role === "Decorador")) {
       notifyInvoiceAdded({
         guideName: session.user.name ?? session.user.email ?? "Guia",
         supplier,
@@ -310,7 +313,8 @@ export async function editExpenseAction(
     session.user.role !== "Super Guide" &&
     session.user.role !== "Chef" &&
     session.user.role !== "Driver" &&
-    session.user.role !== "Logistics"
+    session.user.role !== "Logistics" &&
+    session.user.role !== "Decorador"
   ) {
     throw new Error("Forbidden");
   }
@@ -462,7 +466,8 @@ export async function deleteExpenseAction(
     session.user.role !== "Super Guide" &&
     session.user.role !== "Chef" &&
     session.user.role !== "Driver" &&
-    session.user.role !== "Logistics"
+    session.user.role !== "Logistics" &&
+    session.user.role !== "Decorador"
   ) {
     throw new Error("Forbidden");
   }
