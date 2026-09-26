@@ -10,12 +10,13 @@ import {
   getTasksForSale,
   getServiceSteps,
   getServiceRestaurants,
+  getRegistrationsForSale,
   deleteSale,
 } from "@/lib/notion";
 import type { Fornecedor, TeamSlotRole, Transaction } from "@/lib/notion";
 import { categoriaBadgeClass } from "@/lib/fornecedor-categories";
 import { getOpenStatusForDate, isRowClosed, formatDayHours } from "@/lib/restaurantOpenStatus";
-import { WEEKDAY_LABELS } from "@/lib/constants";
+import { WEEKDAY_LABELS, EVENT_SERVICE_TYPE } from "@/lib/constants";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { Suspense } from "react";
@@ -29,6 +30,7 @@ import { MapsLink } from "@/components/MapsLink";
 import { DeleteSaleButton } from "@/components/DeleteSaleButton";
 import { EarningList } from "@/components/EarningList";
 import { TourTaskList } from "@/components/TourTaskList";
+import { EventRegistrations } from "@/components/EventRegistrations";
 import { SaleEmails } from "@/components/SaleEmails";
 import { getSaleEmails } from "@/lib/integration";
 
@@ -208,6 +210,8 @@ async function TourPageContent({
 
   const steps = tour.service ? await getServiceSteps(tour.service) : [];
   const restaurants = tour.service ? await getServiceRestaurants(tour.service) : [];
+  const isEvent = tour.serviceType === EVENT_SERVICE_TYPE;
+  const registrations = isEvent ? await getRegistrationsForSale(id) : [];
   const tourDate = tour.date ? new Date(`${tour.date}T12:00:00`) : null;
 
   const totalSpent = transactions.reduce((s, t) => s + t.totalCost, 0); // negative values
@@ -379,6 +383,17 @@ async function TourPageContent({
                 )}
               </div>
             </section>
+
+            {/* Registrations — event services only; payment details for Admin / Super Guide */}
+            {isEvent && (
+              <EventRegistrations
+                tourId={id}
+                saleRef={tour.saleId}
+                registrations={registrations}
+                numGuests={tour.numGuests}
+                canManage={canEditTeam}
+              />
+            )}
 
             {/* Steps — from the service catalog, visible to everyone */}
             {steps.length > 0 && (
