@@ -119,6 +119,8 @@ export function EventRegistrations({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
+  // The participant list starts collapsed; the summary stays visible.
+  const [expanded, setExpanded] = useState(false);
 
   const stats = useMemo(() => {
     const bilhetes = items.filter((r) => r.ticketType === "Bilhete");
@@ -219,31 +221,33 @@ export function EventRegistrations({
               color={stats.invoicePending === 0 ? "text-emerald-600" : "text-amber-600"}
             />
           </div>
-          <div className="flex flex-wrap items-center gap-1.5">
-            {(Object.keys(FILTER_LABELS) as Filter[]).map((f) => (
-              <button
-                key={f}
-                type="button"
-                onClick={() => setFilter(f)}
-                className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors ${
-                  filter === f ? "bg-[#32373c] text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-                }`}
-              >
-                {FILTER_LABELS[f]}
-                {f === "unpaid" && ` (${stats.bilhetes - stats.paid})`}
-                {f === "invoice" && ` (${stats.invoicePending})`}
-                {f === "dietary" && ` (${stats.dietary})`}
-              </button>
-            ))}
-            {items.length > 10 && (
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Procurar nome…"
-                className="ml-auto border border-gray-200 rounded-full px-3 py-1 text-xs text-[#32373c] placeholder:text-gray-400 focus:outline-none focus:border-[#667470] w-36"
-              />
-            )}
-          </div>
+          {expanded && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              {(Object.keys(FILTER_LABELS) as Filter[]).map((f) => (
+                <button
+                  key={f}
+                  type="button"
+                  onClick={() => setFilter(f)}
+                  className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors ${
+                    filter === f ? "bg-[#32373c] text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                  }`}
+                >
+                  {FILTER_LABELS[f]}
+                  {f === "unpaid" && ` (${stats.bilhetes - stats.paid})`}
+                  {f === "invoice" && ` (${stats.invoicePending})`}
+                  {f === "dietary" && ` (${stats.dietary})`}
+                </button>
+              ))}
+              {items.length > 10 && (
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Procurar nome…"
+                  className="ml-auto border border-gray-200 rounded-full px-3 py-1 text-xs text-[#32373c] placeholder:text-gray-400 focus:outline-none focus:border-[#667470] w-36"
+                />
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -251,7 +255,7 @@ export function EventRegistrations({
         <div className="px-4 py-3 border-b border-gray-50">
           <RegistrationForm
             tourId={tourId}
-            onSaved={(reg) => { setItems([...items, reg]); setMode("idle"); }}
+            onSaved={(reg) => { setItems([...items, reg]); setMode("idle"); setExpanded(true); }}
             onCancel={() => setMode("idle")}
           />
         </div>
@@ -261,15 +265,27 @@ export function EventRegistrations({
         <div className="px-4 py-3 border-b border-gray-50">
           <BulkAddForm
             tourId={tourId}
-            onSaved={(regs) => { setItems([...items, ...regs]); setMode("idle"); }}
+            onSaved={(regs) => { setItems([...items, ...regs]); setMode("idle"); setExpanded(true); }}
             onCancel={() => setMode("idle")}
           />
         </div>
       )}
 
+      {items.length > 0 && (
+        <button
+          type="button"
+          onClick={() => { setExpanded(!expanded); setEditingId(null); }}
+          aria-expanded={expanded}
+          className={`w-full px-4 py-2.5 text-xs font-semibold text-[#667470] hover:bg-gray-50 flex items-center justify-center gap-1.5 transition-colors ${expanded ? "border-b border-gray-50" : ""}`}
+        >
+          {expanded ? "Esconder participantes" : `Mostrar participantes (${items.length})`}
+          <svg className={`w-3.5 h-3.5 transition-transform ${expanded ? "rotate-180" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>
+        </button>
+      )}
+
       {items.length === 0 ? (
         mode === "idle" && <div className="px-4 py-6 text-center text-sm text-gray-400">Ainda sem inscrições neste evento</div>
-      ) : visible.length === 0 ? (
+      ) : !expanded ? null : visible.length === 0 ? (
         <div className="px-4 py-6 text-center text-sm text-gray-400">Nenhuma inscrição corresponde ao filtro</div>
       ) : (
         <ul className="divide-y divide-gray-50">
