@@ -45,6 +45,8 @@ export const EVENT_SERVICE_TYPE = "Evento";
 export const REGISTRATION_TICKET_TYPES = ["Bilhete", "Convite"] as const;
 export const REGISTRATION_PAYMENT_STATUSES = ["Feito", "Não Feito"] as const;
 export const REGISTRATION_INVOICE_STATUSES = ["Feito", "Não Feito", "Não precisa"] as const;
+// Price of one "Bilhete" (€). Convites are free.
+export const REGISTRATION_TICKET_PRICE = 20;
 // Suggestions only — the payment method field stays free text.
 export const REGISTRATION_PAYMENT_METHODS = ["Website - Cartão", "MB Way - António", "MB Way - Manel", "Transferência", "Dinheiro"] as const;
 

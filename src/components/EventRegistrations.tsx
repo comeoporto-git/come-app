@@ -7,6 +7,7 @@ import {
   REGISTRATION_PAYMENT_STATUSES,
   REGISTRATION_INVOICE_STATUSES,
   REGISTRATION_PAYMENT_METHODS,
+  REGISTRATION_TICKET_PRICE,
 } from "@/lib/constants";
 import {
   addSaleRegistrationsAction,
@@ -79,18 +80,26 @@ function toInput(r: SaleRegistration): SaleRegistrationInput {
   };
 }
 
+function ticketValue(r: SaleRegistration): number {
+  return r.ticketType === "Bilhete" ? REGISTRATION_TICKET_PRICE : 0;
+}
+
+function formatEuros(value: number): string {
+  return `€${value.toLocaleString("pt-PT")}`;
+}
+
 function csvCell(value: string): string {
   return /[",;\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
 }
 
 function exportCsv(items: SaleRegistration[], filename: string) {
   const header = [
-    "#", "Nome", "Tipo",
+    "#", "Nome", "Tipo", "Valor (€)",
     "Pagamento", "Método de Pagamento", "Data do Pagamento",
     "Fatura Enviada", "Restrições Alimentares", "Email", "Telefone", "Notas",
   ];
   const lines = items.map((r, i) => [
-    String(i + 1), r.name, r.ticketType,
+    String(i + 1), r.name, r.ticketType, String(ticketValue(r)),
     r.ticketType === "Convite" ? "" : r.paymentStatus, r.paymentMethod, r.paymentDate ?? "",
     r.invoiceStatus, r.dietaryRestrictions, r.email, r.phone, r.notes,
   ].map(csvCell).join(","));
@@ -124,10 +133,14 @@ export function EventRegistrations({
 
   const stats = useMemo(() => {
     const bilhetes = items.filter((r) => r.ticketType === "Bilhete");
+    const paid = bilhetes.filter((r) => r.paymentStatus === "Feito").length;
     return {
       bilhetes: bilhetes.length,
       convites: items.length - bilhetes.length,
-      paid: bilhetes.filter((r) => r.paymentStatus === "Feito").length,
+      paid,
+      totalValue: bilhetes.length * REGISTRATION_TICKET_PRICE,
+      paidValue: paid * REGISTRATION_TICKET_PRICE,
+      pendingValue: (bilhetes.length - paid) * REGISTRATION_TICKET_PRICE,
       invoicePending: items.filter((r) => r.invoiceStatus === "Não Feito").length,
       dietary: items.filter((r) => r.dietaryRestrictions).length,
     };
@@ -180,6 +193,7 @@ export function EventRegistrations({
           Inscrições
           <span className="ml-2 text-gray-400 font-normal">
             {items.length}{numGuests > 0 ? ` / ${numGuests} pax` : ""}
+            {` · ${formatEuros(REGISTRATION_TICKET_PRICE)}/bilhete`}
           </span>
         </h2>
         <div className="flex items-center gap-3">
@@ -219,6 +233,15 @@ export function EventRegistrations({
               label="Faturas por enviar"
               value={String(stats.invoicePending)}
               color={stats.invoicePending === 0 ? "text-emerald-600" : "text-amber-600"}
+            />
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <Stat label="Total" value={formatEuros(stats.totalValue)} />
+            <Stat label="Recebido" value={formatEuros(stats.paidValue)} color="text-emerald-600" />
+            <Stat
+              label="Por receber"
+              value={formatEuros(stats.pendingValue)}
+              color={stats.pendingValue === 0 ? "text-emerald-600" : "text-red-500"}
             />
           </div>
           {expanded && (
