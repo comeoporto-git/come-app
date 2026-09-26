@@ -384,6 +384,9 @@ async function TourPageContent({
               </div>
             </section>
 
+            {/* Tasks */}
+            <TourTaskList tourId={id} tasks={tasks} canManage={canEditTeam} />
+
             {/* Registrations — event services only; payment details for Admin / Super Guide */}
             {isEvent && (
               <EventRegistrations
@@ -460,9 +463,6 @@ async function TourPageContent({
                 </ul>
               </section>
             )}
-
-            {/* Tasks */}
-            <TourTaskList tourId={id} tasks={tasks} canManage={canEditTeam} />
 
             {/* Emails — Super Guide / Admin only */}
             {canSeeFinancials && <SaleEmails emails={emails} threadIds={tour.threadIds} />}
