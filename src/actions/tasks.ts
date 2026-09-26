@@ -1,7 +1,7 @@
 "use server";
 
 import { auth } from "@/lib/auth";
-import { updateTaskStatus, createSaleTask, updateSaleTask, deleteSaleTask, getTasksForSale, type SaleTask } from "@/lib/notion";
+import { updateTaskStatus, createSaleTask, updateSaleTask, deleteSaleTask, reorderSaleTasks, getTasksForSale, type SaleTask } from "@/lib/notion";
 import { revalidatePath } from "next/cache";
 
 const ALLOWED_ROLES: ReadonlyArray<string> = ["Guide", "Super Guide", "Admin", "Chef", "Driver", "Logistics"];
@@ -78,6 +78,20 @@ export async function deleteSaleTaskAction(tourId: string, taskId: string): Prom
       return { error: "Unauthorized" };
     }
     await deleteSaleTask(tourId, taskId);
+    revalidatePath(`/guide/tours/${tourId}`);
+    return {};
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+export async function reorderSaleTasksAction(tourId: string, orderedIds: string[]): Promise<{ error?: string }> {
+  try {
+    const session = await auth();
+    if (!session || !CAN_MANAGE_ROLES.includes(session.user.role)) {
+      return { error: "Unauthorized" };
+    }
+    await reorderSaleTasks(tourId, orderedIds);
     revalidatePath(`/guide/tours/${tourId}`);
     return {};
   } catch (e) {

@@ -539,7 +539,9 @@ export async function getTasksForSale(saleId: string, viewerRole: string): Promi
     .select("id, name, task_description, status, priority, categoria, due_date, file_url, role, team_member_id, team(name)")
     .eq("sale_id", saleId)
     .not("role", "is", null)
-    .order("due_date", { ascending: true, nullsFirst: false });
+    .order("sort_order", { ascending: true, nullsFirst: false })
+    .order("due_date", { ascending: true, nullsFirst: false })
+    .order("created_at", { ascending: true });
 
   const rows = (data ?? []) as unknown as {
     id: string; name: string; task_description: string | null; status: string | null; priority: string | null;
@@ -619,9 +621,18 @@ export async function createSaleTask(saleId: string, data: {
   dueDate: string | null;
 }): Promise<string> {
   const id = crypto.randomUUID();
+  const { data: last } = await supabase
+    .from("tasks")
+    .select("sort_order")
+    .eq("sale_id", saleId)
+    .not("sort_order", "is", null)
+    .order("sort_order", { ascending: false })
+    .limit(1)
+    .maybeSingle();
   const { error } = await supabase.from("tasks").insert({
     id,
     sale_id:          saleId,
+    sort_order:       (last?.sort_order ?? -1) + 1,
     name:             data.name,
     task_description: data.description || null,
     role:             data.role || null,
@@ -656,6 +667,20 @@ export async function updateSaleTask(saleId: string, taskId: string, data: {
 export async function deleteSaleTask(saleId: string, taskId: string): Promise<void> {
   const { error } = await supabase.from("tasks").delete().eq("id", taskId).eq("sale_id", saleId);
   if (error) throw new Error(`deleteSaleTask: ${error.message}`);
+}
+
+/** Persists a booking's task order. Every id must belong to the sale. */
+export async function reorderSaleTasks(saleId: string, orderedIds: string[]): Promise<void> {
+  if (!orderedIds.length) return;
+  const { data: owned, error: readError } = await supabase.from("tasks").select("id").eq("sale_id", saleId).in("id", orderedIds);
+  if (readError) throw new Error(`reorderSaleTasks: ${readError.message}`);
+  if ((owned ?? []).length !== new Set(orderedIds).size) throw new Error("reorderSaleTasks: task not found for this sale");
+
+  const results = await Promise.all(
+    orderedIds.map((id, index) => supabase.from("tasks").update({ sort_order: index }).eq("id", id).eq("sale_id", saleId)),
+  );
+  const failed = results.find((r) => r.error);
+  if (failed?.error) throw new Error(`reorderSaleTasks: ${failed.error.message}`);
 }
 
 // ── Sale registrations (participants of an event service) ─────────────────────
@@ -1034,9 +1059,10 @@ async function populateSaleTasksFromTemplate(saleId: string, serviceId: string):
   if (!templates || templates.length === 0) return;
 
   const { error } = await supabase.from("tasks").insert(
-    templates.map((t) => ({
+    templates.map((t, i) => ({
       id:                crypto.randomUUID(),
       sale_id:           saleId,
+      sort_order:        i,
       name:              t.name,
       task_description:  t.description,
       role:              t.role,
