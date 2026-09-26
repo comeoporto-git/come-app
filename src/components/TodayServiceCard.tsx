@@ -47,6 +47,7 @@ export function TodayServiceCard({
   const chefs     = roleNames(tour, "Chef", chefName);
   const drivers   = roleNames(tour, "Driver", driverName);
   const logistics = roleNames(tour, "Logistics", logisticsName);
+  const decoradores = roleNames(tour, "Decorador", tour.decoradorName);
   const { expanded, tasks, loading, count, toggle, updateTasks } = useServiceTasks(
     tour.id,
     taskCount ?? { done: 0, total: 0 },
@@ -76,12 +77,13 @@ export function TodayServiceCard({
             ) : tour.numGuests > 0 ? (
               <p className="text-xs opacity-50">{tour.numGuests} pax</p>
             ) : null}
-            {(chefs || drivers || logistics) && (
+            {(chefs || drivers || logistics || decoradores) && (
               <p className="text-xs opacity-50">
                 {[
                   chefs ? `🧑‍🍳 ${chefs}` : null,
                   drivers ? `🚗 ${drivers}` : null,
                   logistics ? `📦 ${logistics}` : null,
+                  decoradores ? `🎨 ${decoradores}` : null,
                 ].filter(Boolean).join("  ·  ")}
               </p>
             )}

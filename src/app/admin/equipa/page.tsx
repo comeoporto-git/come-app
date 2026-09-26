@@ -10,6 +10,7 @@ const ROLE_COLORS: Record<TeamMember["role"], string> = {
   Chef:          "bg-orange-100 text-orange-700",
   Driver:        "bg-slate-100 text-slate-700",
   Logistics:     "bg-cyan-100 text-cyan-700",
+  Decorador:     "bg-pink-100 text-pink-700",
   Accountant:    "bg-gray-100 text-gray-600",
 };
 
@@ -20,6 +21,7 @@ const ROLE_ORDER: TeamMember["role"][] = [
   "Chef",
   "Driver",
   "Logistics",
+  "Decorador",
   "Accountant",
 ];
 

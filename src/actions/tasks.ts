@@ -4,7 +4,7 @@ import { auth } from "@/lib/auth";
 import { updateTaskStatus, createSaleTask, updateSaleTask, deleteSaleTask, reorderSaleTasks, getTasksForSale, type SaleTask } from "@/lib/notion";
 import { revalidatePath } from "next/cache";
 
-const ALLOWED_ROLES: ReadonlyArray<string> = ["Guide", "Super Guide", "Admin", "Chef", "Driver", "Logistics"];
+const ALLOWED_ROLES: ReadonlyArray<string> = ["Guide", "Super Guide", "Admin", "Chef", "Driver", "Logistics", "Decorador"];
 const CAN_MANAGE_ROLES: ReadonlyArray<string> = ["Admin", "Super Guide"];
 
 export async function getSaleTasksAction(tourId: string): Promise<{ tasks?: SaleTask[]; error?: string }> {

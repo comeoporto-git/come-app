@@ -26,7 +26,7 @@ export type TeamMember = {
   phone: string;
   nif: string;
   iban: string;
-  role: "Admin" | "Guide" | "Super Guide" | "Accountant" | "Chef" | "Driver" | "Logistics";
+  role: "Admin" | "Guide" | "Super Guide" | "Accountant" | "Chef" | "Driver" | "Logistics" | "Decorador";
 };
 
 export type Tour = {
@@ -53,6 +53,8 @@ export type Tour = {
   driverName: string;
   logisticsId: string | null;
   logisticsName: string;
+  decoradorId: string | null;
+  decoradorName: string;
   /** Extra people beyond the one primary slot per role (e.g. a second chef). */
   extraTeam: ExtraTeamMember[];
   teamId: string | null;
@@ -64,7 +66,7 @@ export type Tour = {
   expectedRevenue?: number;
 };
 
-export type TeamSlotRole = "Guide" | "Chef" | "Driver" | "Logistics";
+export type TeamSlotRole = "Guide" | "Chef" | "Driver" | "Logistics" | "Decorador";
 
 export type ExtraTeamMember = { teamId: string; name: string; role: TeamSlotRole };
 
@@ -162,6 +164,8 @@ function mapSaleRow(row: any): Tour {
     driverName:    row.driver?.name  ?? "",
     logisticsId:   row.logistics_id  ?? null,
     logisticsName: row.logistics?.name ?? "",
+    decoradorId:   row.decorador_id  ?? null,
+    decoradorName: row.decorador?.name ?? "",
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     extraTeam: ((row.sale_team_members ?? []) as any[])
       .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)))
@@ -219,6 +223,7 @@ const SALE_SELECT = `
   chef:team!sales_chef_id_fkey(name),
   driver:team!sales_driver_id_fkey(name),
   logistics:team!sales_logistics_id_fkey(name),
+  decorador:team!sales_decorador_id_fkey(name),
   sale_team_members(team_id, role, created_at, member:team(name))
 `.trim();
 
@@ -245,6 +250,7 @@ function getMissingStaffRoles(tour: Tour): string[] {
     else if (r.includes("chef") && !tour.chefId && !hasExtra("Chef")) missing.push(role);
     else if ((r.includes("driver") || r.includes("condutor")) && !tour.driverId && !hasExtra("Driver")) missing.push(role);
     else if (r.includes("logist") && !tour.logisticsId && !hasExtra("Logistics")) missing.push(role);
+    else if (r.includes("decor") && !tour.decoradorId && !hasExtra("Decorador")) missing.push(role);
   }
   return missing;
 }
@@ -1157,13 +1163,13 @@ async function getExtraSaleIdsForMember(memberId: string): Promise<string[]> {
 }
 
 function personSlotFilter(memberId: string, extraSaleIds: string[]): string {
-  const slots = [`guide_id.eq.${memberId}`, `chef_id.eq.${memberId}`, `driver_id.eq.${memberId}`, `logistics_id.eq.${memberId}`];
+  const slots = [`guide_id.eq.${memberId}`, `chef_id.eq.${memberId}`, `driver_id.eq.${memberId}`, `logistics_id.eq.${memberId}`, `decorador_id.eq.${memberId}`];
   if (extraSaleIds.length > 0) slots.push(`id.in.(${extraSaleIds.join(",")})`);
   return slots.join(",");
 }
 
 // Any tour where the person is assigned in ANY role slot (guide, chef, driver,
-// logistics) — a team member's `role` field only picks their default dashboard
+// logistics, decorador) — a team member's `role` field only picks their default dashboard
 // view, it doesn't limit which slots they can be booked into on a given sale.
 export async function getToursForPerson(email: string): Promise<Tour[]> {
   const member = await getTeamMemberByEmail(email);
@@ -1267,6 +1273,7 @@ export async function updateTourTeam(
   chefId: string | null,
   driverId: string | null,
   logisticsId: string | null,
+  decoradorId: string | null,
   extraTeam: { teamId: string; role: TeamSlotRole }[] = [],
 ): Promise<void> {
   const { error } = await supabase.from("sales").update({
@@ -1274,6 +1281,7 @@ export async function updateTourTeam(
     chef_id:      chefId       ?? null,
     driver_id:    driverId     ?? null,
     logistics_id: logisticsId  ?? null,
+    decorador_id: decoradorId  ?? null,
   }).eq("id", tourId);
   if (error) throw new Error(`updateTourTeam: ${error.message}`);
 
@@ -1299,6 +1307,7 @@ const SALE_SELECT_WITH_PRICES = `
   chef:team!sales_chef_id_fkey(name),
   driver:team!sales_driver_id_fkey(name),
   logistics:team!sales_logistics_id_fkey(name),
+  decorador:team!sales_decorador_id_fkey(name),
   sale_team_members(team_id, role, created_at, member:team(name))
 `.trim();
 
@@ -1707,7 +1716,7 @@ export async function getAnalyticsTransactions(): Promise<Transaction[]> {
 export async function getGuideExpenses(): Promise<Transaction[]> {
   try {
     const { data } = await supabase.from("transactions")
-      .select(`*, sales!transactions_sale_id_fkey(notion_id, guide_id, chef_id, driver_id, logistics_id)`)
+      .select(`*, sales!transactions_sale_id_fkey(notion_id, guide_id, chef_id, driver_id, logistics_id, decorador_id)`)
       .eq("transferencia_feita", false)
       .neq("status", "Archived")
       .or("type.is.null,type.neq.Earning")
@@ -1717,6 +1726,7 @@ export async function getGuideExpenses(): Promise<Transaction[]> {
         "metodo_pagamento.eq.Pelo Chef",
         "metodo_pagamento.eq.Pelo Driver",
         "metodo_pagamento.eq.Pelo Logistics",
+        "metodo_pagamento.eq.Pelo Decorador",
         ...PARTNER_PAYMENT_METHODS.map((p) => `metodo_pagamento.eq.${p.method}`),
         "metodo_pagamento.eq.Honorários",
         "status.eq.Pending Payment",
@@ -1758,6 +1768,7 @@ export async function getGuideExpenses(): Promise<Transaction[]> {
                      ?? (t.paymentMethod === "Pelo Chef"      ? sale.chef_id
                        : t.paymentMethod === "Pelo Driver"    ? sale.driver_id
                        : t.paymentMethod === "Pelo Logistics" ? sale.logistics_id
+                       : t.paymentMethod === "Pelo Decorador" ? sale.decorador_id
                        : sale.guide_id);
       const member = memberId ? memberById[memberId] : undefined;
       return { ...t, tourName, paidByName: member?.name ?? "", payeeIban: member?.iban ?? "" };

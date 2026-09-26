@@ -9,6 +9,7 @@ const ROLE_LABELS: { role: TeamSlotRole; label: string }[] = [
   { role: "Chef",      label: "Chef" },
   { role: "Driver",    label: "Driver" },
   { role: "Logistics", label: "Logistics" },
+  { role: "Decorador", label: "Decorador" },
 ];
 
 // An extra member row while editing. `key` keeps React rows stable when one is removed.
@@ -28,6 +29,9 @@ export function TeamPicker({
   logisticsId,
   logisticsName,
   logisticsPhone,
+  decoradorId,
+  decoradorName,
+  decoradorPhone,
   extraTeam,
   teamMembers,
 }: {
@@ -44,6 +48,9 @@ export function TeamPicker({
   logisticsId: string | null;
   logisticsName: string;
   logisticsPhone?: string;
+  decoradorId: string | null;
+  decoradorName: string;
+  decoradorPhone?: string;
   extraTeam: ExtraTeamMember[];
   teamMembers: TeamMember[];
 }) {
@@ -57,6 +64,7 @@ export function TeamPicker({
   const [selectedChef, setSelectedChef]           = useState(chefId       ?? "");
   const [selectedDriver, setSelectedDriver]       = useState(driverId     ?? "");
   const [selectedLogistics, setSelectedLogistics] = useState(logisticsId  ?? "");
+  const [selectedDecorador, setSelectedDecorador] = useState(decoradorId  ?? "");
   const [extras, setExtras] = useState<ExtraRow[]>(initialExtras);
   const [nextKey, setNextKey] = useState(extraTeam.length);
   const [pickingRole, setPickingRole] = useState(false);
@@ -71,6 +79,7 @@ export function TeamPicker({
         selectedChef       || null,
         selectedDriver     || null,
         selectedLogistics  || null,
+        selectedDecorador  || null,
         extras.filter((e) => e.teamId).map(({ teamId, role }) => ({ teamId, role })),
       );
       if (result.error) {
@@ -90,6 +99,7 @@ export function TeamPicker({
     setSelectedChef(chefId            ?? "");
     setSelectedDriver(driverId        ?? "");
     setSelectedLogistics(logisticsId  ?? "");
+    setSelectedDecorador(decoradorId  ?? "");
     setExtras(initialExtras());
     setPickingRole(false);
     setEditing(false);
@@ -117,6 +127,7 @@ export function TeamPicker({
     Chef:      { value: selectedChef,      onChange: setSelectedChef,      name: chefName,      phone: chefPhone },
     Driver:    { value: selectedDriver,    onChange: setSelectedDriver,    name: driverName,    phone: driverPhone },
     Logistics: { value: selectedLogistics, onChange: setSelectedLogistics, name: logisticsName, phone: logisticsPhone },
+    Decorador: { value: selectedDecorador, onChange: setSelectedDecorador, name: decoradorName, phone: decoradorPhone },
   };
 
   if (!editing) {
