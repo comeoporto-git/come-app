@@ -10,6 +10,8 @@ import {
 import { revalidatePath } from "next/cache";
 
 const CAN_MANAGE_ROLES: ReadonlyArray<string> = ["Admin", "Super Guide"];
+// Only Admin sees or sets payment status/method/date.
+const CAN_SEE_PAYMENT_ROLE = "Admin";
 
 function clean(data: SaleRegistrationInput): SaleRegistrationInput {
   return {
@@ -32,7 +34,10 @@ export async function addSaleRegistrationsAction(
     if (!session || !CAN_MANAGE_ROLES.includes(session.user.role)) {
       return { error: "Unauthorized" };
     }
-    const cleaned = items.map(clean);
+    const canSetPayment = session.user.role === CAN_SEE_PAYMENT_ROLE;
+    const cleaned = items.map(clean).map((r) => canSetPayment
+      ? r
+      : { ...r, paymentStatus: "Não Feito" as const, paymentMethod: "", paymentDate: null });
     if (!cleaned.length || cleaned.some((r) => !r.name)) return { error: "Nome obrigatório" };
     const ids = await createSaleRegistrations(tourId, cleaned);
     revalidatePath(`/guide/tours/${tourId}`);
@@ -54,7 +59,9 @@ export async function updateSaleRegistrationAction(
     }
     const cleaned = clean(data);
     if (!cleaned.name) return { error: "Nome obrigatório" };
-    await updateSaleRegistration(tourId, registrationId, cleaned);
+    await updateSaleRegistration(tourId, registrationId, cleaned, {
+      includePayment: session.user.role === CAN_SEE_PAYMENT_ROLE,
+    });
     revalidatePath(`/guide/tours/${tourId}`);
     return {};
   } catch (e) {

@@ -83,13 +83,16 @@ function csvCell(value: string): string {
   return /[",;\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
 }
 
-function exportCsv(items: SaleRegistration[], filename: string) {
-  const header = ["#", "Nome", "Tipo", "Pagamento", "Método de Pagamento", "Data do Pagamento", "Fatura Enviada", "Restrições Alimentares", "Email", "Telefone", "Notas"];
+function exportCsv(items: SaleRegistration[], filename: string, showPayment: boolean) {
+  const header = [
+    "#", "Nome", "Tipo",
+    ...(showPayment ? ["Pagamento", "Método de Pagamento", "Data do Pagamento"] : []),
+    "Fatura Enviada", "Restrições Alimentares", "Email", "Telefone", "Notas",
+  ];
   const lines = items.map((r, i) => [
     String(i + 1), r.name, r.ticketType,
-    r.ticketType === "Convite" ? "" : r.paymentStatus,
-    r.paymentMethod, r.paymentDate ?? "", r.invoiceStatus,
-    r.dietaryRestrictions, r.email, r.phone, r.notes,
+    ...(showPayment ? [r.ticketType === "Convite" ? "" : r.paymentStatus, r.paymentMethod, r.paymentDate ?? ""] : []),
+    r.invoiceStatus, r.dietaryRestrictions, r.email, r.phone, r.notes,
   ].map(csvCell).join(","));
   // BOM so Excel opens accents correctly.
   const blob = new Blob(["﻿" + [header.join(","), ...lines].join("\n")], { type: "text/csv;charset=utf-8" });
@@ -102,13 +105,15 @@ function exportCsv(items: SaleRegistration[], filename: string) {
 }
 
 export function EventRegistrations({
-  tourId, saleRef, registrations, numGuests, canManage,
+  tourId, saleRef, registrations, numGuests, canManage, showPayment,
 }: {
   tourId: string;
   saleRef: string;
   registrations: SaleRegistration[];
   numGuests: number;
   canManage: boolean;
+  /** Payment status/method/date — Admin only. */
+  showPayment: boolean;
 }) {
   const [items, setItems] = useState(registrations);
   const [pending, startTransition] = useTransition();
@@ -183,7 +188,7 @@ export function EventRegistrations({
             {items.length > 0 && (
               <button
                 type="button"
-                onClick={() => exportCsv(items, `Participantes - ${saleRef || tourId}.csv`)}
+                onClick={() => exportCsv(items, `Participantes - ${saleRef || tourId}.csv`, showPayment)}
                 className="text-xs text-gray-400 hover:text-[#32373c] font-medium"
               >
                 Exportar
@@ -205,14 +210,16 @@ export function EventRegistrations({
 
       {canManage && items.length > 0 && (
         <div className="px-4 py-3 border-b border-gray-50 space-y-3">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <div className={`grid gap-2 ${showPayment ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-3"}`}>
             <Stat label="Bilhetes" value={String(stats.bilhetes)} />
             <Stat label="Convites" value={String(stats.convites)} />
-            <Stat
-              label="Pagos"
-              value={`${stats.paid}/${stats.bilhetes}`}
-              color={stats.paid === stats.bilhetes ? "text-emerald-600" : "text-red-500"}
-            />
+            {showPayment && (
+              <Stat
+                label="Pagos"
+                value={`${stats.paid}/${stats.bilhetes}`}
+                color={stats.paid === stats.bilhetes ? "text-emerald-600" : "text-red-500"}
+              />
+            )}
             <Stat
               label="Faturas por enviar"
               value={String(stats.invoicePending)}
@@ -220,7 +227,7 @@ export function EventRegistrations({
             />
           </div>
           <div className="flex flex-wrap items-center gap-1.5">
-            {(Object.keys(FILTER_LABELS) as Filter[]).map((f) => (
+            {(Object.keys(FILTER_LABELS) as Filter[]).filter((f) => showPayment || f !== "unpaid").map((f) => (
               <button
                 key={f}
                 type="button"
@@ -251,6 +258,7 @@ export function EventRegistrations({
         <div className="px-4 py-3 border-b border-gray-50">
           <RegistrationForm
             tourId={tourId}
+            showPayment={showPayment}
             onSaved={(reg) => { setItems([...items, reg]); setMode("idle"); }}
             onCancel={() => setMode("idle")}
           />
@@ -279,6 +287,7 @@ export function EventRegistrations({
                 <li key={r.id} className="px-4 py-3">
                   <RegistrationForm
                     tourId={tourId}
+                    showPayment={showPayment}
                     registration={r}
                     onSaved={(updated) => { setItems(items.map((x) => (x.id === updated.id ? updated : x))); setEditingId(null); }}
                     onDeleted={() => { setItems(items.filter((x) => x.id !== r.id)); setEditingId(null); }}
@@ -296,7 +305,7 @@ export function EventRegistrations({
                     <span className={`text-xs border px-1.5 py-0.5 rounded-md font-medium ${TICKET_COLORS[r.ticketType]}`}>
                       {r.ticketType}
                     </span>
-                    {canManage && r.ticketType === "Bilhete" && (
+                    {showPayment && r.ticketType === "Bilhete" && (
                       <button
                         type="button"
                         onClick={() => togglePayment(r)}
@@ -318,8 +327,8 @@ export function EventRegistrations({
                         Fatura: {r.invoiceStatus}
                       </button>
                     )}
-                    {canManage && r.paymentMethod && <span className="text-xs text-gray-400">{r.paymentMethod}</span>}
-                    {canManage && r.paymentDate && <span className="text-xs text-gray-400">{formatDate(r.paymentDate)}</span>}
+                    {showPayment && r.paymentMethod && <span className="text-xs text-gray-400">{r.paymentMethod}</span>}
+                    {showPayment && r.paymentDate && <span className="text-xs text-gray-400">{formatDate(r.paymentDate)}</span>}
                   </div>
                   {r.dietaryRestrictions && (
                     <p className="text-xs font-bold text-red-600 mt-1.5 whitespace-pre-line">🍽️ {r.dietaryRestrictions}</p>
@@ -362,9 +371,10 @@ function Stat({ label, value, color = "text-[#32373c]" }: { label: string; value
 }
 
 function RegistrationForm({
-  tourId, registration, onSaved, onDeleted, onCancel,
+  tourId, showPayment, registration, onSaved, onDeleted, onCancel,
 }: {
   tourId: string;
+  showPayment: boolean;
   /** When set, the form edits this registration; otherwise it creates a new one. */
   registration?: SaleRegistration;
   onSaved: (registration: SaleRegistration) => void;
@@ -428,7 +438,7 @@ function RegistrationForm({
           {REGISTRATION_TICKET_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
         </select>
       </div>
-      {!isInvite && (
+      {showPayment && !isInvite && (
         <div className="grid grid-cols-3 gap-2">
           <select value={data.paymentStatus} onChange={(e) => setPaymentStatus(e.target.value as SaleRegistrationInput["paymentStatus"])} className={inputCls} aria-label="Pagamento">
             {REGISTRATION_PAYMENT_STATUSES.map((s) => <option key={s} value={s}>{s === "Feito" ? "Pago" : "Por pagar"}</option>)}
