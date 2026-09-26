@@ -6,7 +6,10 @@
 
 import { createClient } from "@supabase/supabase-js";
 import { unstable_cache } from "next/cache";
-import { PARTNERS, PARTNER_SPLIT_DATE, PARTNER_PAYMENT_METHODS, partnerPaymentByMethod } from "@/lib/constants";
+import {
+  PARTNERS, PARTNER_SPLIT_DATE, PARTNER_PAYMENT_METHODS, partnerPaymentByMethod,
+  REGISTRATION_TICKET_TYPES, REGISTRATION_PAYMENT_STATUSES, REGISTRATION_INVOICE_STATUSES,
+} from "@/lib/constants";
 
 export const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -653,6 +656,111 @@ export async function updateSaleTask(saleId: string, taskId: string, data: {
 export async function deleteSaleTask(saleId: string, taskId: string): Promise<void> {
   const { error } = await supabase.from("tasks").delete().eq("id", taskId).eq("sale_id", saleId);
   if (error) throw new Error(`deleteSaleTask: ${error.message}`);
+}
+
+// ── Sale registrations (participants of an event service) ─────────────────────
+
+export type SaleRegistration = {
+  id: string;
+  name: string;
+  ticketType: typeof REGISTRATION_TICKET_TYPES[number];
+  paymentStatus: typeof REGISTRATION_PAYMENT_STATUSES[number];
+  paymentMethod: string;
+  paymentDate: string | null;
+  invoiceStatus: typeof REGISTRATION_INVOICE_STATUSES[number];
+  dietaryRestrictions: string;
+  email: string;
+  phone: string;
+  notes: string;
+};
+
+export type SaleRegistrationInput = Omit<SaleRegistration, "id">;
+
+type SaleRegistrationRow = {
+  id: string; name: string; ticket_type: string; payment_status: string; payment_method: string | null;
+  payment_date: string | null; invoice_status: string; dietary_restrictions: string | null;
+  email: string | null; phone: string | null; notes: string | null;
+};
+
+function registrationToRow(data: SaleRegistrationInput) {
+  if (!REGISTRATION_TICKET_TYPES.includes(data.ticketType)) throw new Error(`Tipo inválido: "${data.ticketType}"`);
+  if (!REGISTRATION_PAYMENT_STATUSES.includes(data.paymentStatus)) throw new Error(`Pagamento inválido: "${data.paymentStatus}"`);
+  if (!REGISTRATION_INVOICE_STATUSES.includes(data.invoiceStatus)) throw new Error(`Fatura inválida: "${data.invoiceStatus}"`);
+  return {
+    name:                 data.name,
+    ticket_type:          data.ticketType,
+    payment_status:       data.paymentStatus,
+    payment_method:       data.paymentMethod || null,
+    payment_date:         data.paymentDate || null,
+    invoice_status:       data.invoiceStatus,
+    dietary_restrictions: data.dietaryRestrictions || null,
+    email:                data.email || null,
+    phone:                data.phone || null,
+    notes:                data.notes || null,
+  };
+}
+
+export async function getRegistrationsForSale(saleId: string): Promise<SaleRegistration[]> {
+  const { data, error } = await supabase
+    .from("sale_registrations")
+    .select("id, name, ticket_type, payment_status, payment_method, payment_date, invoice_status, dietary_restrictions, email, phone, notes")
+    .eq("sale_id", saleId)
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: true });
+  if (error) throw new Error(`getRegistrationsForSale: ${error.message}`);
+
+  return ((data ?? []) as SaleRegistrationRow[]).map((r) => ({
+    id: r.id,
+    name: r.name,
+    ticketType: r.ticket_type as SaleRegistration["ticketType"],
+    paymentStatus: r.payment_status as SaleRegistration["paymentStatus"],
+    paymentMethod: r.payment_method ?? "",
+    paymentDate: r.payment_date,
+    invoiceStatus: r.invoice_status as SaleRegistration["invoiceStatus"],
+    dietaryRestrictions: r.dietary_restrictions ?? "",
+    email: r.email ?? "",
+    phone: r.phone ?? "",
+    notes: r.notes ?? "",
+  }));
+}
+
+/** Appends registrations to the end of the sale's list, keeping the given order. Returns the new ids in the same order. */
+export async function createSaleRegistrations(saleId: string, items: SaleRegistrationInput[]): Promise<string[]> {
+  if (!items.length) return [];
+  const { data: last } = await supabase
+    .from("sale_registrations")
+    .select("sort_order")
+    .eq("sale_id", saleId)
+    .order("sort_order", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const start = (last?.sort_order ?? -1) + 1;
+
+  const rows = items.map((item, i) => ({
+    id: crypto.randomUUID(),
+    sale_id: saleId,
+    sort_order: start + i,
+    ...registrationToRow(item),
+  }));
+  const { error } = await supabase.from("sale_registrations").insert(rows);
+  if (error) throw new Error(`createSaleRegistrations: ${error.message}`);
+  return rows.map((r) => r.id);
+}
+
+export async function updateSaleRegistration(saleId: string, registrationId: string, data: SaleRegistrationInput): Promise<void> {
+  const { data: updated, error } = await supabase
+    .from("sale_registrations")
+    .update(registrationToRow(data))
+    .eq("id", registrationId)
+    .eq("sale_id", saleId)
+    .select("id");
+  if (error) throw new Error(`updateSaleRegistration: ${error.message}`);
+  if (!updated?.length) throw new Error("updateSaleRegistration: registration not found for this sale");
+}
+
+export async function deleteSaleRegistration(saleId: string, registrationId: string): Promise<void> {
+  const { error } = await supabase.from("sale_registrations").delete().eq("id", registrationId).eq("sale_id", saleId);
+  if (error) throw new Error(`deleteSaleRegistration: ${error.message}`);
 }
 
 export async function updateServiceCore(id: string, data: {

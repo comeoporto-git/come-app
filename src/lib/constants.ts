@@ -37,6 +37,14 @@ export const WEEKDAY_LABELS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta
 // hidden from every other role — see getTasksForSale.
 export const TASK_ROLE_OPTIONS = ["Admin", "Guide", "Super Guide", "Chef", "Driver", "Logistics"] as const;
 
+// Participant registrations on event services (services.type = EVENT_SERVICE_TYPE).
+export const EVENT_SERVICE_TYPE = "Evento";
+export const REGISTRATION_TICKET_TYPES = ["Bilhete", "Convite"] as const;
+export const REGISTRATION_PAYMENT_STATUSES = ["Feito", "Não Feito"] as const;
+export const REGISTRATION_INVOICE_STATUSES = ["Feito", "Não Feito", "Não precisa"] as const;
+// Suggestions only — the payment method field stays free text.
+export const REGISTRATION_PAYMENT_METHODS = ["Website - Cartão", "MB Way - António", "MB Way - Manel", "Transferência", "Dinheiro"] as const;
+
 // "Pelo …" payment methods → the service role whose member paid out of pocket.
 export const TEAM_PAYMENT_METHOD_ROLE: Record<string, "Guide" | "Chef" | "Driver" | "Logistics"> = {
   "Pelo Guia": "Guide",
