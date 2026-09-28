@@ -109,6 +109,8 @@ export type Transaction = {
   socioTransferenciaFeita?: boolean;
   /** Team member who paid a "Pelo …" expense or issued a "… Fee" invoice — set when they log it themselves. */
   paidByTeamId?: string | null;
+  /** Membro da equipa que registou a transação — definido sempre no servidor a partir da sessão. */
+  createdByTeamId?: string | null;
 };
 
 export type Fornecedor = {
@@ -207,6 +209,7 @@ function mapTransactionRow(row: any): Transaction {
     socioPessoal:            row.socio_pessoal ?? null,
     socioTransferenciaFeita: row.socio_transferencia_feita ?? false,
     paidByTeamId:            row.paid_by_team_id ?? null,
+    createdByTeamId:         row.created_by_team_id ?? null,
   };
 }
 
@@ -1422,14 +1425,27 @@ export async function getExpensesAndEarningsForTour(
   };
 }
 
-export async function getChefTransactionsForTour(tourId: string): Promise<Transaction[]> {
+// Despesas/Honorários que um membro da equipa vê num serviço. Só se estiver no
+// serviço (chef_id, guide_id, driver_id, logistics_id ou equipa extra) e, dentro
+// dele, só as transações que registou, pagou ou que lhe estão atribuídas.
+// Não filtra por pago_por nem pela função no serviço: pago_por é só um rótulo.
+export async function getMemberTransactionsForTour(tourId: string, memberId: string): Promise<Transaction[]> {
+  if (!memberId) return [];
   try {
+    const extraSaleIds = await getExtraSaleIdsForMember(memberId);
+    const { data: sale } = await supabase.from("sales")
+      .select("id")
+      .eq("id", tourId)
+      .or(personSlotFilter(memberId, extraSaleIds))
+      .maybeSingle();
+    if (!sale) return [];
     const { data } = await supabase.from("transactions")
       .select(TX_SELECT)
       .eq("sale_id", tourId)
-      .in("metodo_pagamento", ["Pelo Chef", "Chef Fee"])
+      .or(`created_by_team_id.eq.${memberId},paid_by_team_id.eq.${memberId},team_id.eq.${memberId}`)
+      .or("status.is.null,status.neq.Archived")
       .order("data", { ascending: false });
-    return (data ?? []).map(mapTransactionRow);
+    return (data ?? []).map(mapTransactionRow).filter((t) => !t.supplier.startsWith("IN -"));
   } catch { return []; }
 }
 
@@ -1765,8 +1781,10 @@ export async function getGuideExpenses(): Promise<Transaction[]> {
   } catch { return []; }
 }
 
+// createdByTeamId vem sempre da sessão do servidor, nunca de `data` (cliente).
 export async function createTransaction(
-  data: Omit<Transaction, "id" | "accountantVerified">
+  data: Omit<Transaction, "id" | "accountantVerified" | "createdByTeamId">,
+  createdByTeamId: string | null,
 ): Promise<string> {
   const { data: row, error } = await supabase.from("transactions").insert({
     notion_id:        data.supplier       || "Despesa",
@@ -1789,6 +1807,7 @@ export async function createTransaction(
     precisa_fatura:   data.precisaDeFatura || null,
     socio_pessoal:    data.socioPessoal   ?? null,
     paid_by_team_id:  data.paidByTeamId   ?? null,
+    created_by_team_id: createdByTeamId  || null,
   }).select("id").single();
   if (error) throw new Error(`createTransaction: ${error.message}`);
   return row.id;

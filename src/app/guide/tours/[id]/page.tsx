@@ -1,7 +1,7 @@
 import { auth } from "@/lib/auth";
 import {
   getTourById,
-  getChefTransactionsForTour,
+  getMemberTransactionsForTour,
   getExpensesAndEarningsForTour,
   getFornecedores,
   getTeamMembers,
@@ -100,12 +100,13 @@ export default async function TourDetailPage({ params }: { params: Promise<{ id:
   const { id } = await params;
   const role = session.user.role;
   const email = session.user.email ?? "";
+  const memberId = session.user.notionId ?? "";
   const backHref = role === "Admin" ? "/admin/servicos" : "/guide/services";
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
       <Suspense fallback={<PageSkeleton backHref={backHref} />}>
-        <TourPageContent id={id} role={role} email={email} backHref={backHref} />
+        <TourPageContent id={id} role={role} email={email} memberId={memberId} backHref={backHref} />
       </Suspense>
     </div>
   );
@@ -146,21 +147,25 @@ async function TourPageContent({
   id,
   role,
   email,
+  memberId,
   backHref,
 }: {
   id: string;
   role: string;
   email: string;
+  memberId: string;
   backHref: string;
 }) {
-  const isChef = role === "Chef";
+  // Membros da equipa (Guide/Chef/Driver/Logistics) só veem as transações que
+  // registaram ou pagaram, seja qual for a função no serviço ou o pago_por.
+  const isTeamMember = TEAM_SLOT_ROLES.includes(role as TeamSlotRole);
   const canEditTeam = role === "Super Guide" || role === "Admin";
   const canSeeFinancials = role === "Super Guide" || role === "Admin";
 
   const [tour, txResult, fornecedores, teamMembers, emails, servicesList, clientsList, tasks] = await Promise.all([
     getTourById(id),
-    isChef
-      ? getChefTransactionsForTour(id).then((t) => ({ expenses: t, earnings: [] }))
+    isTeamMember
+      ? getMemberTransactionsForTour(id, memberId).then((t) => ({ expenses: t, earnings: [] as Transaction[] }))
       : getExpensesAndEarningsForTour(id),
     getFornecedores(),
     getTeamMembers(),
