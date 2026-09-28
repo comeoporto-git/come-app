@@ -195,7 +195,8 @@ export async function logExpenseAction(
     const paidByTeamId = !SELF_PAID_METHODS.includes(data.paymentMethod) ? null
       : isManager ? (TEAM_PAYMENT_METHOD_ROLE[data.paymentMethod] ? (data.paidByTeamId ?? null) : null)
       : (session.user.notionId || null);
-    const id = await createTransaction({ ...data, paidByTeamId });
+    // Quem registou é sempre o utilizador da sessão; o cliente não o pode definir.
+    const id = await createTransaction({ ...data, paidByTeamId }, session.user.notionId || null);
     if (data.tourId) {
       revalidatePath(`/guide/tours/${data.tourId}`);
     } else {
@@ -511,7 +512,7 @@ export async function createEarningAction(
       bankReference: "",
       invoiceImageUrl: data.invoiceImageUrl,
       precisaDeFatura: "",
-    });
+    }, session.user.notionId || null);
     revalidatePath(`/guide/tours/${tourId}`);
     return {};
   } catch (e) {
@@ -550,7 +551,7 @@ export async function createStandaloneEarningAction(data: {
       bankReference:   "",
       invoiceImageUrl: data.invoiceImageUrl,
       precisaDeFatura: "",
-    });
+    }, session.user.notionId || null);
     revalidatePath("/admin");
     revalidatePath("/admin/transacoes");
     return {};
