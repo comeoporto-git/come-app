@@ -36,7 +36,7 @@ export async function updateTaskStatusAction(tourId: string, taskId: string, sta
 
 export async function addSaleTaskAction(
   tourId: string,
-  data: { name: string; description: string; role: string | null; priority: string | null; dueDate: string | null },
+  data: { name: string; description: string; role: string | null; priority: string | null; dueDate: string | null; parentId?: string | null },
 ): Promise<{ id?: string; error?: string }> {
   try {
     const session = await auth();

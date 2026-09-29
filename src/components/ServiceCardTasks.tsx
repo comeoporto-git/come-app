@@ -5,6 +5,12 @@ import type { SaleTask, TaskCount } from "@/lib/notion";
 import { getSaleTasksAction } from "@/actions/tasks";
 import { TourTaskList } from "@/components/TourTaskList";
 
+/** done/total over top-level tasks — subtasks aren't counted, matching getTaskCountsForSales. */
+function countTopLevel(tasks: SaleTask[]): TaskCount {
+  const top = tasks.filter((t) => !t.parentId);
+  return { done: top.filter((t) => t.status === "Done").length, total: top.length };
+}
+
 type ClickLike = { preventDefault?: () => void; stopPropagation?: () => void };
 
 /** Local expand/collapse + lazy task-list fetch, shared by any service card that shows a "done/total" badge. */
@@ -23,7 +29,7 @@ export function useServiceTasks(tourId: string, initialCount: TaskCount) {
       setLoading(false);
       if (result.tasks) {
         setTasks(result.tasks);
-        setCount({ done: result.tasks.filter((t) => t.status === "Done").length, total: result.tasks.length });
+        setCount(countTopLevel(result.tasks));
       }
     }
     setExpanded((v) => !v);
@@ -31,7 +37,7 @@ export function useServiceTasks(tourId: string, initialCount: TaskCount) {
 
   function updateTasks(next: SaleTask[]) {
     setTasks(next);
-    setCount({ done: next.filter((t) => t.status === "Done").length, total: next.length });
+    setCount(countTopLevel(next));
   }
 
   return { expanded, tasks, loading, count, toggle, updateTasks };
