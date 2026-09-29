@@ -17,7 +17,10 @@ type NavItem = {
 const nav: { group: string | null; items: NavItem[] }[] = [
   {
     group: null,
-    items: [{ label: "Dashboard", href: "/admin", exact: true }],
+    items: [
+      { label: "Dashboard", href: "/admin", exact: true },
+      { label: "Tarefas", href: "/admin/tarefas" },
+    ],
   },
   {
     group: "Operações",
