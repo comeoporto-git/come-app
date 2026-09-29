@@ -212,7 +212,10 @@ export function TourTaskList({
   function toggle(task: SaleTask) {
     const status = nextStatus(task.status);
     setErrorId(null);
-    const optimistic = items.map((t) => (t.id === task.id ? { ...t, status } : t));
+    const updated = items.map((t) => (t.id === task.id ? { ...t, status } : t));
+    // A task marked done jumps to the top of its group (the server saves that order too).
+    const firstSibling = siblingIds(updated, task.parentId ?? null)[0];
+    const optimistic = status === "Done" && firstSibling ? moveWithinGroup(updated, task.id, firstSibling) : updated;
     setItems(optimistic);
     onTasksChange?.(optimistic);
     startTransition(async () => {

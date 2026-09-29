@@ -712,7 +712,23 @@ export async function updateTaskStatus(saleId: string | null, taskId: string, st
     throw new Error("updateTaskStatus: forbidden");
   }
 
-  const { error } = await supabase.from("tasks").update({ status }).eq("id", taskId);
+  // A task marked done moves to the top of its group (the top-level tasks,
+  // or its parent's subtasks): one above the group's current first task.
+  let sortOrder: number | undefined;
+  if (status === "Done") {
+    const siblings = supabase.from("tasks").select("sort_order").not("sort_order", "is", null).neq("id", taskId);
+    const { data: first } = await (
+      task.parent_task_id ? siblings.eq("parent_task_id", task.parent_task_id)
+      : saleId ? siblings.eq("sale_id", saleId).is("parent_task_id", null)
+      : siblings.is("sale_id", null).in("role", [...TASK_PARTNER_OPTIONS]).is("parent_task_id", null)
+    )
+      .order("sort_order", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    sortOrder = (first?.sort_order ?? 1) - 1;
+  }
+
+  const { error } = await supabase.from("tasks").update({ status, ...(sortOrder !== undefined && { sort_order: sortOrder }) }).eq("id", taskId);
   if (error) throw new Error(`updateTaskStatus: ${error.message}`);
 }
 
