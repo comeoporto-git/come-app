@@ -63,13 +63,21 @@ function moveWithinGroup(list: SaleTask[], id: string, overId: string): SaleTask
 }
 
 export function TourTaskList({
-  tourId, tasks, canManage, onTasksChange,
+  tourId, tasks, canManage, onTasksChange, title = "Tarefas", emptyText = "Nenhuma tarefa associada a este serviço", roleOptions, defaultRole,
 }: {
-  tourId: string;
+  /** The booking's id, or null for the general (partner) tasks. */
+  tourId: string | null;
   tasks: SaleTask[];
   canManage: boolean;
   onTasksChange?: (tasks: SaleTask[]) => void;
+  title?: string;
+  emptyText?: string;
+  /** Who tasks can be assigned to; defaults to every role and partner. */
+  roleOptions?: readonly string[];
+  /** Role a new task starts with. */
+  defaultRole?: string;
 }) {
+  const formProps = { tourId, roleOptions, defaultRole };
   const [items, setItems] = useState(tasks);
   const [pending, startTransition] = useTransition();
   const [errorId, setErrorId] = useState<string | null>(null);
@@ -220,7 +228,7 @@ export function TourTaskList({
   function renderEditor(task: SaleTask) {
     return (
       <TaskForm
-        tourId={tourId}
+        {...formProps}
         task={task}
         onSaved={(updated) => {
           replaceItems(items.map((t) => (t.id === updated.id ? updated : t)));
@@ -345,7 +353,7 @@ export function TourTaskList({
         {addingHere && (
           <li className="pl-3 py-2">
             <TaskForm
-              tourId={tourId}
+              {...formProps}
               parent={parent}
               onSaved={(task) => {
                 replaceItems([...items, task]);
@@ -373,7 +381,7 @@ export function TourTaskList({
   return (
     <section className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
       <div className="px-4 py-3 border-b border-gray-50 flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-gray-700">Tarefas</h2>
+        <h2 className="text-sm font-semibold text-gray-700">{title}</h2>
         <div className="flex items-center gap-3">
           {topLevel.length > 0 && <span className="text-xs text-gray-400">{doneCount}/{topLevel.length}</span>}
           {canManage && !adding && (
@@ -386,7 +394,7 @@ export function TourTaskList({
       {canManage && adding && (
         <div className="px-4 py-3 border-b border-gray-50">
           <TaskForm
-            tourId={tourId}
+            {...formProps}
             onSaved={(task) => {
               replaceItems([...items, task]);
               setAdding(false);
@@ -397,7 +405,7 @@ export function TourTaskList({
       )}
       {reorderError && <p className="px-4 pt-3 text-xs text-red-500 font-medium">{reorderError}</p>}
       {topLevel.length === 0 && !adding ? (
-        <div className="px-4 py-6 text-center text-sm text-gray-400">Nenhuma tarefa associada a este serviço</div>
+        <div className="px-4 py-6 text-center text-sm text-gray-400">{emptyText}</div>
       ) : (
         <ul className="divide-y divide-gray-50">
           {topLevel.map((task) => {
@@ -428,7 +436,8 @@ export function TourTaskList({
                         <p className={`text-sm mt-0.5 whitespace-pre-line ${isDone ? "text-gray-300" : "text-gray-500"}`}>{task.description}</p>
                       )}
                       <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                        {renderBadges(task)}
+                        {/* In a list that's all one person's (defaultRole), their name adds nothing. */}
+                        {renderBadges(task, defaultRole)}
                         {subtasks.length > 0 && (
                           <button
                             type="button"
@@ -462,13 +471,15 @@ export function TourTaskList({
 }
 
 function TaskForm({
-  tourId, task, parent, onSaved, onDeleted, onAddSubtask, onCancel,
+  tourId, task, parent, roleOptions = TASK_ROLE_OPTIONS, defaultRole, onSaved, onDeleted, onAddSubtask, onCancel,
 }: {
-  tourId: string;
+  tourId: string | null;
   /** When set, the form edits this task; otherwise it creates a new one. */
   task?: SaleTask;
   /** When creating, makes the new task a subtask of this one. */
   parent?: SaleTask;
+  roleOptions?: readonly string[];
+  defaultRole?: string;
   onSaved: (task: SaleTask) => void;
   onDeleted?: () => void;
   /** Shown as "+ Subtarefa" when editing a top-level task. */
@@ -479,7 +490,7 @@ function TaskForm({
   const [name, setName] = useState(task?.name ?? "");
   const [description, setDescription] = useState(task?.description ?? "");
   // A new subtask starts with its parent's role (tasks without one aren't listed).
-  const [role, setRole] = useState(task?.role ?? parent?.role ?? "");
+  const [role, setRole] = useState(task?.role ?? parent?.role ?? defaultRole ?? "");
   const [priority, setPriority] = useState(task?.priority ?? "");
   const [dueDate, setDueDate] = useState(task?.dueDate ?? "");
   const [saving, setSaving] = useState(false);
@@ -548,8 +559,8 @@ function TaskForm({
       <div className="grid grid-cols-3 gap-2">
         <select value={role} onChange={(e) => setRole(e.target.value)} className={`${inputCls} bg-white`}>
           {/* Tasks without a role aren't listed, so an existing task must keep one. */}
-          {!task && !parent && <option value="">Sem função</option>}
-          {TASK_ROLE_OPTIONS.map((r) => <option key={r} value={r}>{r}</option>)}
+          {!task && !parent && !defaultRole && <option value="">Sem função</option>}
+          {roleOptions.map((r) => <option key={r} value={r}>{r}</option>)}
         </select>
         <select value={priority} onChange={(e) => setPriority(e.target.value)} className={`${inputCls} bg-white`}>
           <option value="">Prioridade</option>

@@ -9,7 +9,7 @@ import { unstable_cache } from "next/cache";
 import {
   PARTNERS, PARTNER_SPLIT_DATE, PARTNER_PAYMENT_METHODS, partnerPaymentByMethod,
   REGISTRATION_TICKET_TYPES, REGISTRATION_PAYMENT_STATUSES, REGISTRATION_INVOICE_STATUSES,
-  PRIVILEGED_TASK_ROLES,
+  PRIVILEGED_TASK_ROLES, TASK_PARTNER_OPTIONS,
 } from "@/lib/constants";
 
 export const supabase = createClient(
@@ -509,6 +509,10 @@ export async function getServiceDetail(id: string): Promise<ServiceDetail | null
 }
 
 // ── Sale tasks (operational checklist for a specific booking) ─────────────────
+//
+// The same functions also serve the general tasks — tasks for the partners
+// (António, Manel, Bernardo) that aren't tied to any booking — when called
+// with saleId = null.
 
 export type SaleTask = {
   id: string;
@@ -528,6 +532,36 @@ export type SaleTask = {
 
 const TASK_STATUS_OPTIONS = ["To do", "In Progress", "Done"] as const;
 
+const TASK_SCOPE_COLUMNS = "sale_id, sales_pipeline_id, transaction_id, social_media_id, role, parent_task_id";
+type TaskScopeRow = {
+  sale_id: string | null; sales_pipeline_id: string | null; transaction_id: string | null;
+  social_media_id: string | null; role: string | null; parent_task_id: string | null;
+};
+
+/**
+ * Whether a task is one of the booking's tasks or — saleId null — a general
+ * task: assigned to a partner and linked to nothing (no sale, pipeline deal,
+ * transaction or social post). Older role-less tasks are neither.
+ */
+function taskInScope(row: TaskScopeRow, saleId: string | null): boolean {
+  if (saleId) return row.sale_id === saleId;
+  return row.sale_id === null && row.sales_pipeline_id === null && row.transaction_id === null
+    && row.social_media_id === null && (TASK_PARTNER_OPTIONS as readonly string[]).includes(row.role ?? "");
+}
+
+async function getScopedTask(taskId: string, saleId: string | null): Promise<TaskScopeRow | null> {
+  const { data } = await supabase.from("tasks").select(TASK_SCOPE_COLUMNS).eq("id", taskId).maybeSingle();
+  const row = data as TaskScopeRow | null;
+  return row && taskInScope(row, saleId) ? row : null;
+}
+
+/** General tasks must stay assigned to a partner, or they'd drop off the page. */
+function assertGeneralTaskRole(saleId: string | null, role: string | null, fn: string) {
+  if (!saleId && !(TASK_PARTNER_OPTIONS as readonly string[]).includes(role ?? "")) {
+    throw new Error(`${fn}: general tasks must be assigned to António, Manel or Bernardo`);
+  }
+}
+
 /**
  * Tasks for a booking. Only tasks created through the role-assignment
  * feature (role IS NOT NULL) are shown — this excludes the older freeform
@@ -537,12 +571,15 @@ const TASK_STATUS_OPTIONS = ["To do", "In Progress", "Done"] as const;
  * Super Guide role. Subtasks come back in the same flat list (with
  * `parentId` set) and are hidden whenever their parent is.
  */
-export async function getTasksForSale(saleId: string, viewerRole: string): Promise<SaleTask[]> {
-  const { data } = await supabase
+export async function getTasksForSale(saleId: string | null, viewerRole: string): Promise<SaleTask[]> {
+  const base = supabase
     .from("tasks")
-    .select("id, name, task_description, status, priority, categoria, due_date, file_url, role, team_member_id, parent_task_id, team(name)")
-    .eq("sale_id", saleId)
-    .not("role", "is", null)
+    .select("id, name, task_description, status, priority, categoria, due_date, file_url, role, team_member_id, parent_task_id, team(name)");
+  const scoped = saleId
+    ? base.eq("sale_id", saleId).not("role", "is", null)
+    : base.is("sale_id", null).is("sales_pipeline_id", null).is("transaction_id", null).is("social_media_id", null)
+        .in("role", [...TASK_PARTNER_OPTIONS]);
+  const { data } = await scoped
     .order("sort_order", { ascending: true, nullsFirst: false })
     .order("due_date", { ascending: true, nullsFirst: false })
     .order("created_at", { ascending: true });
@@ -606,12 +643,12 @@ export async function getTaskCountsForSales(saleIds: string[], viewerRole: strin
   } catch { return counts; }
 }
 
-export async function updateTaskStatus(saleId: string, taskId: string, status: string, viewerRole: string): Promise<void> {
+export async function updateTaskStatus(saleId: string | null, taskId: string, status: string, viewerRole: string): Promise<void> {
   if (!TASK_STATUS_OPTIONS.includes(status as typeof TASK_STATUS_OPTIONS[number])) {
     throw new Error(`updateTaskStatus: invalid status "${status}"`);
   }
-  const { data: task } = await supabase.from("tasks").select("sale_id, role").eq("id", taskId).single();
-  if (!task || task.sale_id !== saleId) throw new Error("updateTaskStatus: task not found for this sale");
+  const task = await getScopedTask(taskId, saleId);
+  if (!task) throw new Error("updateTaskStatus: task not found for this sale");
   const canSeePrivileged = viewerRole === "Admin" || viewerRole === "Super Guide";
   if (!canSeePrivileged && PRIVILEGED_TASK_ROLES.includes(task.role ?? "")) {
     throw new Error("updateTaskStatus: forbidden");
@@ -621,7 +658,7 @@ export async function updateTaskStatus(saleId: string, taskId: string, status: s
   if (error) throw new Error(`updateTaskStatus: ${error.message}`);
 }
 
-export async function createSaleTask(saleId: string, data: {
+export async function createSaleTask(saleId: string | null, data: {
   name: string;
   description: string;
   role: string | null;
@@ -630,16 +667,22 @@ export async function createSaleTask(saleId: string, data: {
   /** Creates a subtask of this task. */
   parentId?: string | null;
 }): Promise<string> {
+  assertGeneralTaskRole(saleId, data.role, "createSaleTask");
   const parentId = data.parentId || null;
   if (parentId) {
-    const { data: parent } = await supabase.from("tasks").select("sale_id, parent_task_id").eq("id", parentId).single();
-    if (!parent || parent.sale_id !== saleId) throw new Error("createSaleTask: parent task not found for this sale");
+    const parent = await getScopedTask(parentId, saleId);
+    if (!parent) throw new Error("createSaleTask: parent task not found for this sale");
     if (parent.parent_task_id) throw new Error("createSaleTask: subtasks can't have subtasks");
   }
   const id = crypto.randomUUID();
-  // Subtasks are ordered within their parent, top-level tasks within the sale.
+  // Subtasks are ordered within their parent, top-level tasks within the
+  // sale (general tasks: among each other).
   const lastQuery = supabase.from("tasks").select("sort_order");
-  const { data: last } = await (parentId ? lastQuery.eq("parent_task_id", parentId) : lastQuery.eq("sale_id", saleId).is("parent_task_id", null))
+  const { data: last } = await (
+    parentId ? lastQuery.eq("parent_task_id", parentId)
+    : saleId ? lastQuery.eq("sale_id", saleId).is("parent_task_id", null)
+    : lastQuery.is("sale_id", null).in("role", [...TASK_PARTNER_OPTIONS]).is("parent_task_id", null)
+  )
     .not("sort_order", "is", null)
     .order("sort_order", { ascending: false })
     .limit(1)
@@ -660,15 +703,16 @@ export async function createSaleTask(saleId: string, data: {
   return id;
 }
 
-export async function updateSaleTask(saleId: string, taskId: string, data: {
+export async function updateSaleTask(saleId: string | null, taskId: string, data: {
   name: string;
   description: string;
   role: string | null;
   priority: string | null;
   dueDate: string | null;
 }): Promise<void> {
-  const { data: task } = await supabase.from("tasks").select("sale_id").eq("id", taskId).single();
-  if (!task || task.sale_id !== saleId) throw new Error("updateSaleTask: task not found for this sale");
+  assertGeneralTaskRole(saleId, data.role, "updateSaleTask");
+  const task = await getScopedTask(taskId, saleId);
+  if (!task) throw new Error("updateSaleTask: task not found for this sale");
 
   const { error } = await supabase.from("tasks").update({
     name:             data.name,
@@ -681,8 +725,9 @@ export async function updateSaleTask(saleId: string, taskId: string, data: {
 }
 
 /** Deletes a task; its subtasks go with it (ON DELETE CASCADE). */
-export async function deleteSaleTask(saleId: string, taskId: string): Promise<void> {
-  const { error } = await supabase.from("tasks").delete().eq("id", taskId).eq("sale_id", saleId);
+export async function deleteSaleTask(saleId: string | null, taskId: string): Promise<void> {
+  if (!(await getScopedTask(taskId, saleId))) throw new Error("deleteSaleTask: task not found for this sale");
+  const { error } = await supabase.from("tasks").delete().eq("id", taskId);
   if (error) throw new Error(`deleteSaleTask: ${error.message}`);
 }
 
@@ -690,15 +735,16 @@ export async function deleteSaleTask(saleId: string, taskId: string): Promise<vo
  * Persists the order of one group of a booking's tasks: its top-level tasks,
  * or one task's subtasks. Every id must belong to the sale and share a parent.
  */
-export async function reorderSaleTasks(saleId: string, orderedIds: string[]): Promise<void> {
+export async function reorderSaleTasks(saleId: string | null, orderedIds: string[]): Promise<void> {
   if (!orderedIds.length) return;
-  const { data: owned, error: readError } = await supabase.from("tasks").select("id, parent_task_id").eq("sale_id", saleId).in("id", orderedIds);
+  const { data, error: readError } = await supabase.from("tasks").select(`id, ${TASK_SCOPE_COLUMNS}`).in("id", orderedIds);
   if (readError) throw new Error(`reorderSaleTasks: ${readError.message}`);
-  if ((owned ?? []).length !== new Set(orderedIds).size) throw new Error("reorderSaleTasks: task not found for this sale");
-  if (new Set((owned ?? []).map((t) => t.parent_task_id)).size > 1) throw new Error("reorderSaleTasks: tasks don't share a parent");
+  const owned = ((data ?? []) as unknown as (TaskScopeRow & { id: string })[]).filter((t) => taskInScope(t, saleId));
+  if (owned.length !== new Set(orderedIds).size) throw new Error("reorderSaleTasks: task not found for this sale");
+  if (new Set(owned.map((t) => t.parent_task_id)).size > 1) throw new Error("reorderSaleTasks: tasks don't share a parent");
 
   const results = await Promise.all(
-    orderedIds.map((id, index) => supabase.from("tasks").update({ sort_order: index }).eq("id", id).eq("sale_id", saleId)),
+    orderedIds.map((id, index) => supabase.from("tasks").update({ sort_order: index }).eq("id", id)),
   );
   const failed = results.find((r) => r.error);
   if (failed?.error) throw new Error(`reorderSaleTasks: ${failed.error.message}`);
