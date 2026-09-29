@@ -41,6 +41,27 @@ function nextStatus(status: string | null): string {
   return STATUS_ORDER[(i + 1) % STATUS_ORDER.length];
 }
 
+/** Ids of the tasks under `parentId` (null = top-level), in list order. */
+function siblingIds(list: SaleTask[], parentId: string | null): string[] {
+  return list.filter((t) => (t.parentId ?? null) === parentId).map((t) => t.id);
+}
+
+/**
+ * Moves task `id` to where `overId` is among its siblings (same parent),
+ * leaving every other task — including other groups' subtasks — in place.
+ */
+function moveWithinGroup(list: SaleTask[], id: string, overId: string): SaleTask[] {
+  const parentId = list.find((t) => t.id === id)?.parentId ?? null;
+  const group = list.filter((t) => (t.parentId ?? null) === parentId);
+  const from = group.findIndex((t) => t.id === id);
+  const over = group.findIndex((t) => t.id === overId);
+  if (from === -1 || over === -1 || from === over) return list;
+  const [moved] = group.splice(from, 1);
+  group.splice(over, 0, moved);
+  let i = 0;
+  return list.map((t) => ((t.parentId ?? null) === parentId ? group[i++] : t));
+}
+
 export function TourTaskList({
   tourId, tasks, canManage, onTasksChange,
 }: {
@@ -74,12 +95,13 @@ export function TourTaskList({
 
   const canReorder = canManage && editingId === null && addingSubtaskFor === null;
 
-  // Saves the new order of the top-level tasks; restores `previous` if the server rejects it.
-  function persistOrder(next: SaleTask[], previous: SaleTask[]) {
+  // Saves the new order of one group (top-level tasks, or one task's
+  // subtasks); restores `previous` if the server rejects it.
+  function persistOrder(next: SaleTask[], previous: SaleTask[], parentId: string | null) {
     setReorderError(null);
     replaceItems(next);
     startTransition(async () => {
-      const result = await reorderSaleTasksAction(tourId, next.filter((t) => !t.parentId).map((t) => t.id));
+      const result = await reorderSaleTasksAction(tourId, siblingIds(next, parentId));
       if (result.error) {
         setReorderError("Erro ao reordenar, tenta novamente");
         replaceItems(previous);
@@ -89,8 +111,8 @@ export function TourTaskList({
 
   // Pointer-based drag (works for mouse and touch). Listeners live on the
   // window because reordering moves the row in the DOM, which would drop
-  // pointer capture on the handle. Only top-level tasks are dragged; their
-  // subtasks move with them.
+  // pointer capture on the handle. A task moves among its siblings: a
+  // top-level task drags its subtasks along, a subtask stays in its parent.
   const itemsRef = useRef(items);
   itemsRef.current = items;
 
@@ -105,17 +127,14 @@ export function TourTaskList({
       else if (y > window.innerHeight - edge) window.scrollBy(0, 12);
 
       const current = itemsRef.current;
-      const top = current.filter((t) => !t.parentId);
-      const from = top.findIndex((t) => t.id === dragId);
-      const over = top.findIndex((t) => {
-        const rect = rowRefs.current.get(t.id)?.getBoundingClientRect();
+      const parentId = current.find((t) => t.id === dragId)?.parentId ?? null;
+      const overId = siblingIds(current, parentId).find((id) => {
+        const rect = rowRefs.current.get(id)?.getBoundingClientRect();
         return rect ? y >= rect.top && y <= rect.bottom : false;
       });
-      if (from === -1 || over === -1 || over === from) return;
-      const nextTop = [...top];
-      const [moved] = nextTop.splice(from, 1);
-      nextTop.splice(over, 0, moved);
-      const next = [...nextTop, ...current.filter((t) => t.parentId)];
+      if (!overId || !dragId) return;
+      const next = moveWithinGroup(current, dragId, overId);
+      if (next === current) return;
       itemsRef.current = next;
       setItems(next);
     }
@@ -128,10 +147,11 @@ export function TourTaskList({
       dragStartRef.current = null;
       const next = itemsRef.current;
       if (!previous) return;
-      const prevIds = previous.filter((t) => !t.parentId).map((t) => t.id);
-      const nextIds = next.filter((t) => !t.parentId).map((t) => t.id);
+      const parentId = next.find((t) => t.id === dragId)?.parentId ?? null;
+      const prevIds = siblingIds(previous, parentId);
+      const nextIds = siblingIds(next, parentId);
       if (prevIds.every((id, i) => id === nextIds[i])) return;
-      persistOrder(next, previous);
+      persistOrder(next, previous, parentId);
     }
 
     window.addEventListener("pointermove", onMove);
@@ -216,6 +236,24 @@ export function TourTaskList({
     );
   }
 
+  function renderDragHandle(id: string, small: boolean) {
+    return (
+      <span
+        role="button"
+        tabIndex={-1}
+        onPointerDown={(e) => handleDragStart(e, id)}
+        onClick={(e) => e.stopPropagation()}
+        title="Arrastar para reordenar"
+        aria-label="Arrastar para reordenar"
+        className={`shrink-0 -my-1 -mr-2 p-2 text-gray-300 hover:text-gray-400 select-none touch-none ${
+          dragId === id ? "cursor-grabbing text-[#667470]" : "cursor-grab"
+        }`}
+      >
+        <svg width={small ? 10 : 12} height={small ? 15 : 18} viewBox="0 0 10 16" fill="currentColor"><circle cx="2" cy="2" r="1.5" /><circle cx="8" cy="2" r="1.5" /><circle cx="2" cy="8" r="1.5" /><circle cx="8" cy="8" r="1.5" /><circle cx="2" cy="14" r="1.5" /><circle cx="8" cy="14" r="1.5" /></svg>
+      </span>
+    );
+  }
+
   function renderCheckbox(task: SaleTask, small: boolean) {
     const status = task.status ?? "To do";
     const isDone = status === "Done";
@@ -280,8 +318,14 @@ export function TourTaskList({
           return (
             <li
               key={sub.id}
+              ref={(el) => {
+                if (el) rowRefs.current.set(sub.id, el);
+                else rowRefs.current.delete(sub.id);
+              }}
               onClick={canManage && dragId === null ? () => startEditing(sub.id) : undefined}
-              className={`pl-3 pr-2 py-2 flex items-start gap-2.5 rounded-r-lg ${canManage && dragId === null ? "cursor-pointer hover:bg-gray-50/60" : ""}`}
+              className={`pl-3 pr-2 py-2 flex items-start gap-2.5 rounded-r-lg transition-colors ${
+                dragId === sub.id ? "bg-gray-50 shadow-inner relative z-10" : ""
+              } ${canManage && dragId === null ? "cursor-pointer hover:bg-gray-50/60" : ""}`}
             >
               {renderCheckbox(sub, true)}
               <div className="flex-1 min-w-0">
@@ -294,6 +338,7 @@ export function TourTaskList({
                 )}
                 {errorId === sub.id && <p className="text-xs text-red-500 font-medium mt-1">Erro ao guardar, tenta novamente</p>}
               </div>
+              {canReorder && subtasks.length > 1 && renderDragHandle(sub.id, true)}
             </li>
           );
         })}
@@ -403,21 +448,7 @@ export function TourTaskList({
                       </div>
                       {errorId === task.id && <p className="text-xs text-red-500 font-medium mt-1">Erro ao guardar, tenta novamente</p>}
                     </div>
-                    {canReorder && topLevel.length > 1 && (
-                      <span
-                        role="button"
-                        tabIndex={-1}
-                        onPointerDown={(e) => handleDragStart(e, task.id)}
-                        onClick={(e) => e.stopPropagation()}
-                        title="Arrastar para reordenar"
-                        aria-label="Arrastar para reordenar"
-                        className={`shrink-0 -my-1 -mr-2 p-2 text-gray-300 hover:text-gray-400 select-none touch-none ${
-                          dragId === task.id ? "cursor-grabbing text-[#667470]" : "cursor-grab"
-                        }`}
-                      >
-                        <svg width="12" height="18" viewBox="0 0 10 16" fill="currentColor"><circle cx="2" cy="2" r="1.5" /><circle cx="8" cy="2" r="1.5" /><circle cx="2" cy="8" r="1.5" /><circle cx="8" cy="8" r="1.5" /><circle cx="2" cy="14" r="1.5" /><circle cx="8" cy="14" r="1.5" /></svg>
-                      </span>
-                    )}
+                    {canReorder && topLevel.length > 1 && renderDragHandle(task.id, false)}
                   </div>
                 )}
                 {renderSubtasks(task, subtasks)}

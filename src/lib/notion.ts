@@ -637,12 +637,9 @@ export async function createSaleTask(saleId: string, data: {
     if (parent.parent_task_id) throw new Error("createSaleTask: subtasks can't have subtasks");
   }
   const id = crypto.randomUUID();
-  let lastQuery = supabase
-    .from("tasks")
-    .select("sort_order")
-    .eq("sale_id", saleId);
-  lastQuery = parentId ? lastQuery.eq("parent_task_id", parentId) : lastQuery;
-  const { data: last } = await lastQuery
+  // Subtasks are ordered within their parent, top-level tasks within the sale.
+  const lastQuery = supabase.from("tasks").select("sort_order");
+  const { data: last } = await (parentId ? lastQuery.eq("parent_task_id", parentId) : lastQuery.eq("sale_id", saleId).is("parent_task_id", null))
     .not("sort_order", "is", null)
     .order("sort_order", { ascending: false })
     .limit(1)
@@ -689,12 +686,16 @@ export async function deleteSaleTask(saleId: string, taskId: string): Promise<vo
   if (error) throw new Error(`deleteSaleTask: ${error.message}`);
 }
 
-/** Persists a booking's task order. Every id must belong to the sale. */
+/**
+ * Persists the order of one group of a booking's tasks: its top-level tasks,
+ * or one task's subtasks. Every id must belong to the sale and share a parent.
+ */
 export async function reorderSaleTasks(saleId: string, orderedIds: string[]): Promise<void> {
   if (!orderedIds.length) return;
-  const { data: owned, error: readError } = await supabase.from("tasks").select("id").eq("sale_id", saleId).in("id", orderedIds);
+  const { data: owned, error: readError } = await supabase.from("tasks").select("id, parent_task_id").eq("sale_id", saleId).in("id", orderedIds);
   if (readError) throw new Error(`reorderSaleTasks: ${readError.message}`);
   if ((owned ?? []).length !== new Set(orderedIds).size) throw new Error("reorderSaleTasks: task not found for this sale");
+  if (new Set((owned ?? []).map((t) => t.parent_task_id)).size > 1) throw new Error("reorderSaleTasks: tasks don't share a parent");
 
   const results = await Promise.all(
     orderedIds.map((id, index) => supabase.from("tasks").update({ sort_order: index }).eq("id", id).eq("sale_id", saleId)),
