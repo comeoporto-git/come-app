@@ -53,7 +53,10 @@ export function TourTaskList({
   const [pending, startTransition] = useTransition();
   const [errorId, setErrorId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  // Parent task id whose "new subtask" form is open.
+  const [addingSubtaskFor, setAddingSubtaskFor] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [dragId, setDragId] = useState<string | null>(null);
   const [reorderError, setReorderError] = useState<string | null>(null);
   const rowRefs = useRef(new Map<string, HTMLLIElement>());
@@ -66,14 +69,17 @@ export function TourTaskList({
     onTasksChange?.(next);
   }
 
-  const canReorder = canManage && editingId === null;
+  const topLevel = items.filter((t) => !t.parentId);
+  const subtasksOf = (id: string) => items.filter((t) => t.parentId === id);
 
-  // Saves the new order; restores `previous` if the server rejects it.
+  const canReorder = canManage && editingId === null && addingSubtaskFor === null;
+
+  // Saves the new order of the top-level tasks; restores `previous` if the server rejects it.
   function persistOrder(next: SaleTask[], previous: SaleTask[]) {
     setReorderError(null);
     replaceItems(next);
     startTransition(async () => {
-      const result = await reorderSaleTasksAction(tourId, next.map((t) => t.id));
+      const result = await reorderSaleTasksAction(tourId, next.filter((t) => !t.parentId).map((t) => t.id));
       if (result.error) {
         setReorderError("Erro ao reordenar, tenta novamente");
         replaceItems(previous);
@@ -83,7 +89,8 @@ export function TourTaskList({
 
   // Pointer-based drag (works for mouse and touch). Listeners live on the
   // window because reordering moves the row in the DOM, which would drop
-  // pointer capture on the handle.
+  // pointer capture on the handle. Only top-level tasks are dragged; their
+  // subtasks move with them.
   const itemsRef = useRef(items);
   itemsRef.current = items;
 
@@ -98,15 +105,17 @@ export function TourTaskList({
       else if (y > window.innerHeight - edge) window.scrollBy(0, 12);
 
       const current = itemsRef.current;
-      const from = current.findIndex((t) => t.id === dragId);
-      const over = current.findIndex((t) => {
+      const top = current.filter((t) => !t.parentId);
+      const from = top.findIndex((t) => t.id === dragId);
+      const over = top.findIndex((t) => {
         const rect = rowRefs.current.get(t.id)?.getBoundingClientRect();
         return rect ? y >= rect.top && y <= rect.bottom : false;
       });
       if (from === -1 || over === -1 || over === from) return;
-      const next = [...current];
-      const [moved] = next.splice(from, 1);
-      next.splice(over, 0, moved);
+      const nextTop = [...top];
+      const [moved] = nextTop.splice(from, 1);
+      nextTop.splice(over, 0, moved);
+      const next = [...nextTop, ...current.filter((t) => t.parentId)];
       itemsRef.current = next;
       setItems(next);
     }
@@ -118,7 +127,10 @@ export function TourTaskList({
       const previous = dragStartRef.current;
       dragStartRef.current = null;
       const next = itemsRef.current;
-      if (!previous || previous.every((t, i) => t.id === next[i]?.id)) return;
+      if (!previous) return;
+      const prevIds = previous.filter((t) => !t.parentId).map((t) => t.id);
+      const nextIds = next.filter((t) => !t.parentId).map((t) => t.id);
+      if (prevIds.every((id, i) => id === nextIds[i])) return;
       persistOrder(next, previous);
     }
 
@@ -143,10 +155,31 @@ export function TourTaskList({
   function startEditing(id: string) {
     if (justDraggedRef.current) return;
     setAdding(false);
+    setAddingSubtaskFor(null);
     setEditingId(id);
   }
 
-  const doneCount = items.filter((t) => t.status === "Done").length;
+  function startAddingSubtask(parentId: string) {
+    setAdding(false);
+    setEditingId(null);
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      next.delete(parentId);
+      return next;
+    });
+    setAddingSubtaskFor(parentId);
+  }
+
+  function toggleCollapsed(id: string) {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  const doneCount = topLevel.filter((t) => t.status === "Done").length;
 
   function toggle(task: SaleTask) {
     const status = nextStatus(task.status);
@@ -164,14 +197,142 @@ export function TourTaskList({
     });
   }
 
+  function renderEditor(task: SaleTask) {
+    return (
+      <TaskForm
+        tourId={tourId}
+        task={task}
+        onSaved={(updated) => {
+          replaceItems(items.map((t) => (t.id === updated.id ? updated : t)));
+          setEditingId(null);
+        }}
+        onDeleted={() => {
+          replaceItems(items.filter((t) => t.id !== task.id && t.parentId !== task.id));
+          setEditingId(null);
+        }}
+        onAddSubtask={task.parentId ? undefined : () => startAddingSubtask(task.id)}
+        onCancel={() => setEditingId(null)}
+      />
+    );
+  }
+
+  function renderCheckbox(task: SaleTask, small: boolean) {
+    const status = task.status ?? "To do";
+    const isDone = status === "Done";
+    return (
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); toggle(task); }}
+        disabled={pending}
+        aria-label={`Marcar tarefa como ${STATUS_LABELS[nextStatus(status)]}`}
+        className={`${small ? "w-4 h-4" : "w-5 h-5"} rounded-full border-2 shrink-0 mt-0.5 flex items-center justify-center transition-colors disabled:opacity-50 ${
+          isDone ? "bg-emerald-500 border-emerald-500" : "border-gray-300 hover:border-[#667470]"
+        }`}
+      >
+        {isDone && (
+          <svg className={`${small ? "w-2.5 h-2.5" : "w-3 h-3"} text-white`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M20 6 9 17l-5-5" />
+          </svg>
+        )}
+      </button>
+    );
+  }
+
+  function renderBadges(task: SaleTask, parentRole?: string | null) {
+    const status = task.status ?? "To do";
+    return (
+      <>
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); toggle(task); }}
+          disabled={pending}
+          className={`text-xs px-2 py-0.5 rounded-full font-medium disabled:opacity-50 ${STATUS_COLORS[status] ?? "bg-gray-100 text-gray-500"}`}
+        >
+          {STATUS_LABELS[status] ?? status}
+        </button>
+        {/* A subtask only shows its role when it differs from the parent's. */}
+        {task.role && task.role !== parentRole && (
+          <span className={`text-xs border px-1.5 py-0.5 rounded-md font-medium ${ROLE_COLORS[task.role] ?? "bg-gray-50 text-gray-500 border-gray-100"}`}>
+            {task.role}
+          </span>
+        )}
+        {task.priority && (
+          <span className={`text-xs border px-1.5 py-0.5 rounded-md font-medium ${PRIORITY_COLORS[task.priority] ?? "bg-gray-50 text-gray-500 border-gray-100"}`}>
+            {task.priority}
+          </span>
+        )}
+        {task.dueDate && <span className="text-xs text-gray-400">{formatDueDate(task.dueDate)}</span>}
+        {task.teamMemberName && <span className="text-xs text-gray-400">{task.teamMemberName}</span>}
+      </>
+    );
+  }
+
+  function renderSubtasks(parent: SaleTask, subtasks: SaleTask[]) {
+    const addingHere = canManage && addingSubtaskFor === parent.id;
+    if ((subtasks.length === 0 || collapsed.has(parent.id)) && !addingHere) return null;
+    return (
+      <ul className="ml-12 mr-4 mb-3 border-l border-gray-100">
+        {subtasks.map((sub) => {
+          const isDone = sub.status === "Done";
+          if (canManage && editingId === sub.id) {
+            return <li key={sub.id} className="pl-3 py-2">{renderEditor(sub)}</li>;
+          }
+          return (
+            <li
+              key={sub.id}
+              onClick={canManage && dragId === null ? () => startEditing(sub.id) : undefined}
+              className={`pl-3 pr-2 py-2 flex items-start gap-2.5 rounded-r-lg ${canManage && dragId === null ? "cursor-pointer hover:bg-gray-50/60" : ""}`}
+            >
+              {renderCheckbox(sub, true)}
+              <div className="flex-1 min-w-0">
+                <p className={`text-sm ${isDone ? "text-gray-400 line-through" : "text-[#32373c]"}`}>{sub.name}</p>
+                {sub.description && (
+                  <p className={`text-xs mt-0.5 whitespace-pre-line ${isDone ? "text-gray-300" : "text-gray-500"}`}>{sub.description}</p>
+                )}
+                {(!isDone || sub.dueDate || sub.priority) && (
+                  <div className="flex items-center gap-1.5 mt-1 flex-wrap">{renderBadges(sub, parent.role)}</div>
+                )}
+                {errorId === sub.id && <p className="text-xs text-red-500 font-medium mt-1">Erro ao guardar, tenta novamente</p>}
+              </div>
+            </li>
+          );
+        })}
+        {addingHere && (
+          <li className="pl-3 py-2">
+            <TaskForm
+              tourId={tourId}
+              parent={parent}
+              onSaved={(task) => {
+                replaceItems([...items, task]);
+                setAddingSubtaskFor(null);
+              }}
+              onCancel={() => setAddingSubtaskFor(null)}
+            />
+          </li>
+        )}
+        {canManage && !addingHere && (
+          <li className="pl-3 py-1">
+            <button
+              type="button"
+              onClick={() => startAddingSubtask(parent.id)}
+              className="text-xs text-[#667470] hover:text-[#32373c] font-medium"
+            >
+              + Subtarefa
+            </button>
+          </li>
+        )}
+      </ul>
+    );
+  }
+
   return (
     <section className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
       <div className="px-4 py-3 border-b border-gray-50 flex items-center justify-between">
         <h2 className="text-sm font-semibold text-gray-700">Tarefas</h2>
         <div className="flex items-center gap-3">
-          {items.length > 0 && <span className="text-xs text-gray-400">{doneCount}/{items.length}</span>}
+          {topLevel.length > 0 && <span className="text-xs text-gray-400">{doneCount}/{topLevel.length}</span>}
           {canManage && !adding && (
-            <button type="button" onClick={() => { setEditingId(null); setAdding(true); }} className="text-xs text-[#667470] hover:text-[#32373c] font-medium">
+            <button type="button" onClick={() => { setEditingId(null); setAddingSubtaskFor(null); setAdding(true); }} className="text-xs text-[#667470] hover:text-[#32373c] font-medium">
               + Adicionar
             </button>
           )}
@@ -190,32 +351,15 @@ export function TourTaskList({
         </div>
       )}
       {reorderError && <p className="px-4 pt-3 text-xs text-red-500 font-medium">{reorderError}</p>}
-      {items.length === 0 && !adding ? (
+      {topLevel.length === 0 && !adding ? (
         <div className="px-4 py-6 text-center text-sm text-gray-400">Nenhuma tarefa associada a este serviço</div>
       ) : (
         <ul className="divide-y divide-gray-50">
-          {items.map((task) => {
-            const status = task.status ?? "To do";
-            const isDone = status === "Done";
-            if (canManage && editingId === task.id) {
-              return (
-                <li key={task.id} className="px-4 py-3">
-                  <TaskForm
-                    tourId={tourId}
-                    task={task}
-                    onSaved={(updated) => {
-                      replaceItems(items.map((t) => (t.id === updated.id ? updated : t)));
-                      setEditingId(null);
-                    }}
-                    onDeleted={() => {
-                      replaceItems(items.filter((t) => t.id !== task.id));
-                      setEditingId(null);
-                    }}
-                    onCancel={() => setEditingId(null)}
-                  />
-                </li>
-              );
-            }
+          {topLevel.map((task) => {
+            const isDone = (task.status ?? "To do") === "Done";
+            const subtasks = subtasksOf(task.id);
+            const subtasksDone = subtasks.filter((t) => t.status === "Done").length;
+            const isCollapsed = collapsed.has(task.id);
             return (
               <li
                 key={task.id}
@@ -223,70 +367,60 @@ export function TourTaskList({
                   if (el) rowRefs.current.set(task.id, el);
                   else rowRefs.current.delete(task.id);
                 }}
-                onClick={canManage && dragId === null ? () => startEditing(task.id) : undefined}
-                className={`px-4 py-3 flex items-start gap-3 transition-colors ${
-                  dragId === task.id ? "bg-gray-50 shadow-inner relative z-10" : ""
-                } ${canManage && dragId === null ? "cursor-pointer hover:bg-gray-50/60" : ""}`}
+                className={`transition-colors ${dragId === task.id ? "bg-gray-50 shadow-inner relative z-10" : ""}`}
               >
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); toggle(task); }}
-                  disabled={pending}
-                  aria-label={`Marcar tarefa como ${STATUS_LABELS[nextStatus(status)]}`}
-                  className={`w-5 h-5 rounded-full border-2 shrink-0 mt-0.5 flex items-center justify-center transition-colors disabled:opacity-50 ${
-                    isDone ? "bg-emerald-500 border-emerald-500" : "border-gray-300 hover:border-[#667470]"
-                  }`}
-                >
-                  {isDone && (
-                    <svg className="w-3 h-3 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M20 6 9 17l-5-5" />
-                    </svg>
-                  )}
-                </button>
-                <div className="flex-1 min-w-0">
-                  <p className={`text-sm font-semibold ${isDone ? "text-gray-400 line-through" : "text-[#32373c]"}`}>{task.name}</p>
-                  {task.description && (
-                    <p className={`text-sm mt-0.5 whitespace-pre-line ${isDone ? "text-gray-300" : "text-gray-500"}`}>{task.description}</p>
-                  )}
-                  <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); toggle(task); }}
-                      disabled={pending}
-                      className={`text-xs px-2 py-0.5 rounded-full font-medium disabled:opacity-50 ${STATUS_COLORS[status] ?? "bg-gray-100 text-gray-500"}`}
-                    >
-                      {STATUS_LABELS[status] ?? status}
-                    </button>
-                    {task.role && (
-                      <span className={`text-xs border px-1.5 py-0.5 rounded-md font-medium ${ROLE_COLORS[task.role] ?? "bg-gray-50 text-gray-500 border-gray-100"}`}>
-                        {task.role}
-                      </span>
-                    )}
-                    {task.priority && (
-                      <span className={`text-xs border px-1.5 py-0.5 rounded-md font-medium ${PRIORITY_COLORS[task.priority] ?? "bg-gray-50 text-gray-500 border-gray-100"}`}>
-                        {task.priority}
-                      </span>
-                    )}
-                    {task.dueDate && <span className="text-xs text-gray-400">{formatDueDate(task.dueDate)}</span>}
-                    {task.teamMemberName && <span className="text-xs text-gray-400">{task.teamMemberName}</span>}
-                  </div>
-                  {errorId === task.id && <p className="text-xs text-red-500 font-medium mt-1">Erro ao guardar, tenta novamente</p>}
-                </div>
-                {canReorder && items.length > 1 && (
-                  <span
-                    role="button"
-                    tabIndex={-1}
-                    onPointerDown={(e) => handleDragStart(e, task.id)}
-                    onClick={(e) => e.stopPropagation()}
-                    title="Arrastar para reordenar"
-                    aria-label="Arrastar para reordenar"
-                    className={`shrink-0 -my-1 -mr-2 p-2 text-gray-300 hover:text-gray-400 select-none touch-none ${
-                      dragId === task.id ? "cursor-grabbing text-[#667470]" : "cursor-grab"
-                    }`}
+                {canManage && editingId === task.id ? (
+                  <div className="px-4 py-3">{renderEditor(task)}</div>
+                ) : (
+                  <div
+                    onClick={canManage && dragId === null ? () => startEditing(task.id) : undefined}
+                    className={`px-4 py-3 flex items-start gap-3 ${canManage && dragId === null ? "cursor-pointer hover:bg-gray-50/60" : ""}`}
                   >
-                    <svg width="12" height="18" viewBox="0 0 10 16" fill="currentColor"><circle cx="2" cy="2" r="1.5" /><circle cx="8" cy="2" r="1.5" /><circle cx="2" cy="8" r="1.5" /><circle cx="8" cy="8" r="1.5" /><circle cx="2" cy="14" r="1.5" /><circle cx="8" cy="14" r="1.5" /></svg>
-                  </span>
+                    {renderCheckbox(task, false)}
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm font-semibold ${isDone ? "text-gray-400 line-through" : "text-[#32373c]"}`}>{task.name}</p>
+                      {task.description && (
+                        <p className={`text-sm mt-0.5 whitespace-pre-line ${isDone ? "text-gray-300" : "text-gray-500"}`}>{task.description}</p>
+                      )}
+                      <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                        {renderBadges(task)}
+                        {subtasks.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); toggleCollapsed(task.id); }}
+                            aria-expanded={!isCollapsed}
+                            aria-label={isCollapsed ? "Mostrar subtarefas" : "Esconder subtarefas"}
+                            className={`text-xs border px-1.5 py-0.5 rounded-md font-medium flex items-center gap-1 ${
+                              subtasksDone === subtasks.length ? "bg-emerald-50 text-emerald-700 border-emerald-100" : "bg-gray-50 text-gray-500 border-gray-100"
+                            }`}
+                          >
+                            <svg className={`w-2.5 h-2.5 transition-transform ${isCollapsed ? "" : "rotate-90"}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="m9 18 6-6-6-6" />
+                            </svg>
+                            {subtasksDone}/{subtasks.length}
+                          </button>
+                        )}
+                      </div>
+                      {errorId === task.id && <p className="text-xs text-red-500 font-medium mt-1">Erro ao guardar, tenta novamente</p>}
+                    </div>
+                    {canReorder && topLevel.length > 1 && (
+                      <span
+                        role="button"
+                        tabIndex={-1}
+                        onPointerDown={(e) => handleDragStart(e, task.id)}
+                        onClick={(e) => e.stopPropagation()}
+                        title="Arrastar para reordenar"
+                        aria-label="Arrastar para reordenar"
+                        className={`shrink-0 -my-1 -mr-2 p-2 text-gray-300 hover:text-gray-400 select-none touch-none ${
+                          dragId === task.id ? "cursor-grabbing text-[#667470]" : "cursor-grab"
+                        }`}
+                      >
+                        <svg width="12" height="18" viewBox="0 0 10 16" fill="currentColor"><circle cx="2" cy="2" r="1.5" /><circle cx="8" cy="2" r="1.5" /><circle cx="2" cy="8" r="1.5" /><circle cx="8" cy="8" r="1.5" /><circle cx="2" cy="14" r="1.5" /><circle cx="8" cy="14" r="1.5" /></svg>
+                      </span>
+                    )}
+                  </div>
                 )}
+                {renderSubtasks(task, subtasks)}
               </li>
             );
           })}
@@ -297,18 +431,24 @@ export function TourTaskList({
 }
 
 function TaskForm({
-  tourId, task, onSaved, onDeleted, onCancel,
+  tourId, task, parent, onSaved, onDeleted, onAddSubtask, onCancel,
 }: {
   tourId: string;
   /** When set, the form edits this task; otherwise it creates a new one. */
   task?: SaleTask;
+  /** When creating, makes the new task a subtask of this one. */
+  parent?: SaleTask;
   onSaved: (task: SaleTask) => void;
   onDeleted?: () => void;
+  /** Shown as "+ Subtarefa" when editing a top-level task. */
+  onAddSubtask?: () => void;
   onCancel: () => void;
 }) {
+  const isSubtask = !!(task?.parentId ?? parent);
   const [name, setName] = useState(task?.name ?? "");
   const [description, setDescription] = useState(task?.description ?? "");
-  const [role, setRole] = useState(task?.role ?? "");
+  // A new subtask starts with its parent's role (tasks without one aren't listed).
+  const [role, setRole] = useState(task?.role ?? parent?.role ?? "");
   const [priority, setPriority] = useState(task?.priority ?? "");
   const [dueDate, setDueDate] = useState(task?.dueDate ?? "");
   const [saving, setSaving] = useState(false);
@@ -326,7 +466,7 @@ function TaskForm({
     };
     const result: { id?: string; error?: string } = task
       ? await updateSaleTaskAction(tourId, task.id, data)
-      : await addSaleTaskAction(tourId, data);
+      : await addSaleTaskAction(tourId, { ...data, parentId: parent?.id ?? null });
     setSaving(false);
     if (result.error) {
       setError(result.error);
@@ -350,12 +490,15 @@ function TaskForm({
         fileUrl: null,
         teamMemberId: null,
         teamMemberName: null,
+        parentId: parent?.id ?? null,
       });
     }
   }
 
   async function handleDelete() {
-    if (!task || !confirm(`Eliminar a tarefa "${task.name}"?`)) return;
+    const what = isSubtask ? "a subtarefa" : "a tarefa";
+    const withSubtasks = isSubtask ? "" : " (e as suas subtarefas)";
+    if (!task || !confirm(`Eliminar ${what} "${task.name}"${withSubtasks}?`)) return;
     setSaving(true);
     setError(null);
     const result = await deleteSaleTaskAction(tourId, task.id);
@@ -369,12 +512,12 @@ function TaskForm({
 
   return (
     <div className="space-y-2">
-      <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome da tarefa" className={inputCls} autoFocus={!!task} />
+      <input value={name} onChange={(e) => setName(e.target.value)} placeholder={isSubtask ? "Nome da subtarefa" : "Nome da tarefa"} className={inputCls} autoFocus={!!task || !!parent} />
       <textarea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Descrição (opcional)" className={`${inputCls} resize-none`} />
       <div className="grid grid-cols-3 gap-2">
         <select value={role} onChange={(e) => setRole(e.target.value)} className={`${inputCls} bg-white`}>
           {/* Tasks without a role aren't listed, so an existing task must keep one. */}
-          {!task && <option value="">Sem função</option>}
+          {!task && !parent && <option value="">Sem função</option>}
           {TASK_ROLE_OPTIONS.map((r) => <option key={r} value={r}>{r}</option>)}
         </select>
         <select value={priority} onChange={(e) => setPriority(e.target.value)} className={`${inputCls} bg-white`}>
@@ -393,6 +536,11 @@ function TaskForm({
         <button onClick={onCancel} disabled={saving} className="border border-gray-200 text-gray-600 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-gray-50 transition-colors">
           Cancelar
         </button>
+        {onAddSubtask && (
+          <button onClick={onAddSubtask} disabled={saving} className="text-[#667470] text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors">
+            + Subtarefa
+          </button>
+        )}
         {task && (
           <button onClick={handleDelete} disabled={saving} className="ml-auto text-red-500 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-red-50 disabled:opacity-50 transition-colors">
             Eliminar

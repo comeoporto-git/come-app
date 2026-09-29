@@ -522,6 +522,8 @@ export type SaleTask = {
   role: string | null;
   teamMemberId: string | null;
   teamMemberName: string | null;
+  /** Set on subtasks: the id of the task they belong to (one level deep). */
+  parentId: string | null;
 };
 
 const TASK_STATUS_OPTIONS = ["To do", "In Progress", "Done"] as const;
@@ -532,12 +534,13 @@ const TASK_STATUS_OPTIONS = ["To do", "In Progress", "Done"] as const;
  * tasks (e.g. "Definir Chef", "Adicionar Despesas") that predate it and
  * were never meant to show up here. Admin/Super Guide see everything;
  * every other role sees everything except tasks assigned to the Admin or
- * Super Guide role.
+ * Super Guide role. Subtasks come back in the same flat list (with
+ * `parentId` set) and are hidden whenever their parent is.
  */
 export async function getTasksForSale(saleId: string, viewerRole: string): Promise<SaleTask[]> {
   const { data } = await supabase
     .from("tasks")
-    .select("id, name, task_description, status, priority, categoria, due_date, file_url, role, team_member_id, team(name)")
+    .select("id, name, task_description, status, priority, categoria, due_date, file_url, role, team_member_id, parent_task_id, team(name)")
     .eq("sale_id", saleId)
     .not("role", "is", null)
     .order("sort_order", { ascending: true, nullsFirst: false })
@@ -547,13 +550,15 @@ export async function getTasksForSale(saleId: string, viewerRole: string): Promi
   const rows = (data ?? []) as unknown as {
     id: string; name: string; task_description: string | null; status: string | null; priority: string | null;
     categoria: string[] | null; due_date: string | null; file_url: string | null; role: string | null;
-    team_member_id: string | null; team: { name: string } | null;
+    team_member_id: string | null; parent_task_id: string | null; team: { name: string } | null;
   }[];
 
   const canSeePrivileged = viewerRole === "Admin" || viewerRole === "Super Guide";
+  const visible = rows.filter((t) => canSeePrivileged || !PRIVILEGED_TASK_ROLES.includes(t.role ?? ""));
+  const visibleParentIds = new Set(visible.filter((t) => !t.parent_task_id).map((t) => t.id));
 
-  return rows
-    .filter((t) => canSeePrivileged || !PRIVILEGED_TASK_ROLES.includes(t.role ?? ""))
+  return visible
+    .filter((t) => !t.parent_task_id || visibleParentIds.has(t.parent_task_id))
     .map((t) => ({
       id: t.id,
       name: t.name,
@@ -566,12 +571,13 @@ export async function getTasksForSale(saleId: string, viewerRole: string): Promi
       role: t.role,
       teamMemberId: t.team_member_id,
       teamMemberName: t.team?.name ?? null,
+      parentId: t.parent_task_id,
     }));
 }
 
 export type TaskCount = { done: number; total: number };
 
-/** Bulk done/total task counts per sale — for showing a "2/6" badge on a list of service cards without fetching full task details. */
+/** Bulk done/total task counts per sale — for showing a "2/6" badge on a list of service cards without fetching full task details. Subtasks aren't counted. */
 export async function getTaskCountsForSales(saleIds: string[], viewerRole: string): Promise<Record<string, TaskCount>> {
   const counts: Record<string, TaskCount> = {};
   if (!saleIds.length) return counts;
@@ -585,7 +591,8 @@ export async function getTaskCountsForSales(saleIds: string[], viewerRole: strin
         .from("tasks")
         .select("sale_id, status, role")
         .in("sale_id", chunk)
-        .not("role", "is", null);
+        .not("role", "is", null)
+        .is("parent_task_id", null);
 
       for (const row of (data ?? []) as { sale_id: string; status: string | null; role: string | null }[]) {
         if (!canSeePrivileged && PRIVILEGED_TASK_ROLES.includes(row.role ?? "")) continue;
@@ -620,12 +627,22 @@ export async function createSaleTask(saleId: string, data: {
   role: string | null;
   priority: string | null;
   dueDate: string | null;
+  /** Creates a subtask of this task. */
+  parentId?: string | null;
 }): Promise<string> {
+  const parentId = data.parentId || null;
+  if (parentId) {
+    const { data: parent } = await supabase.from("tasks").select("sale_id, parent_task_id").eq("id", parentId).single();
+    if (!parent || parent.sale_id !== saleId) throw new Error("createSaleTask: parent task not found for this sale");
+    if (parent.parent_task_id) throw new Error("createSaleTask: subtasks can't have subtasks");
+  }
   const id = crypto.randomUUID();
-  const { data: last } = await supabase
+  let lastQuery = supabase
     .from("tasks")
     .select("sort_order")
-    .eq("sale_id", saleId)
+    .eq("sale_id", saleId);
+  lastQuery = parentId ? lastQuery.eq("parent_task_id", parentId) : lastQuery;
+  const { data: last } = await lastQuery
     .not("sort_order", "is", null)
     .order("sort_order", { ascending: false })
     .limit(1)
@@ -633,6 +650,7 @@ export async function createSaleTask(saleId: string, data: {
   const { error } = await supabase.from("tasks").insert({
     id,
     sale_id:          saleId,
+    parent_task_id:   parentId,
     sort_order:       (last?.sort_order ?? -1) + 1,
     name:             data.name,
     task_description: data.description || null,
@@ -665,6 +683,7 @@ export async function updateSaleTask(saleId: string, taskId: string, data: {
   if (error) throw new Error(`updateSaleTask: ${error.message}`);
 }
 
+/** Deletes a task; its subtasks go with it (ON DELETE CASCADE). */
 export async function deleteSaleTask(saleId: string, taskId: string): Promise<void> {
   const { error } = await supabase.from("tasks").delete().eq("id", taskId).eq("sale_id", saleId);
   if (error) throw new Error(`deleteSaleTask: ${error.message}`);
