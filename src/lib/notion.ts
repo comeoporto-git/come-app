@@ -532,6 +532,30 @@ export type SaleTask = {
 
 const TASK_STATUS_OPTIONS = ["To do", "In Progress", "Done"] as const;
 
+const TASK_COLUMNS = "id, sale_id, name, task_description, status, priority, categoria, due_date, file_url, role, team_member_id, parent_task_id, team(name)";
+type TaskRow = {
+  id: string; name: string; task_description: string | null; status: string | null; priority: string | null;
+  categoria: string[] | null; due_date: string | null; file_url: string | null; role: string | null;
+  team_member_id: string | null; parent_task_id: string | null; team: { name: string } | null;
+};
+
+function mapTaskRow(t: TaskRow): SaleTask {
+  return {
+    id: t.id,
+    name: t.name,
+    description: t.task_description ?? "",
+    status: t.status,
+    priority: t.priority,
+    categoria: t.categoria ?? [],
+    dueDate: t.due_date,
+    fileUrl: t.file_url,
+    role: t.role,
+    teamMemberId: t.team_member_id,
+    teamMemberName: t.team?.name ?? null,
+    parentId: t.parent_task_id,
+  };
+}
+
 const TASK_SCOPE_COLUMNS = "sale_id, sales_pipeline_id, transaction_id, social_media_id, role, parent_task_id";
 type TaskScopeRow = {
   sale_id: string | null; sales_pipeline_id: string | null; transaction_id: string | null;
@@ -572,9 +596,7 @@ function assertGeneralTaskRole(saleId: string | null, role: string | null, fn: s
  * `parentId` set) and are hidden whenever their parent is.
  */
 export async function getTasksForSale(saleId: string | null, viewerRole: string): Promise<SaleTask[]> {
-  const base = supabase
-    .from("tasks")
-    .select("id, name, task_description, status, priority, categoria, due_date, file_url, role, team_member_id, parent_task_id, team(name)");
+  const base = supabase.from("tasks").select(TASK_COLUMNS);
   const scoped = saleId
     ? base.eq("sale_id", saleId).not("role", "is", null)
     : base.is("sale_id", null).is("sales_pipeline_id", null).is("transaction_id", null).is("social_media_id", null)
@@ -584,11 +606,7 @@ export async function getTasksForSale(saleId: string | null, viewerRole: string)
     .order("due_date", { ascending: true, nullsFirst: false })
     .order("created_at", { ascending: true });
 
-  const rows = (data ?? []) as unknown as {
-    id: string; name: string; task_description: string | null; status: string | null; priority: string | null;
-    categoria: string[] | null; due_date: string | null; file_url: string | null; role: string | null;
-    team_member_id: string | null; parent_task_id: string | null; team: { name: string } | null;
-  }[];
+  const rows = (data ?? []) as unknown as TaskRow[];
 
   const canSeePrivileged = viewerRole === "Admin" || viewerRole === "Super Guide";
   const visible = rows.filter((t) => canSeePrivileged || !PRIVILEGED_TASK_ROLES.includes(t.role ?? ""));
@@ -596,19 +614,59 @@ export async function getTasksForSale(saleId: string | null, viewerRole: string)
 
   return visible
     .filter((t) => !t.parent_task_id || visibleParentIds.has(t.parent_task_id))
-    .map((t) => ({
-      id: t.id,
-      name: t.name,
-      description: t.task_description ?? "",
-      status: t.status,
-      priority: t.priority,
-      categoria: t.categoria ?? [],
-      dueDate: t.due_date,
-      fileUrl: t.file_url,
-      role: t.role,
-      teamMemberId: t.team_member_id,
-      teamMemberName: t.team?.name ?? null,
-      parentId: t.parent_task_id,
+    .map(mapTaskRow);
+}
+
+export type PartnerServiceTasks = {
+  saleId: string;
+  /** The booking's display name, as on the service cards. */
+  label: string;
+  serviceName: string;
+  date: string | null;
+  /** The booking's partner-assigned tasks and their subtasks. */
+  tasks: SaleTask[];
+};
+
+/**
+ * Booking tasks assigned to a partner that are still open, grouped by
+ * booking in date order (cancelled bookings skipped) — for showing on
+ * /admin/tarefas next to the general tasks. Each group carries the
+ * booking's partner tasks (open or not) and their subtasks.
+ */
+export async function getPartnerServiceTasks(): Promise<PartnerServiceTasks[]> {
+  const partners = [...TASK_PARTNER_OPTIONS];
+  const { data: open } = await supabase
+    .from("tasks")
+    .select("sale_id")
+    .in("role", partners)
+    .not("sale_id", "is", null)
+    .is("parent_task_id", null)
+    .or("status.is.null,status.neq.Done");
+  const saleIds = [...new Set(((open ?? []) as { sale_id: string }[]).map((t) => t.sale_id))];
+  if (!saleIds.length) return [];
+
+  const [{ data: sales }, { data: taskRows }] = await Promise.all([
+    supabase.from("sales").select(SALE_SELECT).in("id", saleIds),
+    supabase.from("tasks").select(TASK_COLUMNS).in("sale_id", saleIds)
+      .order("sort_order", { ascending: true, nullsFirst: false })
+      .order("due_date", { ascending: true, nullsFirst: false })
+      .order("created_at", { ascending: true }),
+  ]);
+  const rows = (taskRows ?? []) as unknown as (TaskRow & { sale_id: string })[];
+  const partnerTaskIds = new Set(rows.filter((t) => !t.parent_task_id && partners.includes(t.role as typeof partners[number])).map((t) => t.id));
+
+  return (sales ?? [])
+    .map(mapSaleRow)
+    .filter((tour) => tour.status !== "Cancelled")
+    .sort((a, b) => (a.date ?? "9999").localeCompare(b.date ?? "9999"))
+    .map((tour) => ({
+      saleId: tour.id,
+      label: tour.saleId,
+      serviceName: tour.serviceName,
+      date: tour.date,
+      tasks: rows
+        .filter((t) => t.sale_id === tour.id && partnerTaskIds.has(t.parent_task_id ?? t.id))
+        .map(mapTaskRow),
     }));
 }
 
