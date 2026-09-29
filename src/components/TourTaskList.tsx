@@ -70,7 +70,7 @@ export function TourTaskList({
   tasks: SaleTask[];
   canManage: boolean;
   onTasksChange?: (tasks: SaleTask[]) => void;
-  title?: string;
+  title?: React.ReactNode;
   emptyText?: string;
   /** Who tasks can be assigned to; defaults to every role and partner. */
   roleOptions?: readonly string[];
@@ -381,7 +381,7 @@ export function TourTaskList({
   return (
     <section className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
       <div className="px-4 py-3 border-b border-gray-50 flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-gray-700">{title}</h2>
+        <h2 className="text-sm font-semibold text-gray-700 min-w-0">{title}</h2>
         <div className="flex items-center gap-3">
           {topLevel.length > 0 && <span className="text-xs text-gray-400">{doneCount}/{topLevel.length}</span>}
           {canManage && !adding && (
