@@ -94,6 +94,7 @@ function TourCard({
   const chefs     = roleNames(tour, "Chef", tour.chefName);
   const drivers   = roleNames(tour, "Driver", tour.driverName);
   const logistics = roleNames(tour, "Logistics", tour.logisticsName);
+  const decoradores = roleNames(tour, "Decorador", tour.decoradorName);
   const { expanded, tasks, loading, count, toggle, updateTasks } = useServiceTasks(
     tour.id,
     taskCount ?? { done: 0, total: 0 },
@@ -135,12 +136,13 @@ function TourCard({
             ) : tour.numGuests > 0 ? (
               <p className="text-xs text-gray-400">{tour.numGuests} pax</p>
             ) : null}
-            {(chefs || drivers || logistics) && (
+            {(chefs || drivers || logistics || decoradores) && (
               <p className="text-xs text-gray-400">
                 {[
                   chefs ? `🧑‍🍳 ${chefs}` : null,
                   drivers ? `🚗 ${drivers}` : null,
                   logistics ? `📦 ${logistics}` : null,
+                  decoradores ? `🎨 ${decoradores}` : null,
                 ].filter(Boolean).join("  ·  ")}
               </p>
             )}
@@ -204,6 +206,7 @@ function filterTours(
       (t.chefName ?? "").toLowerCase().includes(q) ||
       (t.driverName ?? "").toLowerCase().includes(q) ||
       (t.logisticsName ?? "").toLowerCase().includes(q) ||
+      (t.decoradorName ?? "").toLowerCase().includes(q) ||
       t.extraTeam.some((m) => m.name.toLowerCase().includes(q))
     );
   });
@@ -217,9 +220,9 @@ function uniqueValues(tours: Tour[], key: "status" | "serviceType"): string[] {
   return Array.from(set).sort((a, b) => a.localeCompare(b));
 }
 
-// Everyone assigned to the service, whatever their role (guide, chef, driver, logistics).
+// Everyone assigned to the service, whatever their role (guide, chef, driver, logistics, decorador).
 function tourMemberIds(t: Tour): string[] {
-  return [t.guideId, t.chefId, t.driverId, t.logisticsId, ...t.extraTeam.map((m) => m.teamId)]
+  return [t.guideId, t.chefId, t.driverId, t.logisticsId, t.decoradorId, ...t.extraTeam.map((m) => m.teamId)]
     .filter((id): id is string => !!id);
 }
 
@@ -233,6 +236,7 @@ function uniqueTeamMembers(tours: Tour[], teamMap?: Record<string, string>): { v
       [t.chefId, t.chefName],
       [t.driverId, t.driverName],
       [t.logisticsId, t.logisticsName],
+      [t.decoradorId, t.decoradorName],
       ...t.extraTeam.map((m): [string, string] => [m.teamId, m.name]),
     ];
     for (const [id, name] of roleNames) {

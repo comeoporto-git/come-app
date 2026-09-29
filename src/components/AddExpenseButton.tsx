@@ -13,6 +13,7 @@ export function AddExpenseButton({
   guideName,
   driverName,
   logisticsName,
+  decoradorName,
   tourTeam = [],
   roster = [],
 }: {
@@ -23,6 +24,7 @@ export function AddExpenseButton({
   guideName?: string;
   driverName?: string;
   logisticsName?: string;
+  decoradorName?: string;
   tourTeam?: { name: string; role: string }[];
   roster?: ServicePerson[];
 }) {
@@ -44,6 +46,7 @@ export function AddExpenseButton({
           guideName={guideName}
           driverName={driverName}
           logisticsName={logisticsName}
+          decoradorName={decoradorName}
           tourTeam={tourTeam}
           roster={roster}
           onClose={() => setOpen(false)}
