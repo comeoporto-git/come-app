@@ -8,6 +8,7 @@ import { createClient } from "@supabase/supabase-js";
 import { unstable_cache } from "next/cache";
 import {
   PARTNERS, PARTNER_SPLIT_DATE, PARTNER_PAYMENT_METHODS, partnerPaymentByMethod,
+  FEE_PAYMENT_METHODS, isMemberFeeMethod,
   REGISTRATION_TICKET_TYPES, REGISTRATION_PAYMENT_STATUSES, REGISTRATION_INVOICE_STATUSES,
   PRIVILEGED_TASK_ROLES, TASK_PARTNER_OPTIONS,
 } from "@/lib/constants";
@@ -113,6 +114,8 @@ export type Transaction = {
   paidByTeamId?: string | null;
   /** Membro da equipa que registou a transação — definido sempre no servidor a partir da sessão. */
   createdByTeamId?: string | null;
+  /** Membro da equipa a quem a transação pertence (team_id) — p.ex. o destinatário de Honorários. */
+  memberTeamId?: string | null;
 };
 
 export type Fornecedor = {
@@ -214,6 +217,7 @@ function mapTransactionRow(row: any): Transaction {
     socioTransferenciaFeita: row.socio_transferencia_feita ?? false,
     paidByTeamId:            row.paid_by_team_id ?? null,
     createdByTeamId:         row.created_by_team_id ?? null,
+    memberTeamId:            row.team_id ?? null,
   };
 }
 
@@ -270,6 +274,14 @@ export const getTeamMembers = unstable_cache(
   ["team-members"],
   { revalidate: 300, tags: ["team-members"] },
 );
+
+// Honorários store the member by name (notion_id); this resolves it to their team id.
+export async function findTeamMemberIdByName(name: string): Promise<string | null> {
+  const key = name.trim().toLowerCase();
+  if (!key) return null;
+  const members = await getTeamMembers();
+  return members.find((m) => m.name.trim().toLowerCase() === key)?.id ?? null;
+}
 
 export const getTeamMemberByEmail = unstable_cache(
   async (email: string): Promise<TeamMember | null> => {
@@ -1885,6 +1897,7 @@ export async function getGuideExpenses(): Promise<Transaction[]> {
         "metodo_pagamento.eq.Pelo Decorador",
         ...PARTNER_PAYMENT_METHODS.map((p) => `metodo_pagamento.eq.${p.method}`),
         "metodo_pagamento.eq.Honorários",
+        ...FEE_PAYMENT_METHODS.map((m) => `metodo_pagamento.eq.${m}`),
         "status.eq.Pending Payment",
       ].join(","))
       .order("data", { ascending: false });
@@ -1905,7 +1918,13 @@ export async function getGuideExpenses(): Promise<Transaction[]> {
       const sale = (row as any).sales;
       const tourName = sale?.notion_id ?? "";
 
-      if (t.paymentMethod === "Honorários" || (t.status === "Pending Payment" && t.whoPaid === "Company")) {
+      if (isMemberFeeMethod(t.paymentMethod) || (t.status === "Pending Payment" && t.whoPaid === "Company")) {
+        // Honorários / "… Fee": pay the team member it belongs to, not whatever name was typed.
+        const owedMemberId = isMemberFeeMethod(t.paymentMethod) ? (t.memberTeamId ?? t.paidByTeamId) : null;
+        const owedMember = owedMemberId ? memberById[owedMemberId] : undefined;
+        if (owedMember) {
+          return { ...t, tourName, paidByName: owedMember.name, payeeIban: owedMember.iban ?? "" };
+        }
         const fornecedor = t.fornecedorId ? fornecedorById[t.fornecedorId] : undefined;
         const payeeIban = fornecedor?.iban
           || ibanByFornecedorName[t.supplier.toLowerCase()]
@@ -1958,6 +1977,7 @@ export async function createTransaction(
     precisa_fatura:   data.precisaDeFatura || null,
     socio_pessoal:    data.socioPessoal   ?? null,
     paid_by_team_id:  data.paidByTeamId   ?? null,
+    team_id:          data.memberTeamId   ?? null,
     created_by_team_id: createdByTeamId  || null,
   }).select("id").single();
   if (error) throw new Error(`createTransaction: ${error.message}`);
@@ -1993,6 +2013,7 @@ export async function updateTransaction(
   if (data.contaPagamento    !== undefined) updates.conta_pagamento     = data.contaPagamento || null;
   if (data.socioPessoal      !== undefined) updates.socio_pessoal       = data.socioPessoal || null;
   if (data.paidByTeamId      !== undefined) updates.paid_by_team_id     = data.paidByTeamId || null;
+  if (data.memberTeamId      !== undefined) updates.team_id             = data.memberTeamId || null;
   await supabase.from("transactions").update(updates).eq("id", pageId);
 }
 

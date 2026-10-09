@@ -16,6 +16,15 @@ export const PARTNER_PAYMENT_METHODS = [
   { method: "Pago pelo Manuel Antunes",       whoPaid: "Manel",    name: "Manuel Antunes" },
 ] as const;
 
+// A team member's own invoice for their work on a service, logged by themselves.
+export const FEE_PAYMENT_METHODS = ["Guide Fee", "Chef Fee", "Driver Fee", "Logistics Fee", "Decorador Fee"] as const;
+
+// Honorários and "… Fee" invoices are money COME owes the team member: they stay
+// "Pending Payment" until paid and show up in Transferências em Falta.
+export function isMemberFeeMethod(method: string | null | undefined): boolean {
+  return method === "Honorários" || (FEE_PAYMENT_METHODS as readonly string[]).includes(method ?? "");
+}
+
 export function partnerPaymentByMethod(method: string | null | undefined) {
   return PARTNER_PAYMENT_METHODS.find((p) => p.method === method);
 }
