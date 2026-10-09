@@ -196,12 +196,28 @@ function GuideExpenseRow({ expense, fornecedores }: { expense: Transaction; forn
   );
 }
 
+function payeeKey(expense: Transaction) {
+  return expense.paidByName || expense.supplier;
+}
+
 export function GuideExpensesList({ expenses, fornecedores = [] }: { expenses: Transaction[]; fornecedores?: Fornecedor[] }) {
-  const ready = expenses.filter((e) => !!(e.invoiceId || e.invoiceImageUrl));
-  const waitingForInvoice = expenses.filter((e) => !(e.invoiceId || e.invoiceImageUrl));
+  const [payeeFilter, setPayeeFilter] = useState("");
+
+  const payeeCounts = expenses.reduce((acc, expense) => {
+    const key = payeeKey(expense);
+    if (key) acc[key] = (acc[key] ?? 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+  const payeeOptions = Object.keys(payeeCounts).sort((a, b) => a.localeCompare(b, "pt"));
+  // Ignore a stale filter (e.g. the last expense for that payee was just marked as transferred)
+  const activeFilter = payeeFilter && payeeCounts[payeeFilter] ? payeeFilter : "";
+
+  const visible = activeFilter ? expenses.filter((e) => payeeKey(e) === activeFilter) : expenses;
+  const ready = visible.filter((e) => !!(e.invoiceId || e.invoiceImageUrl));
+  const waitingForInvoice = visible.filter((e) => !(e.invoiceId || e.invoiceImageUrl));
 
   const supplierTotals = ready.reduce((acc, expense) => {
-    const key = expense.paidByName || expense.supplier;
+    const key = payeeKey(expense);
     if (!acc[key]) acc[key] = { total: 0, iban: expense.payeeIban ?? "" };
     acc[key].total += Math.abs(expense.totalCost);
     if (!acc[key].iban && expense.payeeIban) acc[key].iban = expense.payeeIban;
@@ -213,6 +229,34 @@ export function GuideExpensesList({ expenses, fornecedores = [] }: { expenses: T
 
   return (
     <div>
+      {payeeOptions.length > 1 && (
+        <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-2">
+          <label htmlFor="payee-filter" className="text-xs font-medium text-gray-500 shrink-0">
+            Pessoa / Fornecedor
+          </label>
+          <select
+            id="payee-filter"
+            value={activeFilter}
+            onChange={(e) => setPayeeFilter(e.target.value)}
+            className="flex-1 min-w-0 text-xs text-[#32373c] border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:border-[#667470]"
+          >
+            <option value="">Todos ({expenses.length})</option>
+            {payeeOptions.map((name) => (
+              <option key={name} value={name}>
+                {name} ({payeeCounts[name]})
+              </option>
+            ))}
+          </select>
+          {activeFilter && (
+            <button
+              onClick={() => setPayeeFilter("")}
+              className="text-xs text-gray-400 hover:text-gray-600 underline shrink-0"
+            >
+              Limpar
+            </button>
+          )}
+        </div>
+      )}
       {ready.length > 0 && (
         <div>
           <div className="px-5 py-2 bg-green-50 border-b border-green-100">
@@ -224,7 +268,13 @@ export function GuideExpensesList({ expenses, fornecedores = [] }: { expenses: T
               {sortedSuppliers.map(([supplier, { total, iban }]) => (
                 <div key={supplier} className="flex items-center justify-between gap-3">
                   <div className="flex flex-col min-w-0">
-                    <span className="text-xs font-medium text-[#32373c]">{supplier}</span>
+                    <button
+                      onClick={() => setPayeeFilter(activeFilter === supplier ? "" : supplier)}
+                      className="text-left text-xs font-medium text-[#32373c] hover:text-[#667470] hover:underline"
+                      title={activeFilter === supplier ? "Mostrar todos" : `Filtrar por ${supplier}`}
+                    >
+                      {supplier}
+                    </button>
                     {iban && <IbanCopy iban={iban} />}
                   </div>
                   <span className="text-xs font-bold text-red-600 shrink-0">€{total.toFixed(2)}</span>
