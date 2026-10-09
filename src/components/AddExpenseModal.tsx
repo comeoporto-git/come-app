@@ -6,7 +6,7 @@ import { logExpenseAction, finishPendingExpenseAction, createFornecedorAction } 
 import type { Transaction, Fornecedor } from "@/lib/notion";
 import { normalizeImage } from "@/lib/image";
 import { useRouter } from "next/navigation";
-import { PARTNERS, PARTNER_PAYMENT_METHODS, ownershipForDate, partnerPaymentByMethod } from "@/lib/constants";
+import { PARTNERS, PARTNER_PAYMENT_METHODS, ownershipForDate, partnerPaymentByMethod, isMemberFeeMethod } from "@/lib/constants";
 import { WhoPaidPicker, peopleForMethod, type ServicePerson } from "./WhoPaidPicker";
 
 type Mode = "chef-choose" | "admin-choose" | "honorarios" | "choose" | "scan" | "manual" | "review";
@@ -279,7 +279,7 @@ export function AddExpenseModal({
           paymentMethod: effectivePaymentMethod,
           status: isHonorarios ? "Pending Receipt"
                  : notPaidYet ? "Pending Payment"
-                 : form.invoiceId ? "Paid"
+                 : form.invoiceId ? (isMemberFeeMethod(effectivePaymentMethod) ? "Pending Payment" : "Paid")
                  : "Pending Receipt",
           tourId,
           bankReference: "",
@@ -698,8 +698,9 @@ export function AddExpenseModal({
                 </label>
               )}
 
-              {/* Not paid yet checkbox — hidden for Honorários (always Pending Receipt at creation) */}
-              {!pendingTransaction && !honorariosMember && (
+              {/* Not paid yet checkbox — hidden for Honorários (always Pending Receipt at creation)
+                  and for the member's own fee invoice (always unpaid until COME transfers it) */}
+              {!pendingTransaction && !honorariosMember && chefExpenseType !== "service-invoice" && (
                 <label className="flex items-center gap-3 cursor-pointer select-none">
                   <div
                     onClick={() => setNotPaidYet((v) => !v)}

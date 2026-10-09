@@ -14,6 +14,7 @@ import {
   setSocioTransferenciaFeita,
   setComprovativoUrl,
   getFornecedores,
+  findTeamMemberIdByName,
   supabase,
 } from "@/lib/notion";
 import type { Transaction, Fornecedor, TeamSlotRole } from "@/lib/notion";
@@ -21,7 +22,7 @@ import { revalidatePath, updateTag } from "next/cache";
 import { auth } from "@/lib/auth";
 import { notifyInvoiceAdded } from "@/lib/notifications";
 import { analyzeInvoice } from "@/actions/invoice";
-import { TEAM_PAYMENT_METHOD_ROLE } from "@/lib/constants";
+import { TEAM_PAYMENT_METHOD_ROLE, isMemberFeeMethod } from "@/lib/constants";
 
 async function requireAuth() {
   const session = await auth();
@@ -197,8 +198,14 @@ export async function logExpenseAction(
     const paidByTeamId = !SELF_PAID_METHODS.includes(data.paymentMethod) ? null
       : isManager ? (TEAM_PAYMENT_METHOD_ROLE[data.paymentMethod] ? (data.paidByTeamId ?? null) : null)
       : (session.user.notionId || null);
+    // Honorários / "… Fee" belong to the team member they pay (so it shows on their
+    // service page), and COME still owes it: never "Paid" until the transfer is made.
+    const memberTeamId = data.paymentMethod === "Honorários" ? await findTeamMemberIdByName(data.supplier)
+      : isMemberFeeMethod(data.paymentMethod) ? paidByTeamId
+      : null;
+    const status = isMemberFeeMethod(data.paymentMethod) && data.status === "Paid" ? "Pending Payment" : data.status;
     // Quem registou é sempre o utilizador da sessão; o cliente não o pode definir.
-    const id = await createTransaction({ ...data, paidByTeamId }, session.user.notionId || null);
+    const id = await createTransaction({ ...data, status, paidByTeamId, memberTeamId }, session.user.notionId || null);
     if (data.tourId) {
       revalidatePath(`/guide/tours/${data.tourId}`);
     } else {
@@ -252,7 +259,7 @@ export async function finishPendingExpenseAction(
       return { error: "Forbidden" };
     }
     const newStatus =
-      (paymentMethod === "Honorários" && originalStatus === "Pending Receipt")
+      (isMemberFeeMethod(paymentMethod) && originalStatus === "Pending Receipt")
         ? "Pending Payment"
         : originalStatus === "Pending Payment"
         ? "Pending Payment"
@@ -331,7 +338,7 @@ export async function editExpenseAction(
   // finishPendingExpenseAction does, instead of leaving it stuck as pending.
   const newStatus =
     data.originalStatus === "Pending Receipt" && data.invoiceId
-      ? (data.paymentMethod === "Honorários" ? "Pending Payment" : "Paid")
+      ? (isMemberFeeMethod(data.paymentMethod) ? "Pending Payment" : "Paid")
       : undefined;
   await updateTransaction(transactionId, {
     supplier: data.supplier,
@@ -377,6 +384,8 @@ export async function convertExpenseToHonorarioAction(
     const hasReceipt = !!(row.id_fatura || row.fatura_url);
     await updateTransaction(transactionId, {
       supplier: memberName.trim(),
+      // Keeps it visible to the member on the service page once it carries their name.
+      memberTeamId: await findTeamMemberIdByName(memberName),
       fornecedorId: null,
       whoPaid: "Company",
       paymentMethod: "Honorários",
