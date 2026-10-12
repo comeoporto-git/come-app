@@ -360,7 +360,7 @@ export function TourTaskList({
               {...formProps}
               parent={parent}
               onSaved={(task) => {
-                replaceItems([...items, task]);
+                replaceItems([task, ...items]);
                 setAddingSubtaskFor(null);
               }}
               onCancel={() => setAddingSubtaskFor(null)}
