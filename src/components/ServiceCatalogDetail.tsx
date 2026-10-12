@@ -642,8 +642,8 @@ const TASK_ROLE_COLORS: Record<string, string> = {
   Logistics:     "bg-orange-50 text-orange-600 border-orange-100",
   Decorador:     "bg-pink-50 text-pink-600 border-pink-100",
   Bernardo:      "bg-indigo-50 text-indigo-600 border-indigo-100",
-  "António":     "bg-indigo-50 text-indigo-600 border-indigo-100",
-  Manel:         "bg-indigo-50 text-indigo-600 border-indigo-100",
+  "António":     "bg-teal-50 text-teal-700 border-teal-100",
+  Manel:         "bg-amber-50 text-amber-700 border-amber-200",
 };
 
 function TasksSection({ service, canEdit }: { service: ServiceDetail; canEdit: boolean }) {
