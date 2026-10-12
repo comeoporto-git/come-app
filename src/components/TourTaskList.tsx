@@ -400,7 +400,7 @@ export function TourTaskList({
           <TaskForm
             {...formProps}
             onSaved={(task) => {
-              replaceItems([...items, task]);
+              replaceItems([task, ...items]);
               setAdding(false);
             }}
             onCancel={() => setAdding(false)}
