@@ -767,23 +767,25 @@ export async function createSaleTask(saleId: string | null, data: {
     if (parent.parent_task_id) throw new Error("createSaleTask: subtasks can't have subtasks");
   }
   const id = crypto.randomUUID();
-  // Subtasks are ordered within their parent, top-level tasks within the
-  // sale (general tasks: among each other).
-  const lastQuery = supabase.from("tasks").select("sort_order");
-  const { data: last } = await (
-    parentId ? lastQuery.eq("parent_task_id", parentId)
-    : saleId ? lastQuery.eq("sale_id", saleId).is("parent_task_id", null)
-    : lastQuery.is("sale_id", null).in("role", [...TASK_PARTNER_OPTIONS]).is("parent_task_id", null)
+  // Subtasks are ordered within their parent and a new one goes last;
+  // top-level tasks are ordered within the sale (general tasks: among each
+  // other) and a new one goes first.
+  const edgeQuery = supabase.from("tasks").select("sort_order");
+  const { data: edge } = await (
+    parentId ? edgeQuery.eq("parent_task_id", parentId)
+    : saleId ? edgeQuery.eq("sale_id", saleId).is("parent_task_id", null)
+    : edgeQuery.is("sale_id", null).in("role", [...TASK_PARTNER_OPTIONS]).is("parent_task_id", null)
   )
     .not("sort_order", "is", null)
-    .order("sort_order", { ascending: false })
+    .order("sort_order", { ascending: !parentId })
     .limit(1)
     .maybeSingle();
+  const sortOrder = parentId ? (edge?.sort_order ?? -1) + 1 : (edge?.sort_order ?? 1) - 1;
   const { error } = await supabase.from("tasks").insert({
     id,
     sale_id:          saleId,
     parent_task_id:   parentId,
-    sort_order:       (last?.sort_order ?? -1) + 1,
+    sort_order:       sortOrder,
     name:             data.name,
     task_description: data.description || null,
     role:             data.role || null,
