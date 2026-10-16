@@ -2144,6 +2144,20 @@ export async function createFornecedor(name: string): Promise<Fornecedor> {
   return data;
 }
 
+/** Finds a fornecedor by name (case-insensitive), creating it when none exists. */
+export async function findOrCreateFornecedor(name: string): Promise<{ fornecedor: Fornecedor; created: boolean }> {
+  const trimmed = name.trim();
+  const pattern = trimmed.replace(/[\\%_]/g, (c) => `\\${c}`);
+  const { data: existing } = await supabase
+    .from("fornecedores")
+    .select("id, name")
+    .ilike("name", pattern)
+    .limit(1)
+    .maybeSingle();
+  if (existing) return { fornecedor: existing, created: false };
+  return { fornecedor: await createFornecedor(trimmed), created: true };
+}
+
 export async function getFornecedorById(id: string): Promise<Fornecedor | null> {
   const { data } = await supabase
     .from("fornecedores")
