@@ -45,23 +45,24 @@ function formatDate(iso: string | null, startTime: string | null): string {
 }
 
 // Buckets expense transactions by their fornecedor's category, falling back
-// to the tour's team role (Guia/Chef/Motorista/Logistics/Decorador) when a transaction
-// was paid directly to a team member rather than to a fornecedor.
+// to the team role (Guia/Chef/Motorista/Logistics/Decorador) of whoever on the
+// service the transaction belongs to — primary slots and extra team members alike,
+// so every chef's / guide's honorários land in their role's bucket.
 function computeCategoryBreakdown(
   transactions: Transaction[],
   fornecedores: Fornecedor[],
-  team: { guideName?: string | null; chefName?: string | null; driverName?: string | null; logisticsName?: string | null; decoradorName?: string | null },
+  roster: ServicePerson[],
 ): { label: string; total: number }[] {
   const categoriaById = new Map(fornecedores.map((f) => [f.id, f.categoria]));
-  const teamRoles = [
-    team.guideName ? { name: team.guideName, label: "Guia" } : null,
-    team.chefName ? { name: team.chefName, label: "Chef" } : null,
-    team.driverName ? { name: team.driverName, label: "Motorista" } : null,
-    team.logisticsName ? { name: team.logisticsName, label: "Logistics" } : null,
-    team.decoradorName ? { name: team.decoradorName, label: "Decorador" } : null,
-  ]
-    .filter(Boolean)
-    .map((r) => ({ name: r!.name.trim().toLowerCase(), label: r!.label }));
+  // Primary slots come first in the roster, so a person's main role wins.
+  const roleByTeamId = new Map<string, string>();
+  const roleByName = new Map<string, string>();
+  for (const p of roster) {
+    const label = EXPENSE_ROLE_LABEL[p.role];
+    if (!roleByTeamId.has(p.teamId)) roleByTeamId.set(p.teamId, label);
+    const name = p.name.trim().toLowerCase();
+    if (name && name !== "—" && !roleByName.has(name)) roleByName.set(name, label);
+  }
 
   const totals = new Map<string, number>();
   for (const t of transactions) {
@@ -69,8 +70,9 @@ function computeCategoryBreakdown(
     if (amount === 0) continue;
 
     const categoria = t.fornecedorId ? categoriaById.get(t.fornecedorId) : null;
-    const teamMatch = teamRoles.find((r) => r.name === t.supplier.trim().toLowerCase());
-    const label = categoria || teamMatch?.label || "Outros";
+    const teamLabel = (t.memberTeamId ? roleByTeamId.get(t.memberTeamId) : undefined)
+      ?? roleByName.get(t.supplier.trim().toLowerCase());
+    const label = categoria || teamLabel || "Outros";
 
     totals.set(label, (totals.get(label) ?? 0) + amount);
   }
@@ -230,7 +232,7 @@ async function TourPageContent({
   const isClosed   = tour.expensesClosed;
 
   const categoryBreakdown = role === "Admin"
-    ? computeCategoryBreakdown(transactions, fornecedores, tour)
+    ? computeCategoryBreakdown(transactions, fornecedores, roster)
     : [];
   const maxCategoryTotal = Math.max(0, ...categoryBreakdown.map((c) => c.total));
 
