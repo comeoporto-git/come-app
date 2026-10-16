@@ -9,6 +9,7 @@ import {
   archiveTransaction,
   closeTour,
   createFornecedor,
+  findOrCreateFornecedor,
   updateFornecedor,
   markTransferenciaFeita,
   setSocioTransferenciaFeita,
@@ -169,6 +170,23 @@ export async function markNoInvoiceNeededAction(
   revalidatePath("/super-guide/invoices");
 }
 
+// An expense typed or AI-scanned with a supplier name that isn't picked from the
+// list would otherwise be saved with no fornecedor — link it, creating one if needed.
+// Honorários / "… Fee" pay a team member, not a fornecedor, so they stay unlinked.
+async function resolveFornecedorId(
+  supplier: string | undefined,
+  paymentMethod: string | undefined,
+  fornecedorId: string | null | undefined,
+): Promise<string | null> {
+  if (fornecedorId || !supplier?.trim() || isMemberFeeMethod(paymentMethod)) return fornecedorId ?? null;
+  const { fornecedor, created } = await findOrCreateFornecedor(supplier);
+  if (created) {
+    updateTag("fornecedores");
+    revalidatePath("/admin/fornecedores");
+  }
+  return fornecedor.id;
+}
+
 const SELF_PAID_METHODS = [
   "Pelo Guia", "Pelo Chef", "Pelo Driver", "Pelo Logistics", "Pelo Decorador",
   "Guide Fee", "Chef Fee", "Driver Fee", "Logistics Fee", "Decorador Fee",
@@ -205,7 +223,8 @@ export async function logExpenseAction(
       : null;
     const status = isMemberFeeMethod(data.paymentMethod) && data.status === "Paid" ? "Pending Payment" : data.status;
     // Quem registou é sempre o utilizador da sessão; o cliente não o pode definir.
-    const id = await createTransaction({ ...data, status, paidByTeamId, memberTeamId }, session.user.notionId || null);
+    const fornecedorId = await resolveFornecedorId(data.supplier, data.paymentMethod, data.fornecedorId);
+    const id = await createTransaction({ ...data, fornecedorId, status, paidByTeamId, memberTeamId }, session.user.notionId || null);
     if (data.tourId) {
       revalidatePath(`/guide/tours/${data.tourId}`);
     } else {
@@ -342,7 +361,7 @@ export async function editExpenseAction(
       : undefined;
   await updateTransaction(transactionId, {
     supplier: data.supplier,
-    fornecedorId: data.fornecedorId,
+    fornecedorId: await resolveFornecedorId(data.supplier, data.paymentMethod, data.fornecedorId),
     date: data.date,
     invoiceId: data.invoiceId,
     taxFree: data.taxFree,
