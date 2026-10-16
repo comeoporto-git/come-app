@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import type { Transaction, Fornecedor } from "@/lib/notion";
 import { updateFornecedorAction } from "@/actions/transactions";
 import { EditExpenseModal } from "@/components/EditExpenseModal";
-import { CATEGORIA_NAMES } from "@/lib/fornecedor-categories";
+import { allCategorias, NEW_CATEGORIA, promptNewCategoria } from "@/lib/fornecedor-categories";
 
 const STATUS_COLORS: Record<string, string> = {
   "Paid":             "bg-green-100 text-green-700",
@@ -28,6 +28,24 @@ export function FornecedorDetailClient({
   const [error, setError] = useState("");
   const [current, setCurrent] = useState(fornecedor);
   const [editingTx, setEditingTx] = useState<Transaction | null>(null);
+
+  const [categoriaValue, setCategoriaValue] = useState(fornecedor.categoria ?? "");
+  const [customCategorias, setCustomCategorias] = useState<string[]>([]);
+  const categoriaOptions = useMemo(
+    () => allCategorias([...fornecedores.map((f) => f.categoria), current.categoria, ...customCategorias]),
+    [fornecedores, current.categoria, customCategorias],
+  );
+
+  function handleCategoriaSelect(value: string) {
+    if (value !== NEW_CATEGORIA) {
+      setCategoriaValue(value);
+      return;
+    }
+    const created = promptNewCategoria(categoriaOptions);
+    if (!created) return;
+    setCustomCategorias((prev) => [...prev, created]);
+    setCategoriaValue(created);
+  }
 
   const total = transactions.reduce((sum, t) => sum + t.totalCost, 0);
 
@@ -83,7 +101,7 @@ export function FornecedorDetailClient({
                   {current.iban && <span>IBAN: <span className="text-gray-600 font-medium">{current.iban}</span></span>}
                   {current.contribuinte && <span>Contribuinte: <span className="text-gray-600 font-medium">{current.contribuinte}</span></span>}
                 </div>
-                <button onClick={() => setEditing(true)} className="mt-2 text-xs text-gray-400 hover:text-[#667470] transition-colors">
+                <button onClick={() => { setCategoriaValue(current.categoria ?? ""); setEditing(true); }} className="mt-2 text-xs text-gray-400 hover:text-[#667470] transition-colors">
                   Editar detalhes
                 </button>
               </>
@@ -102,16 +120,15 @@ export function FornecedorDetailClient({
                     <label className="block text-[10px] text-gray-400 mb-0.5">Categoria</label>
                     <select
                       name="categoria"
-                      defaultValue={current.categoria ?? ""}
+                      value={categoriaValue}
+                      onChange={(e) => handleCategoriaSelect(e.target.value)}
                       className="w-full border border-gray-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-[#667470]/30 bg-white"
                     >
                       <option value="">Sem categoria</option>
-                      {current.categoria && !CATEGORIA_NAMES.includes(current.categoria) && (
-                        <option value={current.categoria}>{current.categoria}</option>
-                      )}
-                      {CATEGORIA_NAMES.map((c) => (
+                      {categoriaOptions.map((c) => (
                         <option key={c} value={c}>{c}</option>
                       ))}
+                      <option value={NEW_CATEGORIA}>+ Nova categoria…</option>
                     </select>
                   </div>
                   {[

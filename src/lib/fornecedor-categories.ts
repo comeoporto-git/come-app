@@ -30,3 +30,22 @@ export function categoriaBadgeClass(categoria: string | null | undefined): strin
   if (!categoria) return FALLBACK_COLOR;
   return CATEGORIA_COLORS[categoria] ?? FALLBACK_COLOR;
 }
+
+// Sentinel <option> value for "create a new category" in category selects.
+export const NEW_CATEGORIA = "__new__";
+
+// Built-in categories plus any custom ones already assigned to a fornecedor,
+// so categories created from the UI keep showing up in the dropdowns.
+export function allCategorias(used: Iterable<string | null | undefined>): string[] {
+  const set = new Set(CATEGORIA_NAMES);
+  for (const c of used) if (c?.trim()) set.add(c.trim());
+  return Array.from(set).sort((a, b) => a.localeCompare(b));
+}
+
+// Asks for a new category name; returns the existing spelling when it matches
+// one case-insensitively, or null when cancelled/empty.
+export function promptNewCategoria(existing: string[]): string | null {
+  const name = window.prompt("Nome da nova categoria:")?.trim();
+  if (!name) return null;
+  return existing.find((c) => c.toLowerCase() === name.toLowerCase()) ?? name;
+}

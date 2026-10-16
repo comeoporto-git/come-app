@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { categoriaBadgeClass, CATEGORIA_NAMES } from "@/lib/fornecedor-categories";
+import { allCategorias, categoriaBadgeClass, NEW_CATEGORIA, promptNewCategoria } from "@/lib/fornecedor-categories";
 import { updateFornecedorAction } from "@/actions/transactions";
 
 type FornecedorRow = {
@@ -34,6 +34,8 @@ export function FornecedoresList({ items }: { items: FornecedorRow[] }) {
     return hasUncategorized ? [...sorted, UNCATEGORIZED] : sorted;
   }, [rows]);
 
+  const categoriaOptions = useMemo(() => allCategorias(rows.map((r) => r.categoria)), [rows]);
+
   const filtered = rows.filter((f) => {
     const matchesSearch = !search.trim() || f.name.toLowerCase().includes(search.trim().toLowerCase());
     const matchesCategory =
@@ -42,6 +44,11 @@ export function FornecedoresList({ items }: { items: FornecedorRow[] }) {
   });
 
   async function handleCategoryChange(id: string, newCategoria: string) {
+    if (newCategoria === NEW_CATEGORIA) {
+      const created = promptNewCategoria(categoriaOptions);
+      if (!created) return;
+      newCategoria = created;
+    }
     const previous = rows;
     const value = newCategoria || null;
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, categoria: value } : r)));
@@ -127,12 +134,10 @@ export function FornecedoresList({ items }: { items: FornecedorRow[] }) {
                   className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium flex-shrink-0 border-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#667470]/30 disabled:opacity-50 ${categoriaBadgeClass(f.categoria)}`}
                 >
                   <option value="">Sem categoria</option>
-                  {f.categoria && !CATEGORIA_NAMES.includes(f.categoria) && (
-                    <option value={f.categoria}>{f.categoria}</option>
-                  )}
-                  {CATEGORIA_NAMES.map((c) => (
+                  {categoriaOptions.map((c) => (
                     <option key={c} value={c}>{c}</option>
                   ))}
+                  <option value={NEW_CATEGORIA}>+ Nova categoria…</option>
                 </select>
 
                 <Link href={`/admin/fornecedores/${f.id}`} className="flex items-center gap-2 flex-shrink-0">
