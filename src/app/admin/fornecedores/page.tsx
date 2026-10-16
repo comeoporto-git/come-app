@@ -1,6 +1,6 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { getFornecedores, getFornecedorStats, getTotalDespesas } from "@/lib/notion";
+import { getFornecedoresFresh, getFornecedorStats, getTotalDespesas } from "@/lib/notion";
 import { FornecedoresList } from "@/components/FornecedoresList";
 
 export default async function FornecedoresPage() {
@@ -8,7 +8,7 @@ export default async function FornecedoresPage() {
   if (!session || session.user.role !== "Admin") redirect("/");
 
   const [fornecedores, stats, totalGeral] = await Promise.all([
-    getFornecedores(),
+    getFornecedoresFresh(),
     getFornecedorStats(),
     getTotalDespesas(),
   ]);

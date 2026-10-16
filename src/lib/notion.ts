@@ -2092,14 +2092,17 @@ export async function setComprovativoUrl(pageId: string, url: string, transferDa
 
 // ── Fornecedores ──────────────────────────────────────────────────────────────
 
+/** Uncached — for the Fornecedores list, which must show new suppliers immediately. */
+export async function getFornecedoresFresh(): Promise<Fornecedor[]> {
+  const { data } = await supabase
+    .from("fornecedores")
+    .select("id, name, iban, categoria, email, contact, contribuinte")
+    .order("name");
+  return (data ?? []).filter((f) => f.name);
+}
+
 export const getFornecedores = unstable_cache(
-  async (): Promise<Fornecedor[]> => {
-    const { data } = await supabase
-      .from("fornecedores")
-      .select("id, name, iban, categoria, email, contact, contribuinte")
-      .order("name");
-    return (data ?? []).filter((f) => f.name);
-  },
+  getFornecedoresFresh,
   ["fornecedores"],
   { revalidate: 300, tags: ["fornecedores"] },
 );
