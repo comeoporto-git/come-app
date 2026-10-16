@@ -219,7 +219,10 @@ export function EditExpenseModal({
 
       await editExpenseAction(transaction.id, tourId, {
         supplier: form.supplier,
-        fornecedorId: selectedFornecedor?.id ?? transaction.fornecedorId,
+        // Renamed to a supplier not in the list → send null so the server links
+        // (or creates) the right fornecedor instead of keeping the old one.
+        fornecedorId: selectedFornecedor?.id
+          ?? (form.supplier.trim() === transaction.supplier.trim() ? transaction.fornecedorId : null),
         date: form.date,
         invoiceId: form.invoiceId,
         taxFree: form.taxFree,
