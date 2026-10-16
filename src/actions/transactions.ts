@@ -8,7 +8,6 @@ import {
   verifyTransaction,
   archiveTransaction,
   closeTour,
-  createFornecedor,
   findOrCreateFornecedor,
   updateFornecedor,
   markTransferenciaFeita,
@@ -92,7 +91,7 @@ export async function updateTourServiceInfoAction(
 
 export async function createFornecedorAction(name: string): Promise<Fornecedor> {
   await requireAuth();
-  const fornecedor = await createFornecedor(name);
+  const { fornecedor } = await findOrCreateFornecedor(name);
   updateTag("fornecedores");
   revalidatePath("/admin/fornecedores");
   return fornecedor;
