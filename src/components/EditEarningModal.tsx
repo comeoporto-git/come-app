@@ -5,6 +5,7 @@ import { editEarningAction, deleteEarningAction } from "@/actions/transactions";
 import type { Transaction } from "@/lib/notion";
 import { CONTA_PAGAMENTO_OPTIONS } from "@/lib/constants";
 import { useRouter } from "next/navigation";
+import { scanInvoiceFile } from "@/lib/scan-invoice";
 
 type FormState = {
   reference: string;
@@ -38,6 +39,8 @@ export function EditEarningModal({
   const [imageFile, setImageFile]       = useState<File | null>(null);
   const [imageDataUrl, setImageDataUrl] = useState("");
   const [lightboxSrc, setLightboxSrc]   = useState("");
+  const [scanning, setScanning]         = useState(false);
+  const [scanError, setScanError]       = useState("");
   const fileRef   = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
 
@@ -74,34 +77,33 @@ export function EditEarningModal({
 
   async function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
+    e.target.value = "";
     if (!file) return;
-    if (file.type === "application/pdf") {
-      setImageFile(file);
-      setImageDataUrl("pdf");
-      return;
+    setScanError("");
+    setScanning(true);
+    try {
+      const { file: uploadFile, preview, data, error } = await scanInvoiceFile(file);
+      setImageFile(uploadFile);
+      setImageDataUrl(preview);
+      setScanError(error);
+      if (data) {
+        setForm((f) => ({
+          ...f,
+          base6:     data.base6,
+          base13:    data.base13,
+          base23:    data.base23,
+          taxFree:   data.taxFree,
+          iva6:      data.iva6,
+          iva13:     data.iva13,
+          iva23:     data.iva23,
+          totalCost: data.totalCost,
+          invoiceId: data.invoiceId || f.invoiceId,
+          date:      data.date ?? f.date,
+        }));
+      }
+    } finally {
+      setScanning(false);
     }
-    const MAX_PX = 2048;
-    const rawDataUrl = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (ev) => resolve(ev.target!.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-      const el = new Image();
-      el.onload = () => resolve(el);
-      el.onerror = reject;
-      el.src = rawDataUrl;
-    });
-    const scale = Math.min(1, MAX_PX / Math.max(img.naturalWidth || 1, img.naturalHeight || 1));
-    const canvas = document.createElement("canvas");
-    canvas.width  = Math.round((img.naturalWidth  || 1) * scale);
-    canvas.height = Math.round((img.naturalHeight || 1) * scale);
-    canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
-    const blob = await new Promise<Blob | null>((r) => canvas.toBlob((b) => r(b), "image/jpeg", 0.85));
-    const outUrl = (() => { const d = canvas.toDataURL("image/jpeg", 0.85); return d.length > 50 ? d : rawDataUrl; })();
-    setImageFile(blob ? new File([blob], "invoice.jpg", { type: "image/jpeg" }) : file);
-    setImageDataUrl(outUrl);
   }
 
   async function handleDelete() {
@@ -298,6 +300,12 @@ export function EditEarningModal({
               <label className="text-xs text-gray-500 mb-1 block">
                 {transaction.invoiceImageUrl ? "Substituir Fatura" : "Fatura (opcional)"}
               </label>
+              {scanning && (
+                <p className="text-xs text-emerald-700 mb-1.5">A analisar a fatura…</p>
+              )}
+              {scanError && (
+                <p className="text-xs text-red-500 mb-1.5">{scanError}</p>
+              )}
               <input ref={cameraRef} type="file" accept="image/*" className="hidden" onChange={handleImageChange} capture="environment" />
               <input ref={fileRef}   type="file" accept="image/jpeg,image/png,image/webp,application/pdf" className="hidden" onChange={handleImageChange} />
               {imageDataUrl === "pdf" ? (
@@ -325,7 +333,7 @@ export function EditEarningModal({
 
             <button
               onClick={handleSave}
-              disabled={saving || form.totalCost === 0}
+              disabled={saving || scanning || form.totalCost === 0}
               className="w-full bg-emerald-700 text-white font-semibold py-3.5 rounded-2xl text-sm disabled:opacity-50 hover:bg-emerald-800 active:scale-[0.98] transition-colors"
             >
               {saving ? "A guardar…" : "Guardar Alterações"}
