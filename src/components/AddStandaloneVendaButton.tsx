@@ -3,6 +3,7 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createStandaloneEarningAction } from "@/actions/transactions";
+import { scanInvoiceFile } from "@/lib/scan-invoice";
 
 export function AddStandaloneVendaButton({ className }: { className?: string }) {
   const [open, setOpen] = useState(false);
@@ -25,8 +26,12 @@ function StandaloneVendaModal({ onClose }: { onClose: () => void }) {
   const [iva13,  setIva13]  = useState(0);
   const [iva23,  setIva23]  = useState(0);
   const [total,  setTotal]  = useState(0);
+  const [date,      setDate]      = useState(new Date().toISOString().slice(0, 10));
+  const [invoiceId, setInvoiceId] = useState("");
   const [imageFile,    setImageFile]    = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState("");
+  const [scanning,  setScanning]  = useState(false);
+  const [scanError, setScanError] = useState("");
   const [saving, setSaving] = useState(false);
   const [error,  setError]  = useState("");
   const fileRef = useRef<HTMLInputElement | null>(null);
@@ -39,14 +44,24 @@ function StandaloneVendaModal({ onClose }: { onClose: () => void }) {
 
   async function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
+    e.target.value = "";
     if (!file) return;
-    setImageFile(file);
-    if (file.type !== "application/pdf") {
-      const reader = new FileReader();
-      reader.onload = (ev) => setImagePreview(ev.target?.result as string);
-      reader.readAsDataURL(file);
-    } else {
-      setImagePreview("pdf");
+    setScanError("");
+    setScanning(true);
+    try {
+      const { file: uploadFile, preview, data, error } = await scanInvoiceFile(file);
+      setImageFile(uploadFile);
+      setImagePreview(preview);
+      setScanError(error);
+      if (data) {
+        setBase6(data.base6); setBase13(data.base13); setBase23(data.base23);
+        setIva6(data.iva6);   setIva13(data.iva13);   setIva23(data.iva23);
+        setTotal(data.totalCost);
+        if (data.invoiceId) setInvoiceId(data.invoiceId);
+        if (data.date) setDate(data.date);
+      }
+    } finally {
+      setScanning(false);
     }
   }
 
@@ -111,11 +126,11 @@ function StandaloneVendaModal({ onClose }: { onClose: () => void }) {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs text-gray-500 mb-1 block">Data</label>
-                <input name="date" type="date" defaultValue={new Date().toISOString().slice(0, 10)} className="input" />
+                <input name="date" type="date" value={date} onChange={(e) => setDate(e.target.value)} className="input" />
               </div>
               <div>
                 <label className="text-xs text-gray-500 mb-1 block">Nº Fatura</label>
-                <input name="invoiceId" type="text" className="input" placeholder="FT 2024/001" />
+                <input name="invoiceId" type="text" value={invoiceId} onChange={(e) => setInvoiceId(e.target.value)} className="input" placeholder="FT 2024/001" />
               </div>
             </div>
 
@@ -162,6 +177,12 @@ function StandaloneVendaModal({ onClose }: { onClose: () => void }) {
 
             <div>
               <label className="text-xs text-gray-500 mb-1 block">Fatura (opcional)</label>
+              {scanning && (
+                <p className="text-xs text-emerald-700 mb-1.5">A analisar a fatura…</p>
+              )}
+              {scanError && (
+                <p className="text-xs text-red-500 mb-1.5">{scanError}</p>
+              )}
               <input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" className="hidden"
                 ref={(el) => { fileRef.current = el; }}
                 onChange={handleImageChange} />
@@ -185,7 +206,7 @@ function StandaloneVendaModal({ onClose }: { onClose: () => void }) {
               )}
             </div>
 
-            <button type="submit" disabled={saving || total === 0}
+            <button type="submit" disabled={saving || scanning || total === 0}
               className="w-full bg-emerald-700 text-white font-semibold py-3.5 rounded-2xl text-sm disabled:opacity-50 hover:bg-emerald-800 active:scale-[0.98] transition-colors">
               {saving ? "A guardar…" : "Guardar"}
             </button>

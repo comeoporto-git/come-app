@@ -6,8 +6,7 @@ import type { Transaction } from "@/lib/notion";
 import { CONTA_PAGAMENTO_OPTIONS } from "@/lib/constants";
 import { EditEarningModal } from "./EditEarningModal";
 import { createEarningAction } from "@/actions/transactions";
-import { analyzeInvoice } from "@/actions/invoice";
-import { normalizeImage } from "@/lib/image";
+import { scanInvoiceFile } from "@/lib/scan-invoice";
 
 export function EarningList({
   earnings,
@@ -204,50 +203,17 @@ function AddEarningModal({
     if (!file) return;
     setScanError("");
     setScanning(true);
-
     try {
-      let base64: string;
-      let mediaType: Parameters<typeof analyzeInvoice>[1];
-
-      if (file.type === "application/pdf") {
-        base64 = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = (ev) => resolve((ev.target?.result as string).split(",")[1]);
-          reader.onerror = reject;
-          reader.readAsDataURL(file);
-        });
-        mediaType = "application/pdf";
-        setImageFile(file);
-        setImagePreview("pdf");
-      } else {
-        let normalized;
-        try {
-          normalized = await normalizeImage(file);
-        } catch (err) {
-          console.error("[AddEarningModal] image processing error:", err);
-          setImageFile(file);
-          setScanError("Não foi possível processar a imagem. Preenche os valores manualmente.");
-          return;
-        }
-        base64 = normalized.base64;
-        mediaType = normalized.mediaType;
-        setImageFile(normalized.normalizedFile);
-        setImagePreview(normalized.dataUrl);
-      }
-
-      try {
-        const result = await analyzeInvoice(base64, mediaType);
-        const r2 = (n: number) => Math.round((Number(n) || 0) * 100) / 100;
-        const b6 = r2(result.base6), b13 = r2(result.base13), b23 = r2(result.base23);
-        const i6 = r2(result.iva6),  i13 = r2(result.iva13),  i23 = r2(result.iva23);
-        setBase6(b6); setBase13(b13); setBase23(b23);
-        setIva6(i6);  setIva13(i13);  setIva23(i23);
-        setTotal(r2(result.totalCost) || r2(b6 + b13 + b23 + i6 + i13 + i23));
-        if (result.invoiceId) setInvoiceId(result.invoiceId);
-        if (/^\d{4}-\d{2}-\d{2}$/.test(result.date ?? "")) setDate(result.date);
-      } catch (err) {
-        console.error("[AddEarningModal] AI scan error:", err);
-        setScanError("Erro ao analisar a fatura. Preenche os valores manualmente.");
+      const { file: uploadFile, preview, data, error } = await scanInvoiceFile(file);
+      setImageFile(uploadFile);
+      setImagePreview(preview);
+      setScanError(error);
+      if (data) {
+        setBase6(data.base6); setBase13(data.base13); setBase23(data.base23);
+        setIva6(data.iva6);   setIva13(data.iva13);   setIva23(data.iva23);
+        setTotal(data.totalCost);
+        if (data.invoiceId) setInvoiceId(data.invoiceId);
+        if (data.date) setDate(data.date);
       }
     } finally {
       setScanning(false);
