@@ -8,15 +8,18 @@ const ALLOWED_ROLES: ReadonlyArray<string> = ["Guide", "Super Guide", "Admin", "
 const CAN_MANAGE_ROLES: ReadonlyArray<string> = ["Admin", "Super Guide"];
 
 // Every action takes the booking's id, or null for the general (partner)
-// tasks on /admin/tarefas — those are Admin-only, to read and to change.
-const GENERAL_TASKS_PATH = "/admin/tarefas";
+// tasks on /admin/tarefas and /super-guide/tarefas — those are Admin and
+// Super Guide only, to read and to change.
+const GENERAL_TASKS_PATHS = ["/admin/tarefas", "/super-guide/tarefas"];
+const GENERAL_TASKS_ROLES: ReadonlyArray<string> = ["Admin", "Super Guide"];
 
 function allowed(role: string, roles: ReadonlyArray<string>, tourId: string | null): boolean {
-  return tourId === null ? role === "Admin" : roles.includes(role);
+  return (tourId === null ? GENERAL_TASKS_ROLES : roles).includes(role);
 }
 
 function revalidateTasks(tourId: string | null) {
-  revalidatePath(tourId === null ? GENERAL_TASKS_PATH : `/guide/tours/${tourId}`);
+  if (tourId === null) GENERAL_TASKS_PATHS.forEach((path) => revalidatePath(path));
+  else revalidatePath(`/guide/tours/${tourId}`);
 }
 
 export async function getSaleTasksAction(tourId: string): Promise<{ tasks?: SaleTask[]; error?: string }> {
