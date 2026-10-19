@@ -17,13 +17,36 @@ function fmtEur(n: number) {
 
 type Filter     = "all" | "matched" | "unmatched" | "partial" | "duplicates";
 type TypeFilter = "all" | "debit" | "credit";
+type DatePreset = "all" | "thisMonth" | "lastMonth" | "30d" | "90d" | "thisYear" | "custom";
 
-function txnDupKey(t: StoredTransaction) {
-  // transaction_date may arrive as a Date object from Neon (DATE column) or as a string
-  const d = t.transaction_date
+// transaction_date may arrive as a Date object from Neon (DATE column) or as a string
+function txnDay(t: StoredTransaction) {
+  return t.transaction_date
     ? new Date(t.transaction_date as unknown as string | Date).toISOString().slice(0, 10)
     : "";
-  return `${d}|${t.amount}|${t.credit_debit}`;
+}
+
+function txnDupKey(t: StoredTransaction) {
+  return `${txnDay(t)}|${t.amount}|${t.credit_debit}`;
+}
+
+function isoDay(d: Date) {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+// Inclusive [from, to] range (YYYY-MM-DD) for a preset; empty string = open-ended
+function presetRange(p: DatePreset): [string, string] {
+  const now = new Date();
+  const y = now.getFullYear(), m = now.getMonth();
+  switch (p) {
+    case "thisMonth": return [isoDay(new Date(y, m, 1)), isoDay(now)];
+    case "lastMonth": return [isoDay(new Date(y, m - 1, 1)), isoDay(new Date(y, m, 0))];
+    case "30d":       return [isoDay(new Date(y, m, now.getDate() - 29)), isoDay(now)];
+    case "90d":       return [isoDay(new Date(y, m, now.getDate() - 89)), isoDay(now)];
+    case "thisYear":  return [isoDay(new Date(y, 0, 1)), isoDay(now)];
+    default:          return ["", ""];
+  }
 }
 
 // ── Inline expense picker ─────────────────────────────────────────────────────
@@ -484,10 +507,34 @@ export function BankLedger({
   const [filter,     setFilter]     = useState<Filter>("all");
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [search,     setSearch]     = useState("");
+  const [datePreset, setDatePreset] = useState<DatePreset>("all");
+  const [dateFrom,   setDateFrom]   = useState("");
+  const [dateTo,     setDateTo]     = useState("");
   const [selectedIds,    setSelectedIds]    = useState<Set<string>>(new Set());
   const [bulkConfirm,    setBulkConfirm]    = useState(false);
   const [bulkPending,    startBulkTransition] = useTransition();
   const router = useRouter();
+
+  function pickPreset(p: DatePreset) {
+    setDatePreset(p);
+    if (p !== "custom") {
+      const [from, to] = presetRange(p);
+      setDateFrom(from);
+      setDateTo(to);
+    }
+  }
+
+  // Transactions within the selected date range — base for KPIs, counts and rows
+  const periodTxns = useMemo(() => {
+    if (!dateFrom && !dateTo) return bankTxns;
+    return bankTxns.filter((t) => {
+      const d = txnDay(t);
+      if (!d) return false;
+      if (dateFrom && d < dateFrom) return false;
+      if (dateTo   && d > dateTo)   return false;
+      return true;
+    });
+  }, [bankTxns, dateFrom, dateTo]);
 
   // Keys (date|amount|credit_debit) that appear more than once → duplicates
   const dupKeys = useMemo(() => {
@@ -510,7 +557,7 @@ export function BankLedger({
   const rows = useMemo(() => {
     const q    = search.toLowerCase().trim();
     const qDot = q.replace(",", ".");
-    return bankTxns.filter((t) => {
+    return periodTxns.filter((t) => {
       const status = matchStatus(t);
       if (filter === "matched"    && status === "none") return false;
       if (filter === "unmatched"  && status !== "none") return false;
@@ -533,7 +580,7 @@ export function BankLedger({
       );
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bankTxns, filter, typeFilter, search, matchedMap]);
+  }, [periodTxns, filter, typeFilter, search, matchedMap]);
 
   // All Notion IDs already linked to any bank transaction
   const linkedIds = useMemo(() => {
@@ -580,15 +627,58 @@ export function BankLedger({
     });
   }
 
-  const fullCount    = bankTxns.filter((t) => matchStatus(t) === "full").length;
-  const partialCount = bankTxns.filter((t) => matchStatus(t) === "partial").length;
-  const noneCount    = bankTxns.filter((t) => matchStatus(t) === "none").length;
-  const dupCount     = bankTxns.filter((t) => dupKeys.has(txnDupKey(t))).length;
-  const debitCount   = bankTxns.filter((t) => t.credit_debit === "DBIT").length;
-  const creditCount  = bankTxns.filter((t) => t.credit_debit === "CRDT").length;
+  const fullCount    = periodTxns.filter((t) => matchStatus(t) === "full").length;
+  const partialCount = periodTxns.filter((t) => matchStatus(t) === "partial").length;
+  const noneCount    = periodTxns.filter((t) => matchStatus(t) === "none").length;
+  const dupCount     = periodTxns.filter((t) => dupKeys.has(txnDupKey(t))).length;
+  const debitCount   = periodTxns.filter((t) => t.credit_debit === "DBIT").length;
+  const creditCount  = periodTxns.filter((t) => t.credit_debit === "CRDT").length;
+
+  // Financial totals for the selected period
+  const totalEntradas = periodTxns
+    .filter((t) => t.credit_debit === "CRDT")
+    .reduce((s, t) => s + Math.abs(t.amount), 0);
+  const totalSaidas = periodTxns
+    .filter((t) => t.credit_debit === "DBIT")
+    .reduce((s, t) => s + Math.abs(t.amount), 0);
+  const saldo = totalEntradas - totalSaidas;
+  const matchedCount = periodTxns.length - noneCount;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      {/* Financial totals — 2 cols on mobile, Saldo full-width below; 3 cols on md+ */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 text-center">
+          <p className="text-base sm:text-lg font-bold text-green-600 tabular-nums">{fmtEur(totalEntradas)}</p>
+          <p className="text-xs text-gray-400 mt-1">Total de Entradas</p>
+        </div>
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 text-center">
+          <p className="text-base sm:text-lg font-bold text-red-500 tabular-nums">{fmtEur(totalSaidas)}</p>
+          <p className="text-xs text-gray-400 mt-1">Total de Saídas</p>
+        </div>
+        <div className={`col-span-2 md:col-span-1 rounded-2xl border shadow-sm p-4 text-center ${saldo >= 0 ? "bg-white border-gray-100" : "bg-red-50 border-red-100"}`}>
+          <p className={`text-base sm:text-lg font-bold tabular-nums ${saldo >= 0 ? "text-[#32373c]" : "text-red-500"}`}>{fmtEur(saldo)}</p>
+          <p className="text-xs text-gray-400 mt-1">Saldo</p>
+        </div>
+      </div>
+
+      {/* Match status KPIs */}
+      <div className="grid grid-cols-3 gap-2">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 text-center overflow-hidden">
+          <p className="text-xl font-bold text-[#32373c] truncate">{periodTxns.length}</p>
+          <p className="text-xs text-gray-400 mt-1 leading-tight">Transações no banco</p>
+        </div>
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 text-center overflow-hidden">
+          <p className="text-xl font-bold text-green-600 truncate">{matchedCount}</p>
+          <p className="text-xs text-gray-400 mt-1 leading-tight">Com registo Notion</p>
+        </div>
+        <div className={`rounded-2xl border shadow-sm p-3 text-center overflow-hidden ${noneCount > 0 ? "bg-orange-50 border-orange-100" : "bg-white border-gray-100"}`}>
+          <p className={`text-xl font-bold truncate ${noneCount > 0 ? "text-orange-500" : "text-gray-400"}`}>{noneCount}</p>
+          <p className="text-xs text-gray-400 mt-1 leading-tight">Sem correspondência</p>
+        </div>
+      </div>
+
+      <div className="space-y-4">
       {/* Controls */}
       <div className="flex flex-wrap gap-3 items-start">
         <AutoMatchButton />
@@ -599,11 +689,43 @@ export function BankLedger({
         </div>
       </div>
 
+      {/* Date range */}
+      <div className="flex flex-wrap gap-2 items-center">
+        <div className="flex bg-gray-100 rounded-xl p-1 gap-1 text-xs font-semibold overflow-x-auto scrollbar-none max-w-full">
+          {([
+            ["all",       "Tudo"],
+            ["thisMonth", "Este mês"],
+            ["lastMonth", "Mês passado"],
+            ["30d",       "30 dias"],
+            ["90d",       "90 dias"],
+            ["thisYear",  "Este ano"],
+          ] as [DatePreset, string][]).map(([p, label]) => (
+            <button key={p} onClick={() => pickPreset(p)}
+              className={`px-3 py-1.5 rounded-lg transition-all whitespace-nowrap ${datePreset === p ? "bg-white text-gray-800 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className={`flex items-center gap-1.5 rounded-xl px-2 py-1 text-xs ${datePreset === "custom" ? "bg-white shadow-sm" : "bg-gray-100"}`}>
+          <span className="text-gray-500 font-semibold">De</span>
+          <input type="date" value={dateFrom} max={dateTo || undefined}
+            onChange={(e) => { setDatePreset("custom"); setDateFrom(e.target.value); }}
+            className="bg-transparent outline-none text-gray-700" aria-label="Data inicial" />
+          <span className="text-gray-500 font-semibold">a</span>
+          <input type="date" value={dateTo} min={dateFrom || undefined}
+            onChange={(e) => { setDatePreset("custom"); setDateTo(e.target.value); }}
+            className="bg-transparent outline-none text-gray-700" aria-label="Data final" />
+          {(dateFrom || dateTo) && (
+            <button onClick={() => pickPreset("all")} className="text-gray-400 hover:text-gray-700 px-1" title="Limpar datas">×</button>
+          )}
+        </div>
+      </div>
+
       {/* Filter pills — scrollable on mobile, wrapping on desktop */}
       <div className="flex gap-2 overflow-x-auto pb-0.5 -mx-4 px-4 md:mx-0 md:px-0 md:flex-wrap md:overflow-visible scrollbar-none">
         <div className="flex bg-gray-100 rounded-xl p-1 gap-1 text-xs font-semibold shrink-0">
           {([
-            ["all",        `Todos (${bankTxns.length})`],
+            ["all",        `Todos (${periodTxns.length})`],
             ["matched",    `✓ Completo (${fullCount})`],
             ["partial",    `◑ Parcial (${partialCount})`],
             ["unmatched",  `○ Sem match (${noneCount})`],
@@ -720,6 +842,7 @@ export function BankLedger({
         {oldestDate ? ` · desde ${new Date(oldestDate).toLocaleDateString("pt-PT", { day: "numeric", month: "long", year: "numeric" })}` : ""}
         {" · PSD2 disponibiliza máx. 90 dias de histórico"}
       </p>
+      </div>
     </div>
   );
 }
