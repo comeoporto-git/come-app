@@ -30,6 +30,16 @@ body {
   overflow-x: hidden;
 }
 
+/* Form controls sit on white surfaces, so don't inherit the dark-mode
+   foreground (#ededed) — that made selected values nearly invisible. */
+@layer base {
+  input,
+  select,
+  textarea {
+    color: #32373c;
+  }
+}
+
 /* Shared input style */
 .input {
   width: 100%;
