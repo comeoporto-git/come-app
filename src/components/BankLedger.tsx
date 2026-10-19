@@ -2,8 +2,8 @@
 
 import { useState, useTransition, useMemo, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { linkBankTransactionAction, dismissUnmatchedAction, runManualMatchAction, unlinkBankTransactionAction, deleteBankTransactionAction, deleteBankTransactionsAction } from "@/actions/banking";
-import type { StoredTransaction } from "@/lib/enablebanking";
+import { linkBankTransactionAction, dismissUnmatchedAction, runManualMatchAction, unlinkBankTransactionAction, deleteBankTransactionAction, deleteBankTransactionsAction, addBankTransactionCommentAction, deleteBankTransactionCommentAction } from "@/actions/banking";
+import type { StoredTransaction, BankTransactionComment } from "@/lib/enablebanking";
 import type { Transaction } from "@/lib/notion";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -149,6 +149,97 @@ function ExpensePicker({
   );
 }
 
+// ── Comments ──────────────────────────────────────────────────────────────────
+
+function fmtDateTime(s: string) {
+  return new Date(s).toLocaleString("pt-PT", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+}
+
+function CommentThread({
+  transactionId, comments, showInput, currentUserEmail, isAdmin, onClose,
+}: {
+  transactionId: string;
+  comments: BankTransactionComment[];
+  showInput: boolean;
+  currentUserEmail: string;
+  isAdmin: boolean;
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const [text, setText] = useState("");
+  const [pending, startTransition] = useTransition();
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => { if (showInput) inputRef.current?.focus(); }, [showInput]);
+
+  function submit() {
+    const body = text.trim();
+    if (!body) return;
+    startTransition(async () => {
+      await addBankTransactionCommentAction(transactionId, body);
+      setText("");
+      router.refresh();
+    });
+  }
+
+  function remove(id: number) {
+    startTransition(async () => {
+      await deleteBankTransactionCommentAction(id);
+      router.refresh();
+    });
+  }
+
+  return (
+    <div className="space-y-1.5">
+      {comments.map((c) => (
+        <div key={c.id} className="group flex items-start gap-2 bg-gray-50 rounded-lg px-2.5 py-1.5">
+          <div className="min-w-0 flex-1">
+            <p className="text-[10px] text-gray-400">
+              <span className="font-semibold text-gray-600">{c.author_name || c.author_email}</span>
+              {" · "}{fmtDateTime(c.created_at)}
+            </p>
+            <p className="text-xs text-gray-700 whitespace-pre-wrap break-words">{c.body}</p>
+          </div>
+          {(isAdmin || c.author_email === currentUserEmail) && (
+            <button
+              disabled={pending}
+              onClick={() => remove(c.id)}
+              className="text-[10px] text-gray-300 hover:text-red-500 transition-colors md:opacity-0 md:group-hover:opacity-100 shrink-0"
+              title="Apagar comentário"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+      ))}
+      {showInput && (
+        <div className="flex items-end gap-2">
+          <textarea
+            ref={inputRef}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); }
+              if (e.key === "Escape") onClose();
+            }}
+            rows={1}
+            maxLength={2000}
+            placeholder="Escrever comentário… (Enter para enviar)"
+            className="flex-1 text-xs bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-[#667470] resize-y min-h-[30px]"
+          />
+          <button
+            disabled={pending || !text.trim()}
+            onClick={submit}
+            className="text-[10px] font-semibold text-white bg-[#32373c] hover:bg-[#32373c]/80 px-3 py-1.5 rounded-lg disabled:opacity-40 transition-colors"
+          >
+            {pending ? "…" : "Enviar"}
+          </button>
+          <button onClick={onClose} className="text-[10px] text-gray-400 hover:text-gray-600 py-1.5">Fechar</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Row ───────────────────────────────────────────────────────────────────────
 
 function UnlinkButton({ notionId, onUnlinked }: { notionId: string; onUnlinked: () => void }) {
@@ -207,7 +298,7 @@ function DeleteButton({ transactionId, onDeleted }: { transactionId: string; onD
 
 function LedgerRow({
   bankTxn, matched, placeholderId, linkableExpenses, linkableEarnings, linkedIds,
-  isSelected, onToggle,
+  isSelected, onToggle, comments, currentUserEmail, isAdmin,
 }: {
   bankTxn: StoredTransaction;
   matched: Transaction[];
@@ -217,9 +308,13 @@ function LedgerRow({
   linkedIds: Set<string>;
   isSelected: boolean;
   onToggle: (id: string) => void;
+  comments: BankTransactionComment[];
+  currentUserEmail: string;
+  isAdmin: boolean;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [commenting, setCommenting] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   const [dismissPending, startDismiss] = useTransition();
 
@@ -313,8 +408,28 @@ function LedgerRow({
           Dispensar
         </button>
       )}
+      <button
+        onClick={() => setCommenting((c) => !c)}
+        className={`text-[10px] transition-colors ${comments.length > 0 ? "font-semibold text-[#667470] hover:text-[#32373c]" : "text-gray-400 hover:text-blue-500"}`}
+        title="Comentários"
+      >
+        💬 {comments.length > 0 ? comments.length : "Comentar"}
+      </button>
       <DeleteButton transactionId={bankTxn.transaction_id} onDeleted={handleDeleted} />
     </>
+  );
+
+  const commentThread = (comments.length > 0 || commenting) && (
+    <div className="px-3 pb-3 pl-9 md:pl-[calc(20px+160px+2.25rem)]">
+      <CommentThread
+        transactionId={bankTxn.transaction_id}
+        comments={comments}
+        showInput={commenting}
+        currentUserEmail={currentUserEmail}
+        isAdmin={isAdmin}
+        onClose={() => setCommenting(false)}
+      />
+    </div>
   );
 
   return (
@@ -456,6 +571,8 @@ function LedgerRow({
           {actionButtons}
         </div>
       </div>
+
+      {commentThread}
     </div>
   );
 }
@@ -496,6 +613,7 @@ function AutoMatchButton() {
 
 export function BankLedger({
   bankTxns, matchedMap, unmatchedPlaceholderMap, linkableExpenses, linkableEarnings, oldestDate,
+  commentsMap, currentUserEmail, isAdmin,
 }: {
   bankTxns: StoredTransaction[];
   matchedMap: Record<string, Transaction[]>;
@@ -503,6 +621,9 @@ export function BankLedger({
   linkableExpenses: Transaction[];
   linkableEarnings: Transaction[];
   oldestDate?: string;
+  commentsMap: Record<string, BankTransactionComment[]>;
+  currentUserEmail: string;
+  isAdmin: boolean;
 }) {
   const [filter,     setFilter]     = useState<Filter>("all");
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
@@ -576,11 +697,12 @@ export function BankLedger({
         matches.some((m) =>
           (m.supplier ?? "").toLowerCase().includes(q) ||
           (m.invoiceId ?? "").toLowerCase().includes(q)
-        )
+        ) ||
+        (commentsMap[t.transaction_id] ?? []).some((c) => c.body.toLowerCase().includes(q))
       );
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [periodTxns, filter, typeFilter, search, matchedMap]);
+  }, [periodTxns, filter, typeFilter, search, matchedMap, commentsMap]);
 
   // All Notion IDs already linked to any bank transaction
   const linkedIds = useMemo(() => {
@@ -684,7 +806,7 @@ export function BankLedger({
         <AutoMatchButton />
         <div className="flex-1 min-w-0">
           <input value={search} onChange={(e) => setSearch(e.target.value)}
-            placeholder="Pesquisar por descrição, fornecedor, fatura, valor…"
+            placeholder="Pesquisar por descrição, fornecedor, fatura, valor, comentário…"
             className="w-full text-xs bg-white border border-gray-200 rounded-xl px-3 py-2 outline-none focus:border-[#667470] transition-colors" />
         </div>
       </div>
@@ -832,6 +954,9 @@ export function BankLedger({
               linkedIds={linkedIds}
               isSelected={selectedIds.has(t.transaction_id)}
               onToggle={toggleSelect}
+              comments={commentsMap[t.transaction_id] ?? []}
+              currentUserEmail={currentUserEmail}
+              isAdmin={isAdmin}
             />
           ))
         )}

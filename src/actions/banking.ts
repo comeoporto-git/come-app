@@ -3,6 +3,8 @@
 import {
   removeEBSession,
   revokeSession,
+  addBankTransactionComment,
+  deleteBankTransactionComment,
 } from "@/lib/enablebanking";
 import {
   getUnmatchedBankTransactions,
@@ -216,6 +218,36 @@ export async function deleteBankTransactionsAction(transactionIds: string[]): Pr
   }
   revalidatePath("/admin/reconciliation");
   return { deleted };
+}
+
+// ── Transaction comments ──────────────────────────────────────────────────────
+
+async function requireReconciliationUser() {
+  const session = await auth();
+  if (!session || (session.user.role !== "Admin" && session.user.role !== "Accountant") || !session.user.email) {
+    throw new Error("Forbidden");
+  }
+  return session.user;
+}
+
+export async function addBankTransactionCommentAction(transactionId: string, body: string): Promise<void> {
+  const user = await requireReconciliationUser();
+  const text = body.trim();
+  if (!text) return;
+  await addBankTransactionComment({
+    transactionId,
+    authorEmail: user.email!,
+    authorName: user.name ?? null,
+    body: text.slice(0, 2000),
+  });
+  revalidatePath("/admin/reconciliation");
+}
+
+export async function deleteBankTransactionCommentAction(commentId: number): Promise<void> {
+  const user = await requireReconciliationUser();
+  // Admins can delete any comment; accountants only their own
+  await deleteBankTransactionComment(commentId, user.role === "Admin" ? undefined : user.email!);
+  revalidatePath("/admin/reconciliation");
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
