@@ -454,3 +454,70 @@ export async function getStoredTransactions(
       `;
   return rows as unknown as StoredTransaction[];
 }
+
+// ── Transaction comments ──────────────────────────────────────────────────────
+
+export type BankTransactionComment = {
+  id: number;
+  transaction_id: string;
+  author_email: string;
+  author_name: string | null;
+  body: string;
+  created_at: string;
+};
+
+/** All comments grouped by bank transaction_id (oldest first) */
+export async function getBankTransactionComments(): Promise<Record<string, BankTransactionComment[]>> {
+  const sql = getDb();
+  try {
+    const rows = (await sql`
+      SELECT * FROM bank_transaction_comments ORDER BY created_at ASC, id ASC
+    `) as unknown as BankTransactionComment[];
+    const map: Record<string, BankTransactionComment[]> = {};
+    for (const r of rows) {
+      (map[r.transaction_id] ??= []).push({ ...r, created_at: new Date(r.created_at).toISOString() });
+    }
+    return map;
+  } catch {
+    return {}; // table may not exist yet
+  }
+}
+
+/** Add a comment to a bank transaction (creates table if needed) */
+export async function addBankTransactionComment(entry: {
+  transactionId: string;
+  authorEmail: string;
+  authorName: string | null;
+  body: string;
+}): Promise<void> {
+  const sql = getDb();
+  await sql`
+    CREATE TABLE IF NOT EXISTS bank_transaction_comments (
+      id              SERIAL PRIMARY KEY,
+      transaction_id  TEXT NOT NULL REFERENCES bank_transactions(transaction_id) ON DELETE CASCADE,
+      author_email    TEXT NOT NULL,
+      author_name     TEXT,
+      body            TEXT NOT NULL,
+      created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
+  await sql`ALTER TABLE bank_transaction_comments ENABLE ROW LEVEL SECURITY`;
+  await sql`
+    CREATE INDEX IF NOT EXISTS bank_transaction_comments_txn_idx
+      ON bank_transaction_comments (transaction_id, created_at)
+  `;
+  await sql`
+    INSERT INTO bank_transaction_comments (transaction_id, author_email, author_name, body)
+    VALUES (${entry.transactionId}, ${entry.authorEmail}, ${entry.authorName}, ${entry.body})
+  `;
+}
+
+/** Delete a comment. Non-admins may only delete their own. */
+export async function deleteBankTransactionComment(id: number, onlyAuthorEmail?: string): Promise<void> {
+  const sql = getDb();
+  if (onlyAuthorEmail) {
+    await sql`DELETE FROM bank_transaction_comments WHERE id = ${id} AND author_email = ${onlyAuthorEmail}`;
+  } else {
+    await sql`DELETE FROM bank_transaction_comments WHERE id = ${id}`;
+  }
+}

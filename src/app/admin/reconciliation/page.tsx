@@ -5,7 +5,7 @@ import {
   getMatchedTransactionMap,
   getLinkableTransactions,
 } from "@/lib/notion";
-import { getStoredTransactions } from "@/lib/enablebanking";
+import { getStoredTransactions, getBankTransactionComments } from "@/lib/enablebanking";
 import { BankLedger } from "@/components/BankLedger";
 
 export default async function ReconciliationPage() {
@@ -15,11 +15,12 @@ export default async function ReconciliationPage() {
   // Fetch all data in parallel — individual failures return empty defaults
   // getLinkableTransactions() makes a SINGLE Notion query instead of two,
   // halving the API calls and preventing timeout on large datasets.
-  const [bankTxns, matchedMap, unmatchedPlaceholders, linkable] = await Promise.all([
+  const [bankTxns, matchedMap, unmatchedPlaceholders, linkable, commentsMap] = await Promise.all([
     getStoredTransactions(0).catch((e) => { console.error("[reconciliation] bankTxns:", e); return []; }),
     getMatchedTransactionMap().catch((e) => { console.error("[reconciliation] matchedMap:", e); return {} as Record<string, import("@/lib/notion").Transaction[]>; }),
     getUnmatchedBankTransactions().catch((e) => { console.error("[reconciliation] unmatched:", e); return []; }),
     getLinkableTransactions().catch((e) => { console.error("[reconciliation] linkable:", e); return { expenses: [], earnings: [] }; }),
+    getBankTransactionComments(),
   ]);
   const linkableExpenses = linkable.expenses;
   const linkableEarnings = linkable.earnings;
@@ -47,6 +48,9 @@ export default async function ReconciliationPage() {
           linkableExpenses={linkableExpenses}
           linkableEarnings={linkableEarnings}
           oldestDate={oldestDate}
+          commentsMap={commentsMap}
+          currentUserEmail={session.user.email ?? ""}
+          isAdmin={session.user.role === "Admin"}
         />
       </main>
     </div>
