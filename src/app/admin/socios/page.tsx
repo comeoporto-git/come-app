@@ -1,6 +1,6 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { getPartnerBalances, getSocioPersonalExpenses } from "@/lib/notion";
+import { getFornecedores, getPartnerBalances, getSocioPersonalExpenses } from "@/lib/notion";
 import type { PartnerBalance } from "@/lib/notion";
 import { OWNERSHIP_BEFORE, OWNERSHIP_AFTER } from "@/lib/constants";
 import { SocioPersonalExpenseList } from "@/components/SocioPersonalExpenseList";
@@ -9,9 +9,10 @@ export default async function SociosPage() {
   const session = await auth();
   if (!session || session.user.role !== "Admin") redirect("/");
 
-  const [{ before, after }, personalExpenses] = await Promise.all([
+  const [{ before, after }, personalExpenses, fornecedores] = await Promise.all([
     getPartnerBalances(),
     getSocioPersonalExpenses(),
+    getFornecedores(),
   ]);
 
   return (
@@ -38,7 +39,7 @@ export default async function SociosPage() {
           ownership={OWNERSHIP_AFTER}
         />
 
-        <SocioPersonalExpenseList expenses={personalExpenses} />
+        <SocioPersonalExpenseList expenses={personalExpenses} fornecedores={fornecedores} />
       </main>
     </div>
   );
