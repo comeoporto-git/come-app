@@ -224,8 +224,13 @@ function ConvertToHonorarioModal({
     ...team,
   ].filter((m, i, arr) => arr.findIndex((o) => o.name === m.name) === i);
   const [member, setMember] = useState(defaultMember ?? options[0]?.name ?? "");
+  const [query, setQuery] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const q = query.trim().toLowerCase();
+  const visible = q
+    ? options.filter((m) => m.name.toLowerCase().includes(q) || m.role.toLowerCase().includes(q))
+    : options;
 
   async function handleConfirm() {
     setSaving(true);
@@ -242,7 +247,7 @@ function ConvertToHonorarioModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="w-full max-w-sm bg-white rounded-2xl p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
+      <div className="w-full max-w-sm max-h-[90vh] flex flex-col bg-white rounded-2xl p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
         <div>
           <h3 className="text-base font-semibold text-[#32373c]">Converter em Honorário</h3>
           <p className="text-xs text-gray-500 mt-1">
@@ -253,9 +258,22 @@ function ConvertToHonorarioModal({
         {options.length === 0 ? (
           <p className="text-sm text-gray-400 text-center py-2">Nenhum membro atribuído a este serviço.</p>
         ) : (
-          <div className="space-y-2">
+          <div className="flex flex-col min-h-0 space-y-2">
             <p className="text-sm text-gray-500">Honorários de:</p>
-            {options.map((m) => (
+            {options.length > 6 && (
+              <input
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Procurar membro…"
+                className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#667470]"
+              />
+            )}
+            <div className="overflow-y-auto min-h-0 space-y-2">
+            {visible.length === 0 && (
+              <p className="text-sm text-gray-400 text-center py-2">Nenhum membro encontrado.</p>
+            )}
+            {visible.map((m) => (
               <button
                 key={m.name}
                 type="button"
@@ -268,6 +286,7 @@ function ConvertToHonorarioModal({
                 <span className="text-xs text-gray-500">{m.role}</span>
               </button>
             ))}
+            </div>
           </div>
         )}
 
