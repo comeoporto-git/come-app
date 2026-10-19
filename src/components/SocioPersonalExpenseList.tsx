@@ -3,10 +3,19 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { setSocioTransferenciaFeitaAction } from "@/actions/transactions";
-import type { Transaction } from "@/lib/notion";
+import type { Transaction, Fornecedor } from "@/lib/notion";
 import { PARTNERS, ownershipForDate } from "@/lib/constants";
+import { EditExpenseModal } from "./EditExpenseModal";
 
-export function SocioPersonalExpenseList({ expenses }: { expenses: Transaction[] }) {
+export function SocioPersonalExpenseList({
+  expenses,
+  fornecedores = [],
+}: {
+  expenses: Transaction[];
+  fornecedores?: Fornecedor[];
+}) {
+  const [editing, setEditing] = useState<Transaction | null>(null);
+
   if (expenses.length === 0) return null;
 
   const transfers = computePendingTransfers(expenses);
@@ -32,9 +41,19 @@ export function SocioPersonalExpenseList({ expenses }: { expenses: Transaction[]
       </div>
       <ul className="divide-y divide-gray-50">
         {expenses.map((e) => (
-          <SocioExpenseRow key={e.id} expense={e} />
+          <SocioExpenseRow key={e.id} expense={e} onEdit={() => setEditing(e)} />
         ))}
       </ul>
+
+      {editing && (
+        <EditExpenseModal
+          transaction={editing}
+          tourId={editing.tourId ?? ""}
+          fornecedores={fornecedores}
+          userRole="Admin"
+          onClose={() => setEditing(null)}
+        />
+      )}
     </section>
   );
 }
@@ -72,7 +91,7 @@ function computePendingTransfers(expenses: Transaction[]): { from: string; to: s
   return transfers;
 }
 
-function SocioExpenseRow({ expense }: { expense: Transaction }) {
+function SocioExpenseRow({ expense, onEdit }: { expense: Transaction; onEdit: () => void }) {
   const router = useRouter();
   const [marking, setMarking] = useState(false);
   const [done, setDone] = useState(!!expense.socioTransferenciaFeita);
@@ -100,7 +119,12 @@ function SocioExpenseRow({ expense }: { expense: Transaction }) {
 
   return (
     <li className={`px-5 py-3.5 flex items-start justify-between gap-3 transition-opacity ${done ? "opacity-50" : ""}`}>
-      <div className="min-w-0">
+      <button
+        type="button"
+        onClick={onEdit}
+        title="Editar despesa"
+        className="min-w-0 flex-1 text-left rounded-lg -mx-1.5 px-1.5 -my-1 py-1 hover:bg-gray-50 transition-colors"
+      >
         <p className="text-sm font-semibold text-[#32373c] truncate">
           {expense.supplier || "—"} <span className="text-gray-400 font-normal">· {payer}</span>
         </p>
@@ -110,7 +134,7 @@ function SocioExpenseRow({ expense }: { expense: Transaction }) {
         <p className="text-xs text-gray-500 mt-1">
           {owed.map((o) => `${o.name}: €${o.amount.toFixed(2)}`).join(" · ")}
         </p>
-      </div>
+      </button>
       <label className="flex items-center gap-2 cursor-pointer select-none shrink-0">
         <div
           onClick={marking ? undefined : handleToggle}
