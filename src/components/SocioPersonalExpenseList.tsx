@@ -58,6 +58,14 @@ export function SocioPersonalExpenseList({
   );
 }
 
+// Amount split between partners. VAT-exempt expenses logged with only a total
+// (no IVA, taxFree 0) use the total, otherwise the split would show €0.
+function splitBase(e: Transaction): number {
+  if (e.taxFree) return Math.abs(e.taxFree);
+  const noIva = !e.iva6 && !e.iva13 && !e.iva23;
+  return noIva ? Math.abs(e.totalCost) : 0;
+}
+
 // Amount each partner still owes each other partner, netted out per pair
 // (a partner can both owe and be owed by the same person, since expenses
 // for different partners' personal use are mixed together). The partner
@@ -73,7 +81,7 @@ function computePendingTransfers(expenses: Transaction[]): { from: string; to: s
     const ownership = ownershipForDate(e.date);
     for (const p of PARTNERS) {
       if (p === beneficiary) continue;
-      const amount = ((ownership[p] ?? 0) / 100) * e.taxFree;
+      const amount = ((ownership[p] ?? 0) / 100) * splitBase(e);
       const key = `${beneficiary}->${p}`;
       owedTo[key] = (owedTo[key] ?? 0) + amount;
     }
@@ -98,10 +106,13 @@ function SocioExpenseRow({ expense, onEdit }: { expense: Transaction; onEdit: ()
 
   const payer = expense.socioPessoal ?? "";
   const ownership = ownershipForDate(expense.date);
-  const owed = PARTNERS.filter((p) => p !== payer).map((p) => ({
+  const base = splitBase(expense);
+  const split = PARTNERS.map((p) => ({
     name: p,
-    amount: ((ownership[p] ?? 0) / 100) * expense.taxFree,
-  }));
+    pct: ownership[p] ?? 0,
+    amount: ((ownership[p] ?? 0) / 100) * base,
+  })).filter((s) => s.pct > 0);
+  const owed = split.filter((s) => s.name !== payer);
 
   async function handleToggle() {
     const next = !done;
@@ -129,11 +140,25 @@ function SocioExpenseRow({ expense, onEdit }: { expense: Transaction; onEdit: ()
           {expense.supplier || "—"} <span className="text-gray-400 font-normal">· {payer}</span>
         </p>
         <p className="text-xs text-gray-400">
-          {expense.date ?? "—"} · €{expense.taxFree.toFixed(2)} sem IVA
+          {expense.date ?? "—"} · €{base.toFixed(2)} sem IVA
         </p>
         <p className="text-xs text-gray-500 mt-1">
-          {owed.map((o) => `${o.name}: €${o.amount.toFixed(2)}`).join(" · ")}
+          Divisão:{" "}
+          {split.map((s, i) => (
+            <span key={s.name}>
+              {i > 0 && " · "}
+              <span className={s.name === payer ? "font-semibold text-gray-600" : ""}>
+                {s.name} {s.pct}% €{s.amount.toFixed(2)}
+              </span>
+            </span>
+          ))}
         </p>
+        {payer && owed.length > 0 && (
+          <p className="text-xs text-gray-500">
+            {payer} transfere:{" "}
+            {owed.map((o) => `${o.name} €${o.amount.toFixed(2)}`).join(" · ")}
+          </p>
+        )}
       </button>
       <label className="flex items-center gap-2 cursor-pointer select-none shrink-0">
         <div

@@ -468,6 +468,14 @@ export function EditExpenseModal({
                 </select>
                 {form.socioPessoal && (
                   <p className="text-xs text-gray-400 mt-1">
+                    Divisão: {PARTNERS.filter((p) => (ownershipForDate(form.date)[p] ?? 0) > 0).map((p) => {
+                      const pct = ownershipForDate(form.date)[p] ?? 0;
+                      return `${p} ${pct}% €${((pct / 100) * form.taxFree).toFixed(2)}`;
+                    }).join(" · ")}
+                  </p>
+                )}
+                {form.socioPessoal && (
+                  <p className="text-xs text-gray-400 mt-0.5">
                     Precisa de transferir: {PARTNERS.filter((p) => p !== form.socioPessoal).map((p) => {
                       const pct = ownershipForDate(form.date)[p] ?? 0;
                       const amount = (pct / 100) * form.taxFree;
