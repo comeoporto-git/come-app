@@ -11,6 +11,8 @@ type FormState = {
   supplier: string;
   date: string;
   invoiceId: string;
+  /** VAT-exempt base (e.g. insurance) — counts towards taxFree with no IVA. */
+  base0: number;
   base6: number;
   base13: number;
   base23: number;
@@ -71,15 +73,22 @@ export function EditExpenseModal({
   const cameraRef = useRef<HTMLInputElement>(null);
 
   // totalCost in Notion is stored as negative; show/work with positive in the form
+  const derivedBases =
+    Math.abs(transaction.iva6) / 0.06 + Math.abs(transaction.iva13) / 0.13 + Math.abs(transaction.iva23) / 0.23;
+  // No base and no IVA but a total (old exempt entries) → treat the total as exempt base
+  const missingBase = !transaction.taxFree && derivedBases === 0 ? Math.abs(transaction.totalCost) : 0;
+  const exemptBase = (Math.abs(transaction.taxFree) || missingBase) - derivedBases;
   const [form, setForm] = useState<FormState>({
     supplier: transaction.supplier,
     date: transaction.date ?? new Date().toISOString().slice(0, 10),
     invoiceId: transaction.invoiceId,
+    // Whatever part of taxFree isn't explained by the IVA rows is exempt
+    base0: exemptBase > 0.01 ? Math.round(exemptBase * 100) / 100 : 0,
     // Derive per-rate bases from IVA amounts (base = iva / rate)
     base6:  transaction.iva6  ? Math.abs(transaction.iva6)  / 0.06 : 0,
     base13: transaction.iva13 ? Math.abs(transaction.iva13) / 0.13 : 0,
     base23: transaction.iva23 ? Math.abs(transaction.iva23) / 0.23 : 0,
-    taxFree: Math.abs(transaction.taxFree),
+    taxFree: Math.abs(transaction.taxFree) || missingBase,
     iva6: Math.abs(transaction.iva6),
     iva13: Math.abs(transaction.iva13),
     iva23: Math.abs(transaction.iva23),
@@ -115,13 +124,24 @@ export function EditExpenseModal({
   function update(field: keyof FormState, value: string | number) {
     setForm((f) => {
       const updated = { ...f, [field]: value };
-      if (["base6", "base13", "base23"].includes(field as string)) {
-        updated.taxFree = Number(updated.base6) + Number(updated.base13) + Number(updated.base23);
+      if (["base0", "base6", "base13", "base23"].includes(field as string)) {
+        updated.taxFree =
+          Number(updated.base0) + Number(updated.base6) + Number(updated.base13) + Number(updated.base23);
       }
-      if (["base6", "base13", "base23", "taxFree", "iva6", "iva13", "iva23"].includes(field as string)) {
+      if (["base0", "base6", "base13", "base23", "taxFree", "iva6", "iva13", "iva23"].includes(field as string)) {
         updated.totalCost =
           Number(updated.taxFree) + Number(updated.iva6) +
           Number(updated.iva13) + Number(updated.iva23);
+      }
+      // Total typed with no IVA breakdown → the whole amount is the (exempt) base,
+      // otherwise taxFree stays 0 and e.g. sócio redistribution comes out as €0.
+      if (field === "totalCost") {
+        const noIva = !updated.iva6 && !updated.iva13 && !updated.iva23;
+        const noRatedBase = !updated.base6 && !updated.base13 && !updated.base23;
+        if (noIva && noRatedBase) {
+          updated.base0 = Number(value);
+          updated.taxFree = Number(value);
+        }
       }
       return updated;
     });
@@ -377,6 +397,11 @@ export function EditExpenseModal({
                   <span>Taxa</span>
                   <span className="text-right">Incidência</span>
                   <span className="text-right">IVA</span>
+                </div>
+                <div className="grid grid-cols-3 gap-1 px-2 py-1.5 border-t border-gray-100">
+                  <span className="flex items-center text-xs text-gray-500 font-medium pl-1">Isento</span>
+                  <input type="number" step="0.01" min="0" value={form.base0 || ""} onChange={(e) => update("base0", parseFloat(e.target.value) || 0)} className="input text-right text-sm py-1 px-2" placeholder="0.00" />
+                  <span />
                 </div>
                 {(["6", "13", "23"] as const).map((rate) => {
                   const bk = `base${rate}` as "base6" | "base13" | "base23";
