@@ -34,6 +34,11 @@ const CARD_MATCH_WINDOW_MS          = 3 * 24 * 60 * 60 * 1000;
 const REIMBURSEMENT_MATCH_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 const AMOUNT_TOLERANCE              = 0.02; // 2 cents
 
+// Incremental syncs re-read this far back before last_fetched_at. Card
+// payments sit as pending for days and are then booked with an earlier date,
+// so a short overlap misses them for good. Re-reading is cheap: upsert dedups.
+const INCREMENTAL_OVERLAP_MS        = 10 * 24 * 60 * 60 * 1000;
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function formatDate(d: Date): string {
@@ -79,11 +84,12 @@ export async function doFetch(opts?: { fullSync?: boolean }): Promise<FetchResul
     const from = fullSync
       ? formatDate(new Date(Date.now() - 89 * 86_400_000))
       : session.last_fetched_at
-        ? formatDate(new Date(new Date(session.last_fetched_at).getTime() - 86_400_000))
+        ? formatDate(new Date(new Date(session.last_fetched_at).getTime() - INCREMENTAL_OVERLAP_MS))
         : formatDate(new Date(Date.now() - 30 * 86_400_000));
     const to = formatDate(new Date());
 
     let sessionClosed = false;
+    let accountFailed = false;
 
     for (const accountId of session.accountIds) {
       const txns: EBTransaction[] = [];
@@ -100,6 +106,7 @@ export async function doFetch(opts?: { fullSync?: boolean }): Promise<FetchResul
         const msg = err instanceof Error ? err.message : String(err);
         console.error(`[doFetch] failed to fetch account ${accountId}:`, msg);
         errors.push(msg);
+        accountFailed = true;
       }
 
       fetched += txns.length;
@@ -121,6 +128,10 @@ export async function doFetch(opts?: { fullSync?: boolean }): Promise<FetchResul
       }
       continue;
     }
+
+    // Don't advance the window past data we failed to fetch, or the next
+    // incremental sync would skip it.
+    if (accountFailed) continue;
 
     try {
       await updateEBLastFetched(session.session_id);
