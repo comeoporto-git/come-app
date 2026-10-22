@@ -171,17 +171,23 @@ export async function getAccountTransactions(
     transaction_status: "BOOK",
   });
   const all: EBTransaction[] = [];
-  let path: string | null =
-    `/accounts/${encodeURIComponent(accountId)}/transactions?${params}`;
+  const base = `/accounts/${encodeURIComponent(accountId)}/transactions`;
+  let path: string | null = `${base}?${params}`;
 
   type TxPage = { transactions?: EBTransaction[]; continuation_key?: string };
   while (path) {
     // eslint-disable-next-line no-await-in-loop
     const page: TxPage = await api<TxPage>("GET", path);
     all.push(...(page.transactions ?? []));
-    path = page.continuation_key
-      ? `/accounts/${encodeURIComponent(accountId)}/transactions?continuation_key=${page.continuation_key}`
-      : null;
+    // The continuation key is only valid together with the exact same
+    // query parameters as the first request (EB returns 422 otherwise).
+    if (page.continuation_key) {
+      const next = new URLSearchParams(params);
+      next.set("continuation_key", page.continuation_key);
+      path = `${base}?${next}`;
+    } else {
+      path = null;
+    }
   }
   return all;
 }
