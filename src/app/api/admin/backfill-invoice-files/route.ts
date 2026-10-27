@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
 import { supabase } from "@/lib/notion";
 import { Client } from "@notionhq/client";
@@ -11,6 +11,11 @@ import { put } from "@vercel/blob";
 // IS the Notion page id) and re-uploads to Vercel Blob for a permanent URL.
 // Time-boxed and resumable — call repeatedly (e.g. refresh the page) until
 // `remaining` is 0. Safe to re-run: skips anything already on Blob.
+//
+// Also recovers files the migration never copied: migrated rows (Notion page
+// ids, i.e. not app-generated v4 UUIDs) with an empty fatura_url/comprovativo_url
+// are checked against Notion too. Those that Notion has no file for stay empty,
+// so this pass is paged with `?offset=` (use `nextOffset` from the response).
 
 export const maxDuration = 60;
 
@@ -43,7 +48,10 @@ async function reuploadToBlob(staleUrl: string): Promise<string | null> {
   return blob.url;
 }
 
-export async function POST() {
+const isNotionPageId = (id: string) => !/^[0-9a-f]{8}-[0-9a-f]{4}-4/i.test(id);
+const onBlob = (url: string | null) => !!url && url.includes("blob.vercel-storage.com");
+
+export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session || session.user.role !== "Admin") {
     return new NextResponse("Forbidden", { status: 403 });
@@ -55,17 +63,17 @@ export async function POST() {
   const notion = new Client({ auth: process.env.NOTION_TOKEN });
   const deadline = Date.now() + 50_000; // leave buffer under the 60s function limit
 
+  const offset = Math.max(0, Number(req.nextUrl.searchParams.get("offset")) || 0);
+
   const { data: rows, error } = await supabase
     .from("transactions")
     .select("id, fatura_url, comprovativo_url")
-    .or("fatura_url.not.is.null,comprovativo_url.not.is.null");
+    .order("id");
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const candidates = (rows ?? []).filter(
-    (r) =>
-      (r.fatura_url && !r.fatura_url.includes("blob.vercel-storage.com")) ||
-      (r.comprovativo_url && !r.comprovativo_url.includes("blob.vercel-storage.com")),
-  );
+  const candidates = (rows ?? [])
+    .filter((r) => isNotionPageId(r.id) && (!onBlob(r.fatura_url) || !onBlob(r.comprovativo_url)))
+    .slice(offset);
 
   let processed = 0, fixed = 0, skipped = 0, failed = 0;
   const errors: { id: string; error: string }[] = [];
@@ -81,11 +89,11 @@ export async function POST() {
 
       const updates: { fatura_url?: string; comprovativo_url?: string } = {};
 
-      if (row.fatura_url && !row.fatura_url.includes("blob.vercel-storage.com") && freshFatura) {
+      if (!onBlob(row.fatura_url) && freshFatura) {
         const newUrl = await reuploadToBlob(freshFatura);
         if (newUrl) updates.fatura_url = newUrl;
       }
-      if (row.comprovativo_url && !row.comprovativo_url.includes("blob.vercel-storage.com") && freshComprovativo) {
+      if (!onBlob(row.comprovativo_url) && freshComprovativo) {
         const newUrl = await reuploadToBlob(freshComprovativo);
         if (newUrl) updates.comprovativo_url = newUrl;
       }
@@ -107,7 +115,8 @@ export async function POST() {
   }
 
   return NextResponse.json({
-    totalCandidates: candidates.length,
+    totalCandidates: offset + candidates.length,
+    nextOffset: offset + processed,
     processed,
     fixed,
     skipped,
