@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition, useMemo, useRef, useEffect } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { linkBankTransactionAction, dismissUnmatchedAction, runManualMatchAction, unlinkBankTransactionAction, deleteBankTransactionAction, deleteBankTransactionsAction, addBankTransactionCommentAction, deleteBankTransactionCommentAction } from "@/actions/banking";
 import type { StoredTransaction, BankTransactionComment } from "@/lib/enablebanking";
@@ -356,7 +357,18 @@ function LedgerRow({
           <p className="text-[10px] text-gray-400 truncate">
             {m.date ? fmtDate(m.date) : ""}
             {m.invoiceId ? ` · Fatura ${m.invoiceId}` : ""}
-            {m.tourName ? ` · ${m.tourName}` : ""}
+            {m.tourName && (m.tourId ? (
+              <>
+                {" · "}
+                <Link
+                  href={`/guide/tours/${m.tourId}`}
+                  className="text-[#667470] font-medium hover:underline"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {m.tourName}
+                </Link>
+              </>
+            ) : ` · ${m.tourName}`)}
           </p>
           {m.paidByName && (
             <p className="text-[10px] text-gray-400 truncate">Pago por: {m.paidByName}</p>
