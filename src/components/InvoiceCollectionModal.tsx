@@ -6,6 +6,7 @@ import { analyzeInvoice, type InvoiceData } from "@/actions/invoice";
 import { markInvoiceCollectedAction, createFornecedorAction, markAiScanFailedAction, markNoInvoiceNeededAction } from "@/actions/transactions";
 import type { Transaction, Fornecedor } from "@/lib/notion";
 import { normalizeImage } from "@/lib/image";
+import { DuplicateInvoiceWarning } from "./DuplicateInvoiceWarning";
 
 type Step = "capture" | "scanning" | "review";
 
@@ -300,6 +301,14 @@ export function InvoiceCollectionModal({
                   Scan IA falhou — preenche os campos manualmente.
                 </div>
               )}
+              <DuplicateInvoiceWarning
+                kind="Expense"
+                invoiceId={form.invoiceId}
+                supplier={transaction.supplier}
+                date={transaction.date}
+                totalCost={form.totalCost}
+                excludeId={transaction.id}
+              />
               {/* Image preview / PDF indicator */}
               {imageDataUrl === "pdf" ? (
                 <div className="flex items-center gap-3 p-3 rounded-xl border border-gray-200 bg-gray-50">

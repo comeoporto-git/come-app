@@ -4,6 +4,7 @@ import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createStandaloneEarningAction } from "@/actions/transactions";
 import { scanInvoiceFile } from "@/lib/scan-invoice";
+import { DuplicateInvoiceWarning } from "./DuplicateInvoiceWarning";
 
 export function AddStandaloneVendaButton({ className }: { className?: string }) {
   const [open, setOpen] = useState(false);
@@ -205,6 +206,8 @@ function StandaloneVendaModal({ onClose }: { onClose: () => void }) {
                 </button>
               )}
             </div>
+
+            <DuplicateInvoiceWarning kind="Earning" invoiceId={invoiceId} />
 
             <button type="submit" disabled={saving || scanning || total === 0}
               className="w-full bg-emerald-700 text-white font-semibold py-3.5 rounded-2xl text-sm disabled:opacity-50 hover:bg-emerald-800 active:scale-[0.98] transition-colors">
