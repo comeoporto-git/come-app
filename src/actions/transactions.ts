@@ -15,9 +15,10 @@ import {
   setComprovativoUrl,
   getFornecedores,
   findTeamMemberIdByName,
+  findDuplicateInvoices,
   supabase,
 } from "@/lib/notion";
-import type { Transaction, Fornecedor, TeamSlotRole } from "@/lib/notion";
+import type { Transaction, Fornecedor, TeamSlotRole, DuplicateInvoiceMatch } from "@/lib/notion";
 import { revalidatePath, updateTag } from "next/cache";
 import { auth } from "@/lib/auth";
 import { notifyInvoiceAdded } from "@/lib/notifications";
@@ -686,5 +687,23 @@ export async function retryAiScanAction(
     return { success: true };
   } catch {
     return { success: false, error: "O scan de AI falhou novamente." };
+  }
+}
+
+/** Looks up faturas already in the system that match a scanned/typed one, so the scanner can warn before saving a duplicate. */
+export async function checkDuplicateInvoiceAction(params: {
+  kind: "Expense" | "Earning";
+  invoiceId: string;
+  supplier?: string;
+  date?: string | null;
+  totalCost?: number;
+  excludeId?: string;
+}): Promise<DuplicateInvoiceMatch[]> {
+  await requireAuth();
+  try {
+    return await findDuplicateInvoices(params);
+  } catch (e) {
+    console.error("[checkDuplicateInvoiceAction]", e);
+    return [];
   }
 }

@@ -8,6 +8,7 @@ import { normalizeImage } from "@/lib/image";
 import { useRouter } from "next/navigation";
 import { PARTNERS, PARTNER_PAYMENT_METHODS, ownershipForDate, partnerPaymentByMethod, isMemberFeeMethod } from "@/lib/constants";
 import { WhoPaidPicker, peopleForMethod, type ServicePerson } from "./WhoPaidPicker";
+import { DuplicateInvoiceWarning } from "./DuplicateInvoiceWarning";
 
 type Mode = "chef-choose" | "admin-choose" | "honorarios" | "choose" | "scan" | "manual" | "review";
 
@@ -723,6 +724,15 @@ export function AddExpenseModal({
                   </div>
                 </label>
               )}
+
+              <DuplicateInvoiceWarning
+                kind="Expense"
+                invoiceId={form.invoiceId}
+                supplier={form.supplier}
+                date={form.date}
+                totalCost={form.totalCost}
+                excludeId={pendingTransaction?.id}
+              />
 
               {error && (
                 <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-600">

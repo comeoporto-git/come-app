@@ -6,6 +6,7 @@ import type { Transaction } from "@/lib/notion";
 import { CONTA_PAGAMENTO_OPTIONS } from "@/lib/constants";
 import { useRouter } from "next/navigation";
 import { scanInvoiceFile } from "@/lib/scan-invoice";
+import { DuplicateInvoiceWarning } from "./DuplicateInvoiceWarning";
 
 type FormState = {
   reference: string;
@@ -330,6 +331,8 @@ export function EditEarningModal({
                 </div>
               )}
             </div>
+
+            <DuplicateInvoiceWarning kind="Earning" invoiceId={form.invoiceId} excludeId={transaction.id} />
 
             <button
               onClick={handleSave}

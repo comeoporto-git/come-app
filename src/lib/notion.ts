@@ -2639,3 +2639,76 @@ export async function getCRMMonthlyActivity(): Promise<CRMMonthlyActivity> {
     newProspects: prospects.count ?? 0,
   };
 }
+
+// ── Duplicate invoice lookup ──────────────────────────────────────────────────
+
+export type DuplicateInvoiceMatch = {
+  id: string;
+  supplier: string;
+  date: string | null;
+  invoiceId: string;
+  totalCost: number;
+  tourId: string | null;
+  tourName: string;
+};
+
+const normalizeInvoiceId = (s: string) => s.replace(/\s+/g, "").toUpperCase();
+const sameName = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+const sameAmount = (a: number, b: number) => Math.abs(Math.abs(a) - Math.abs(b)) < 0.005;
+
+/**
+ * Finds transactions that look like the same fatura already in the system.
+ * Earnings are COME's own invoice series, so the number alone identifies them.
+ * Expense numbers only repeat per supplier, so an expense also needs the same
+ * supplier or the same total; without a number it falls back to supplier + date + total.
+ */
+export async function findDuplicateInvoices(params: {
+  kind: "Expense" | "Earning";
+  invoiceId: string;
+  supplier?: string;
+  date?: string | null;
+  totalCost?: number;
+  excludeId?: string;
+}): Promise<DuplicateInvoiceMatch[]> {
+  const { kind, supplier = "", date, totalCost = 0, excludeId } = params;
+  const invoiceId = normalizeInvoiceId(params.invoiceId ?? "");
+  const select = "id, notion_id, data, id_fatura, valor, sale_id, sales!transactions_sale_id_fkey(notion_id)";
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let rows: any[] = [];
+  if (invoiceId) {
+    // Match ignoring case and whitespace ("FT 2024/1" == "ft2024/1")
+    const pattern = "^\\s*" + [...invoiceId]
+      .map((c) => c.replace(/[\\^$.*+?()[\]{}|\-]/g, "\\$&"))
+      .join("\\s*") + "\\s*$";
+    const { data } = await supabase.from("transactions")
+      .select(select)
+      .eq("type", kind)
+      .filter("id_fatura", "imatch", pattern)
+      .limit(20);
+    rows = (data ?? []).filter((r) =>
+      kind === "Earning" || !supplier.trim() ||
+      sameName(r.notion_id ?? "", supplier) || (totalCost !== 0 && sameAmount(r.valor ?? 0, totalCost)));
+  } else if (kind === "Expense" && supplier.trim() && date && totalCost !== 0) {
+    const { data } = await supabase.from("transactions")
+      .select(select)
+      .eq("type", kind)
+      .eq("data", date)
+      .ilike("notion_id", supplier.trim().replace(/[\\%_]/g, "\\$&"))
+      .limit(20);
+    rows = (data ?? []).filter((r) => sameAmount(r.valor ?? 0, totalCost));
+  }
+
+  return rows
+    .filter((r) => r.id !== excludeId)
+    .slice(0, 5)
+    .map((r) => ({
+      id:        r.id,
+      supplier:  r.notion_id ?? "",
+      date:      r.data ? String(r.data).split("T")[0] : null,
+      invoiceId: r.id_fatura ?? "",
+      totalCost: Math.abs(r.valor ?? 0),
+      tourId:    r.sale_id ?? null,
+      tourName:  r.sales?.notion_id ?? "",
+    }));
+}
