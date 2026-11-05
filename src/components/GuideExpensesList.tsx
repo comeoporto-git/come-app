@@ -342,6 +342,13 @@ export function GuideExpensesList({ expenses, fornecedores = [] }: { expenses: T
           )}
         </div>
       )}
+      {selectableVisible.length > 0 && (
+        <BankFileBar
+          expenses={selectedExpenses}
+          total={selectedTotal}
+          onClear={() => setSelectedIds(new Set())}
+        />
+      )}
       {ready.length > 0 && (
         <div>
           <div className="px-5 py-2 bg-green-50 border-b border-green-100">
@@ -420,13 +427,6 @@ export function GuideExpensesList({ expenses, fornecedores = [] }: { expenses: T
           </ul>
         </div>
       )}
-      {selectedExpenses.length > 0 && (
-        <BankFileBar
-          expenses={selectedExpenses}
-          total={selectedTotal}
-          onClear={() => setSelectedIds(new Set())}
-        />
-      )}
     </div>
   );
 }
@@ -434,21 +434,30 @@ export function GuideExpensesList({ expenses, fornecedores = [] }: { expenses: T
 function BankFileBar({ expenses, total, onClear }: { expenses: Transaction[]; total: number; onClear: () => void }) {
   const lines = toBankLines(expenses);
   return (
-    <div className="sticky bottom-0 z-10 px-5 py-3 bg-white border-t border-emerald-200 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] flex items-center gap-3 flex-wrap">
+    <div className="px-5 py-3 bg-white border-b border-gray-100 flex items-center gap-3 flex-wrap">
       <div className="min-w-0">
-        <p className="text-xs font-semibold text-[#32373c]">
-          {lines.length} transferência{lines.length === 1 ? "" : "s"} · €{total.toFixed(2)}
-        </p>
-        <p className="text-[11px] text-gray-400">
-          {expenses.length} despesa{expenses.length === 1 ? "" : "s"} · uma transferência por pessoa / fornecedor
-        </p>
+        {expenses.length > 0 ? (
+          <>
+            <p className="text-xs font-semibold text-[#32373c]">
+              {lines.length} transferência{lines.length === 1 ? "" : "s"} · €{total.toFixed(2)}
+            </p>
+            <p className="text-[11px] text-gray-400">
+              {expenses.length} despesa{expenses.length === 1 ? "" : "s"} · uma transferência por pessoa / fornecedor
+            </p>
+          </>
+        ) : (
+          <p className="text-xs text-gray-400">Seleciona as transferências a incluir no ficheiro do banco</p>
+        )}
       </div>
-      <button onClick={onClear} className="ml-auto text-xs text-gray-400 hover:text-gray-600 underline">
-        Limpar
-      </button>
+      {expenses.length > 0 && (
+        <button onClick={onClear} className="ml-auto text-xs text-gray-400 hover:text-gray-600 underline">
+          Limpar
+        </button>
+      )}
       <button
         onClick={() => downloadBankFile(lines)}
-        className="text-xs font-semibold text-white bg-emerald-700 hover:bg-emerald-800 px-3 py-2 rounded-lg transition-colors"
+        disabled={expenses.length === 0}
+        className={`${expenses.length === 0 ? "ml-auto" : ""} text-xs font-semibold text-white bg-emerald-700 hover:bg-emerald-800 px-3 py-2 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed`}
         title="CSV no formato do CA Empresas → Transferências → Ficheiro"
       >
         ⬇ Gerar ficheiro para o banco
