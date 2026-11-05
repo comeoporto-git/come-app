@@ -3,11 +3,36 @@
 import { useState, useRef } from "react";
 import Link from "next/link";
 import type { Transaction, Fornecedor } from "@/lib/notion";
-import { uploadComprovantivoAction, markTransferenciaFeitaAction } from "@/actions/transactions";
+import { uploadComprovantivoAction, uploadComprovantivoBulkAction, markTransferenciaFeitaAction } from "@/actions/transactions";
 import { analyzeComprovativo } from "@/actions/invoice";
 import { useRouter } from "next/navigation";
 import { EditExpenseModal } from "./EditExpenseModal";
 import { buildBankTransferCsv, encodeWindows1252, normalizeIban, type BankTransferLine } from "@/lib/bankTransferFile";
+
+/** Carrega o ficheiro e tenta ler a data da transferência. */
+async function uploadAndScanComprovativo(file: File): Promise<{ url: string; transferDate?: string }> {
+  const fd = new FormData();
+  fd.append("file", file);
+  const res = await fetch("/api/upload", { method: "POST", body: fd });
+  if (!res.ok) throw new Error("Upload failed");
+  const { url } = await res.json();
+
+  let transferDate: string | undefined;
+  try {
+    const base64 = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (ev) => resolve((ev.target?.result as string).split(",")[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+    const mediaType = file.type as "image/jpeg" | "image/png" | "image/webp" | "application/pdf";
+    const scanned = await analyzeComprovativo(base64, mediaType);
+    if (scanned.transferDate) transferDate = scanned.transferDate;
+  } catch (err) {
+    console.error("[GuideExpensesList] comprovativo date scan failed:", err);
+  }
+  return { url, transferDate };
+}
 
 type Selection = { selected: boolean; onToggle: () => void } | null;
 
@@ -24,7 +49,9 @@ function GuideExpenseRow({
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [marking, setMarking] = useState(false);
-  const [localComprovantivoUrl, setLocalComprovantivoUrl] = useState(expense.comprovantivoUrl);
+  // Local override after an upload here; otherwise follow the server (e.g. after a bulk upload)
+  const [uploadedUrl, setUploadedUrl] = useState<string>();
+  const localComprovantivoUrl = uploadedUrl ?? expense.comprovantivoUrl;
   const [error, setError] = useState("");
   const [editOpen, setEditOpen] = useState(false);
 
@@ -36,29 +63,9 @@ function GuideExpenseRow({
     setUploading(true);
     setError("");
     try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const res = await fetch("/api/upload", { method: "POST", body: fd });
-      if (!res.ok) throw new Error("Upload failed");
-      const { url } = await res.json();
-
-      let transferDate: string | undefined;
-      try {
-        const base64 = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = (ev) => resolve((ev.target?.result as string).split(",")[1]);
-          reader.onerror = reject;
-          reader.readAsDataURL(file);
-        });
-        const mediaType = file.type as "image/jpeg" | "image/png" | "image/webp" | "application/pdf";
-        const scanned = await analyzeComprovativo(base64, mediaType);
-        if (scanned.transferDate) transferDate = scanned.transferDate;
-      } catch (err) {
-        console.error("[GuideExpensesList] comprovativo date scan failed:", err);
-      }
-
+      const { url, transferDate } = await uploadAndScanComprovativo(file);
       await uploadComprovantivoAction(expense.id, url, transferDate);
-      setLocalComprovantivoUrl(url);
+      setUploadedUrl(url);
       router.refresh();
     } catch {
       setError("Erro ao carregar ficheiro. Tenta novamente.");
@@ -373,6 +380,10 @@ export function GuideExpensesList({ expenses, fornecedores = [] }: { expenses: T
               {sortedSuppliers.map(([supplier, { total, iban }]) => {
                 const payeeSelectable = selectableVisible.filter((e) => payeeKey(e) === supplier);
                 const payeeAllSelected = payeeSelectable.length > 0 && payeeSelectable.every((e) => selectedIds.has(e.id));
+                // Comprovativo em lote: as selecionadas desta pessoa, ou todas as prontas se nenhuma estiver selecionada
+                const payeeReady = ready.filter((e) => payeeKey(e) === supplier);
+                const payeeSelected = payeeReady.filter((e) => selectedIds.has(e.id));
+                const comprovativoTargets = payeeSelected.length > 0 ? payeeSelected : payeeReady;
                 return (
                 <div key={supplier} className="flex items-center justify-between gap-3">
                   <div className="flex items-start gap-2 min-w-0">
@@ -398,7 +409,10 @@ export function GuideExpensesList({ expenses, fornecedores = [] }: { expenses: T
                     {iban ? <IbanCopy iban={iban} /> : <span className="text-[11px] text-orange-600">Sem IBAN</span>}
                   </div>
                   </div>
-                  <span className="text-xs font-bold text-red-600 shrink-0">€{total.toFixed(2)}</span>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <BulkComprovativoButton payee={supplier} expenses={comprovativoTargets} />
+                    <span className="text-xs font-bold text-red-600">€{total.toFixed(2)}</span>
+                  </div>
                 </div>
                 );
               })}
@@ -428,6 +442,63 @@ export function GuideExpensesList({ expenses, fornecedores = [] }: { expenses: T
         </div>
       )}
     </div>
+  );
+}
+
+function BulkComprovativoButton({ payee, expenses }: { payee: string; expenses: Transaction[] }) {
+  const router = useRouter();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState("");
+
+  if (expenses.length < 2) return null;
+  const total = expenses.reduce((sum, e) => sum + Math.abs(e.totalCost), 0);
+
+  function handleClick() {
+    const withProof = expenses.filter((e) => e.comprovantivoUrl).length;
+    if (
+      withProof > 0 &&
+      !confirm(`${withProof} destas ${expenses.length} despesas já têm comprovativo. Substituir em todas?`)
+    ) return;
+    fileRef.current?.click();
+  }
+
+  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setUploading(true);
+    setError("");
+    try {
+      const { url, transferDate } = await uploadAndScanComprovativo(file);
+      await uploadComprovantivoBulkAction(expenses.map((x) => x.id), url, transferDate);
+      router.refresh();
+    } catch {
+      setError("Erro ao carregar");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return (
+    <>
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,application/pdf"
+        className="hidden"
+        onChange={handleUpload}
+      />
+      {error && <span className="text-[11px] text-red-500">{error}</span>}
+      <button
+        onClick={handleClick}
+        disabled={uploading}
+        className="text-[11px] text-[#667470] border border-dashed border-[#667470]/40 bg-white px-2 py-1 rounded-lg font-medium hover:bg-[#667470]/10 transition-colors disabled:opacity-50"
+        title={`Carregar um comprovativo para ${expenses.length} despesas de ${payee} (€${total.toFixed(2)})`}
+      >
+        {uploading ? "A carregar…" : `📎 Comprovativo (${expenses.length})`}
+      </button>
+    </>
   );
 }
 

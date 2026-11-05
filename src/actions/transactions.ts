@@ -459,6 +459,23 @@ export async function uploadComprovantivoAction(
   revalidatePath("/admin/transacoes");
 }
 
+/** Mesmo comprovativo para várias despesas pagas numa única transferência. */
+export async function uploadComprovantivoBulkAction(
+  transactionIds: string[],
+  fileUrl: string,
+  transferDate?: string,
+): Promise<void> {
+  const session = await requireAuth();
+  if (session.user.role !== "Admin" && session.user.role !== "Super Guide") {
+    throw new Error("Forbidden");
+  }
+  await Promise.all(transactionIds.map((id) => setComprovativoUrl(id, fileUrl, transferDate)));
+  revalidatePath("/admin/em-falta");
+  revalidatePath("/admin/transacoes");
+  revalidatePath("/admin/transferencias");
+  revalidatePath("/super-guide/transferencias");
+}
+
 export async function markTransferenciaFeitaAction(
   transactionId: string,
 ): Promise<void> {
