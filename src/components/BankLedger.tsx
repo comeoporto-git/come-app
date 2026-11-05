@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { linkBankTransactionAction, dismissUnmatchedAction, runManualMatchAction, unlinkBankTransactionAction, deleteBankTransactionAction, deleteBankTransactionsAction, addBankTransactionCommentAction, deleteBankTransactionCommentAction } from "@/actions/banking";
 import type { StoredTransaction, BankTransactionComment } from "@/lib/enablebanking";
 import type { Transaction } from "@/lib/notion";
+import { buildZip, type ZipEntry } from "@/lib/zip";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -621,6 +622,126 @@ function AutoMatchButton() {
   );
 }
 
+// ── Bulk invoice download ─────────────────────────────────────────────────────
+
+const EXT_BY_TYPE: Record<string, string> = {
+  "application/pdf": "pdf", "image/jpeg": "jpg", "image/jpg": "jpg", "image/png": "png",
+  "image/webp": "webp", "image/heic": "heic", "image/heif": "heif", "image/gif": "gif",
+};
+
+function safeName(s: string) {
+  return s.normalize("NFC").replace(/[\\/:*?"<>|\u0000-\u001f]+/g, "-").replace(/\s+/g, " ").trim().slice(0, 60);
+}
+
+function csvCell(v: string | number) {
+  const s = String(v);
+  return /[";\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+function InvoiceDownloadButton({
+  rows, matchedMap, dateFrom, dateTo,
+}: {
+  rows: StoredTransaction[];
+  matchedMap: Record<string, Transaction[]>;
+  dateFrom: string;
+  dateTo: string;
+}) {
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [result, setResult] = useState<string | null>(null);
+
+  // One entry per Notion record with an invoice file (a record can be linked
+  // to several bank lines — download it once)
+  const invoices = useMemo(() => {
+    const seen = new Set<string>();
+    const list: { bankTxn: StoredTransaction; m: Transaction }[] = [];
+    for (const t of rows) {
+      for (const m of matchedMap[t.transaction_id] ?? []) {
+        if (!m.invoiceImageUrl || seen.has(m.id)) continue;
+        seen.add(m.id);
+        list.push({ bankTxn: t, m });
+      }
+    }
+    return list;
+  }, [rows, matchedMap]);
+
+  async function download() {
+    setResult(null);
+    setProgress({ done: 0, total: invoices.length });
+    const entries: ZipEntry[] = [];
+    const fileByRecord = new Map<string, string>();
+    const usedNames = new Set<string>();
+    let failed = 0;
+    let done = 0;
+
+    const queue = [...invoices];
+    async function worker() {
+      for (let item = queue.shift(); item; item = queue.shift()) {
+        const { bankTxn, m } = item;
+        try {
+          const res = await fetch(`/api/invoice-image/${encodeURIComponent(m.id)}`);
+          if (!res.ok) throw new Error(String(res.status));
+          const type = (res.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
+          const urlExt = m.invoiceImageUrl!.split("?")[0].match(/\.([a-z0-9]{2,5})$/i)?.[1]?.toLowerCase();
+          const ext = EXT_BY_TYPE[type] ?? urlExt ?? "pdf";
+          const base = [m.date ?? txnDay(bankTxn), safeName(m.supplier || "sem-fornecedor"), m.invoiceId && safeName(m.invoiceId)]
+            .filter(Boolean).join("_");
+          let name = `${base}.${ext}`;
+          for (let n = 2; usedNames.has(name); n++) name = `${base} (${n}).${ext}`;
+          usedNames.add(name);
+          entries.push({ name, data: new Uint8Array(await res.arrayBuffer()) });
+          fileByRecord.set(m.id, name);
+        } catch {
+          failed++;
+          fileByRecord.set(m.id, "ERRO ao descarregar");
+        }
+        setProgress({ done: ++done, total: invoices.length });
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(4, invoices.length) }, worker));
+
+    // Index of every bank movement in the selection, incl. those without invoice
+    const header = ["Data banco", "Tipo", "Descrição banco", "Valor", "Fornecedor", "Nº fatura", "Data fatura", "Valor fatura", "Ficheiro"];
+    const lines = [header.join(";")];
+    for (const t of rows) {
+      const base = [txnDay(t), t.credit_debit === "DBIT" ? "Débito" : "Crédito", t.remittance_info || t.merchant_name || "", Math.abs(t.amount).toFixed(2).replace(".", ",")];
+      const matches = matchedMap[t.transaction_id] ?? [];
+      if (matches.length === 0) lines.push([...base, "", "", "", "", "SEM CORRESPONDÊNCIA"].map(csvCell).join(";"));
+      for (const m of matches) {
+        lines.push([...base, m.supplier, m.invoiceId, m.date ?? "", Math.abs(m.totalCost).toFixed(2).replace(".", ","),
+          m.invoiceImageUrl ? (fileByRecord.get(m.id) ?? "") : "SEM FATURA"].map(csvCell).join(";"));
+      }
+    }
+    entries.sort((a, b) => a.name.localeCompare(b.name));
+    entries.unshift({ name: "_indice.csv", data: new TextEncoder().encode("\uFEFF" + lines.join("\r\n")) });
+
+    const blob = buildZip(entries);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `faturas_${dateFrom || "inicio"}_a_${dateTo || isoDay(new Date())}.zip`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+
+    setProgress(null);
+    setResult(`✓ ${invoices.length - failed} faturas descarregadas${failed ? ` · ${failed} com erro` : ""}`);
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <button onClick={download} disabled={!!progress || invoices.length === 0}
+        title="Descarregar num ZIP todas as faturas das transações visíveis (período e filtros atuais)"
+        className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 text-xs font-semibold rounded-xl shadow-sm transition-colors disabled:opacity-50 whitespace-nowrap">
+        {progress
+          ? <>⏳ A descarregar {progress.done}/{progress.total}…</>
+          : <>⬇ Descarregar faturas ({invoices.length})</>}
+      </button>
+      {result && <span className="text-[10px] font-semibold text-green-600 whitespace-nowrap">{result}</span>}
+    </div>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export function BankLedger({
@@ -853,6 +974,7 @@ export function BankLedger({
             <button onClick={() => pickPreset("all")} className="text-gray-400 hover:text-gray-700 px-1" title="Limpar datas">×</button>
           )}
         </div>
+        <InvoiceDownloadButton rows={rows} matchedMap={matchedMap} dateFrom={dateFrom} dateTo={dateTo} />
       </div>
 
       {/* Filter pills — scrollable on mobile, wrapping on desktop */}
