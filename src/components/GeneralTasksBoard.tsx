@@ -29,14 +29,16 @@ function formatDate(iso: string | null): string {
  * their open tasks on services, grouped by service with a link to it.
  */
 export function GeneralTasksBoard({
-  tasks: initialTasks, serviceTasks: initialServiceTasks,
+  tasks: initialTasks, serviceTasks: initialServiceTasks, defaultFilter = "Todos",
 }: {
   tasks: SaleTask[];
   serviceTasks: PartnerServiceTasks[];
+  /** Tab selected on open — the logged-in partner, so they see their own tasks first. */
+  defaultFilter?: Filter;
 }) {
   const [tasks, setTasks] = useState(initialTasks);
   const [services, setServices] = useState(initialServiceTasks);
-  const [filter, setFilter] = useState<Filter>("Todos");
+  const [filter, setFilter] = useState<Filter>(defaultFilter);
   // Bumped when a task is reassigned to another partner, so every list
   // remounts from `tasks` and the task shows up under its new owner.
   const [revision, setRevision] = useState(0);

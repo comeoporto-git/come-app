@@ -46,6 +46,15 @@ export const WEEKDAY_LABELS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta
 // one of the partners. Admin, Super Guide and partner tasks are hidden from
 // every other role — see PRIVILEGED_TASK_ROLES / getTasksForSale.
 export const TASK_PARTNER_OPTIONS = ["Bernardo", "António", "Manel"] as const;
+// Which partner a logged-in user is, from their name's first word (accents and
+// case ignored): "Antonio Antunes" → António, "Manuel Antunes" → Manel.
+const PARTNER_FIRST_NAMES: Record<string, typeof TASK_PARTNER_OPTIONS[number]> = {
+  bernardo: "Bernardo", antonio: "António", manuel: "Manel", manel: "Manel",
+};
+export function taskPartnerForName(name: string | null | undefined): typeof TASK_PARTNER_OPTIONS[number] | null {
+  const first = (name ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase().split(/\s+/)[0];
+  return PARTNER_FIRST_NAMES[first] ?? null;
+}
 export const TASK_ROLE_OPTIONS = ["Admin", "Guide", "Super Guide", "Chef", "Driver", "Logistics", "Decorador", ...TASK_PARTNER_OPTIONS] as const;
 export const PRIVILEGED_TASK_ROLES: ReadonlyArray<string> = ["Admin", "Super Guide", ...TASK_PARTNER_OPTIONS];
 

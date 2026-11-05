@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { getTasksForSale, getPartnerServiceTasks } from "@/lib/notion";
 import { GeneralTasksBoard } from "@/components/GeneralTasksBoard";
+import { taskPartnerForName } from "@/lib/constants";
 
 export default async function SuperGuideTarefasPage() {
   const session = await auth();
@@ -46,7 +47,11 @@ export default async function SuperGuideTarefasPage() {
             Tarefas do António, Manel e Bernardo: gerais e dos serviços
           </p>
         </div>
-        <GeneralTasksBoard tasks={tasks} serviceTasks={serviceTasks} />
+        <GeneralTasksBoard
+          tasks={tasks}
+          serviceTasks={serviceTasks}
+          defaultFilter={taskPartnerForName(session.user.name) ?? "Todos"}
+        />
       </main>
     </div>
   );
