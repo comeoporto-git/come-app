@@ -239,15 +239,10 @@ function toBankLines(selected: Transaction[]): BankTransferLine[] {
   return [...groups.values()].map((items) => {
     const first = items[0];
     const allSupplierPayments = items.every((e) => e.status === "Pending Payment");
-    const info =
-      items.length === 1 && first.invoiceId
-        ? `Fatura ${first.invoiceId}`
-        : `COME ${items.length} despesa${items.length === 1 ? "" : "s"}`;
     return {
       beneficiary: payeeKey(first),
       iban: first.payeeIban ?? "",
       type: allSupplierPayments ? "Fornecedores" : "Transferência",
-      info,
       amount: Math.round(items.reduce((sum, e) => sum + Math.abs(e.totalCost), 0) * 100) / 100,
     };
   });

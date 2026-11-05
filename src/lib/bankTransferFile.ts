@@ -8,7 +8,6 @@ export type BankTransferLine = {
   beneficiary: string;
   iban: string;
   type: "Transferência" | "Fornecedores";
-  info: string;
   amount: number;
   email?: string;
 };
@@ -37,8 +36,7 @@ export function buildBankTransferCsv(lines: BankTransferLine[]) {
       cleanField(l.beneficiary, 70),
       normalizeIban(l.iban),
       l.type,
-      // Referência SEPA: só caracteres seguros, curta
-      cleanField(l.info.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^A-Za-z0-9 /\-?:().,'+]/g, ""), 35),
+      "", // Informação complementar: fica em branco
       l.amount.toFixed(2).replace(".", ","),
       cleanField(l.email ?? "", 100),
     ].join(";"),
