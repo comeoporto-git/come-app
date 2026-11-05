@@ -380,10 +380,12 @@ export function GuideExpensesList({ expenses, fornecedores = [] }: { expenses: T
               {sortedSuppliers.map(([supplier, { total, iban }]) => {
                 const payeeSelectable = selectableVisible.filter((e) => payeeKey(e) === supplier);
                 const payeeAllSelected = payeeSelectable.length > 0 && payeeSelectable.every((e) => selectedIds.has(e.id));
-                // Comprovativo em lote: as selecionadas desta pessoa, ou todas as prontas se nenhuma estiver selecionada
+                // Comprovativo em lote: com algo selecionado, só as selecionadas desta pessoa;
+                // sem seleção nenhuma, todas as prontas desta pessoa
                 const payeeReady = ready.filter((e) => payeeKey(e) === supplier);
-                const payeeSelected = payeeReady.filter((e) => selectedIds.has(e.id));
-                const comprovativoTargets = payeeSelected.length > 0 ? payeeSelected : payeeReady;
+                const comprovativoTargets = selectedExpenses.length > 0
+                  ? payeeReady.filter((e) => selectedIds.has(e.id))
+                  : payeeReady;
                 return (
                 <div key={supplier} className="flex items-center justify-between gap-3">
                   <div className="flex items-start gap-2 min-w-0">
