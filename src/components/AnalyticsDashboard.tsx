@@ -5,6 +5,7 @@ import Link from "next/link";
 import { AnalyticsDateRangePicker, type DateRange } from "@/components/AnalyticsDateRangePicker";
 import type { Tour, Transaction, Fornecedor } from "@/lib/notion";
 import { categoriaBadgeClass } from "@/lib/fornecedor-categories";
+import { YoYLineChart, type YoYPoint } from "@/components/YoYLineChart";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -375,6 +376,33 @@ function ProfitRow({ label, services, ivaMode, gross, net, tours }: {
   );
 }
 
+function YoYCard({ label, cy, py, pyYear, higherIsBetter = true, accent = false }: {
+  label: string; cy: number; py: number; pyYear: number; higherIsBetter?: boolean; accent?: boolean;
+}) {
+  const pct = py !== 0 ? ((cy - py) / Math.abs(py)) * 100 : null;
+  const good = pct == null ? null : (pct >= 0) === higherIsBetter;
+  return (
+    <div className={`rounded-2xl border p-4 flex flex-col gap-1 min-w-0 ${
+      accent ? "bg-[#32373c] border-[#32373c] text-white" : "bg-white border-gray-100 shadow-sm"
+    }`}>
+      <p className={`text-[11px] font-medium uppercase tracking-wide ${accent ? "text-white/50" : "text-gray-400"}`}>{label}</p>
+      <p className={`text-2xl sm:text-3xl font-bold tabular-nums truncate ${
+        accent ? (cy < 0 ? "text-red-300" : "text-white") : "text-[#32373c]"
+      }`}>{fmtEur(cy)}</p>
+      <p className={`text-xs ${accent ? "text-white/50" : "text-gray-400"}`}>
+        {pyYear}: <span className="tabular-nums font-medium">{fmtEur(py)}</span>
+        {pct != null && (
+          <span className={`ml-2 font-semibold ${
+            good ? (accent ? "text-emerald-300" : "text-emerald-600") : (accent ? "text-red-300" : "text-red-500")
+          }`}>
+            {pct >= 0 ? "▲ +" : "▼ "}{pct.toFixed(0)}%
+          </span>
+        )}
+      </p>
+    </div>
+  );
+}
+
 function EmptyState({ message = "Sem dados para este período" }: { message?: string }) {
   return <p className="text-sm text-gray-400 text-center py-6">{message}</p>;
 }
@@ -437,12 +465,15 @@ export function AnalyticsDashboard({
   teamMap,
   clientNameMap,
   fornecedores,
+  deepDiveBase,
 }: {
   tours: Tour[];
   transactions: Transaction[];
   teamMap: Record<string, string>;
   clientNameMap: Record<string, string>;
   fornecedores: Fornecedor[];
+  /** When set, shows links to the per-service deep dive pages (`${base}/servicos/[id]`). */
+  deepDiveBase?: string;
 }) {
   const [dateRange, setDateRange] = useState<DateRange>(() => {
     const now = new Date();
@@ -721,11 +752,36 @@ export function AnalyticsDashboard({
       costs: finCostMap[k] ?? 0,
       profit: (finRevMap[k] ?? 0) - (finCostMap[k] ?? 0),
     }));
-    const maxMonthlyRev  = Math.max(...monthlyFinancials.map((d) => d.revenue), 1);
-    const maxMonthlyCost = Math.max(...monthlyFinancials.map((d) => d.costs), 1);
-    const maxMonthlyProfit = Math.max(...monthlyFinancials.map((d) => Math.abs(d.profit)), 1);
-    const profitColors    = monthlyFinancials.map((d) => d.profit >= 0 ? "bg-emerald-400" : "bg-red-400");
-    const profitFmtValues = monthlyFinancials.map((d) => fmtEur(d.profit));
+
+    // Same months one year earlier — from the full history, not the filtered txns
+    const shiftKey = (k: string) => `${Number(k.slice(0, 4)) - 1}${k.slice(4)}`;
+    const pyMonths = new Set(allFinMonths.map(shiftKey));
+    const pyRevMap: Record<string, number> = {};
+    const pyCostMap: Record<string, number> = {};
+    for (const t of allTransactions) {
+      if (!t.date) continue;
+      const k = monthKey(new Date(t.date));
+      if (!pyMonths.has(k)) continue;
+      if (isBillableEarning(t)) pyRevMap[k] = (pyRevMap[k] ?? 0) + t.totalCost;
+      else if (!isEarning(t))   pyCostMap[k] = (pyCostMap[k] ?? 0) + Math.abs(t.totalCost);
+    }
+    // Current-period line stops at the current month (future months aren't closed yet)
+    const yoySeries = (pick: (rev: number, cost: number) => number): YoYPoint[] =>
+      allFinMonths.map((k) => {
+        const pk = shiftKey(k);
+        return {
+          label: monthLabel(k),
+          current: k > CURRENT_MONTH ? null : pick(finRevMap[k] ?? 0, finCostMap[k] ?? 0),
+          previous: pick(pyRevMap[pk] ?? 0, pyCostMap[pk] ?? 0),
+        };
+      });
+    const yoyRevenue = yoySeries((r) => r);
+    const yoyCosts   = yoySeries((_, c) => c);
+    const yoyProfit  = yoySeries((r, c) => r - c);
+    const firstYear = allFinMonths[0]?.slice(0, 4);
+    const lastYear  = allFinMonths[allFinMonths.length - 1]?.slice(0, 4);
+    const yoyCurrentLabel  = firstYear && firstYear === lastYear ? firstYear : "Período";
+    const yoyPreviousLabel = firstYear && firstYear === lastYear ? String(Number(firstYear) - 1) : "Ano anterior";
 
     // Per-tour revenue & cost (for service profitability + guide cost comparison)
     // "Net" figures use taxFree (valor sem IVA) instead of the tax-inclusive totalCost
@@ -893,13 +949,68 @@ export function AnalyticsDashboard({
       topClients, maxClientCount,
       topClientsByRevenue, maxClientRevenue,
       totalExpenses, totalEarnings, expPerTour, topMethods, maxMethod,
-      monthlyFinancials, maxMonthlyRev, maxMonthlyCost, maxMonthlyProfit, profitColors, profitFmtValues,
+      monthlyFinancials, yoyRevenue, yoyCosts, yoyProfit, yoyCurrentLabel, yoyPreviousLabel,
       serviceProfit, hasServiceProfit,
       servicePaxBreakdown,
       guideCostComparison, maxGuideAvgCost, maxGuideAvgCostNet,
       rangeLbl,
     };
   }, [allTours, allTransactions, teamMap, clientNameMap, dateRange, fornecedores]);
+
+  // ── YTD vs same period last year (independent of the period picker) ──────
+  const ytd = useMemo(() => {
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const todayStr = `${CURRENT_YEAR}-${pad(TODAY.getMonth() + 1)}-${pad(TODAY.getDate())}`;
+    const cyStart = `${CURRENT_YEAR}-01-01`;
+    const pyStart = `${CURRENT_YEAR - 1}-01-01`;
+    const pyEnd   = `${CURRENT_YEAR - 1}${todayStr.slice(4)}`;
+    const cancelledIds = new Set(allTours.filter(isCancelled).map((t) => t.id).filter(Boolean));
+    const isEarning = (t: Transaction) => t.supplier.startsWith("IN -") || t.txType === "Earning";
+    const acc = { cy: { rev: 0, cost: 0 }, py: { rev: 0, cost: 0 } };
+    for (const t of allTransactions) {
+      if (!t.date) continue;
+      const bucket = t.date >= cyStart && t.date <= todayStr ? acc.cy
+                   : t.date >= pyStart && t.date <= pyEnd    ? acc.py : null;
+      if (!bucket) continue;
+      if (isEarning(t)) {
+        if (!t.tourId || !cancelledIds.has(t.tourId)) bucket.rev += t.totalCost;
+      } else {
+        bucket.cost += Math.abs(t.totalCost);
+      }
+    }
+    const fmtShort = (d: Date) => d.toLocaleDateString("pt-PT", { day: "numeric", month: "short" }).replace(".", "");
+    return {
+      revenue: { cy: acc.cy.rev, py: acc.py.rev },
+      costs:   { cy: acc.cy.cost, py: acc.py.cost },
+      net:     { cy: acc.cy.rev - acc.cy.cost, py: acc.py.rev - acc.py.cost },
+      label:   `1 jan – ${fmtShort(TODAY)} ${CURRENT_YEAR} vs ${CURRENT_YEAR - 1}`,
+      pyYear:  CURRENT_YEAR - 1,
+    };
+  }, [allTours, allTransactions]);
+
+  const serviceLinks = useMemo(() => {
+    const map = new Map<string, { id: string; name: string; count: number }>();
+    for (const t of allTours) {
+      if (!t.service || isCancelled(t)) continue;
+      const e = map.get(t.service) ?? { id: t.service, name: (t.serviceName || "Sem nome").trim(), count: 0 };
+      e.count++;
+      map.set(t.service, e);
+    }
+    return [...map.values()].sort((x, y) => y.count - x.count);
+  }, [allTours]);
+
+  const deepDiveCard = deepDiveBase && serviceLinks.length > 0 && (
+    <SectionCard title="Deep dive por serviço" sub="Faturação, custos, lucro, clientes e fornecedores · YTD ou Rolling 12M vs período homólogo">
+      <div className="flex flex-wrap gap-2">
+        {serviceLinks.map((s) => (
+          <Link key={s.id} href={`${deepDiveBase}/servicos/${s.id}`}
+            className="text-xs font-medium bg-gray-50 hover:bg-[#667470] hover:text-white text-[#32373c] rounded-lg px-3 py-1.5 transition-colors">
+            {s.name} <span className="opacity-50">· {s.count}</span>
+          </Link>
+        ))}
+      </div>
+    </SectionCard>
+  );
 
   const periodLabel = (() => {
     const { start, end } = dateRange;
@@ -1053,6 +1164,7 @@ export function AnalyticsDashboard({
       {/* SERVIÇOS */}
       {category === "servicos" && (
         <div className="space-y-6">
+          {deepDiveCard}
           <SectionCard
             title="Tendência Mensal"
             sub={!dateRange.start ? "Últimos 12 meses" : "Serviços por mês"}
@@ -1205,108 +1317,30 @@ export function AnalyticsDashboard({
       {/* FINANCEIRO */}
       {category === "financeiro" && (
         <div className="space-y-6">
-          <div className="grid md:grid-cols-2 gap-6">
-            <SectionCard title="Despesas" sub={periodLabel}>
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-gray-50 rounded-xl p-3">
-                    <p className="text-xs text-gray-400">Total despesas</p>
-                    <p className="text-lg font-bold text-[#32373c] mt-0.5">{fmtEur(a.totalExpenses)}</p>
-                  </div>
-                  <div className="bg-gray-50 rounded-xl p-3">
-                    <p className="text-xs text-gray-400">Média p/ serviço</p>
-                    <p className="text-lg font-bold text-[#32373c] mt-0.5">{fmtEur(a.expPerTour)}</p>
-                  </div>
-                </div>
-                {a.topMethods.length > 0 && (
-                  <div className="space-y-2.5">
-                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Por método de pagamento</p>
-                    {a.topMethods.map(([method, total]) => (
-                      <HBar key={method} label={method} value={total} max={a.maxMethod} color="bg-orange-400" labelWidth="w-20 sm:w-28" formatValue={fmtEur} />
-                    ))}
-                  </div>
-                )}
-                {a.totalExpenses === 0 && <EmptyState message="Sem despesas registadas" />}
-              </div>
-            </SectionCard>
-
-            <SectionCard title="Receita" sub={periodLabel}>
-              <div className="space-y-4">
-                <div className="bg-gray-50 rounded-xl p-4 flex flex-col gap-1">
-                  <p className="text-xs text-gray-400">Total receita registada</p>
-                  <p className="text-3xl font-bold text-[#32373c]">{fmtEur(a.totalEarnings)}</p>
-                  {a.totalExpenses > 0 && a.totalEarnings > 0 && (
-                    <p className="text-xs text-gray-400 mt-1">
-                      Margem estimada:{" "}
-                      <span className={`font-semibold ${a.totalEarnings - a.totalExpenses >= 0 ? "text-green-600" : "text-red-500"}`}>
-                        {fmtEur(a.totalEarnings - a.totalExpenses)}
-                      </span>
-                    </p>
-                  )}
-                </div>
-                {a.totalEarnings === 0 && (
-                  <p className="text-sm text-gray-400 text-center py-2">
-                    Receita não registada ou com prefixo diferente de &quot;IN -&quot;
-                  </p>
-                )}
-                {a.totalEarnings > 0 && a.pastCompleted.length > 0 && (
-                  <div className="bg-gray-50 rounded-xl p-3">
-                    <p className="text-xs text-gray-400">Receita média p/ serviço realizado</p>
-                    <p className="text-lg font-bold text-[#32373c] mt-0.5">
-                      {fmtEur(a.totalEarnings / a.pastCompleted.length)}
-                    </p>
-                  </div>
-                )}
-              </div>
-            </SectionCard>
+          <div>
+            <p className="text-xs text-white/40 font-semibold uppercase tracking-wide px-1 mb-2">YTD · {ytd.label}</p>
+            <div className="grid sm:grid-cols-3 gap-3">
+              <YoYCard label="Faturação YTD" cy={ytd.revenue.cy} py={ytd.revenue.py} pyYear={ytd.pyYear} />
+              <YoYCard label="Despesas YTD" cy={ytd.costs.cy} py={ytd.costs.py} pyYear={ytd.pyYear} higherIsBetter={false} />
+              <YoYCard label="Rendimento Net YTD" cy={ytd.net.cy} py={ytd.net.py} pyYear={ytd.pyYear} accent />
+            </div>
           </div>
 
           {a.monthlyFinancials.length > 0 && (
             <>
-              <SectionCard title="Faturação Por Mês" sub={periodLabel}>
-                {a.monthlyFinancials.every((d) => d.revenue === 0) ? (
-                  <EmptyState message="Sem receita registada no período" />
-                ) : (
-                  <VBars
-                    entries={a.monthlyFinancials.map((d) => [d.label, d.revenue])}
-                    max={a.maxMonthlyRev}
-                    color="bg-emerald-400"
-                    formatValue={fmtEur}
-                  />
-                )}
+              <SectionCard title="Faturação Por Mês" sub={`${periodLabel} · vs mesmo período do ano anterior`}>
+                <YoYLineChart points={a.yoyRevenue} color="#10b981" formatValue={fmtEur}
+                  currentLabel={a.yoyCurrentLabel} previousLabel={a.yoyPreviousLabel} />
               </SectionCard>
 
-              <SectionCard title="Custos Por Mês" sub={periodLabel}>
-                {a.monthlyFinancials.every((d) => d.costs === 0) ? (
-                  <EmptyState message="Sem despesas registadas no período" />
-                ) : (
-                  <VBars
-                    entries={a.monthlyFinancials.map((d) => [d.label, d.costs])}
-                    max={a.maxMonthlyCost}
-                    color="bg-orange-400"
-                    formatValue={fmtEur}
-                  />
-                )}
+              <SectionCard title="Custos Por Mês" sub={`${periodLabel} · vs mesmo período do ano anterior`}>
+                <YoYLineChart points={a.yoyCosts} color="#f97316" formatValue={fmtEur}
+                  currentLabel={a.yoyCurrentLabel} previousLabel={a.yoyPreviousLabel} />
               </SectionCard>
 
-              <SectionCard title="Lucro Por Mês" sub={periodLabel}>
-                {a.monthlyFinancials.every((d) => d.profit === 0) ? (
-                  <EmptyState message="Sem dados de lucro no período" />
-                ) : (
-                  <>
-                    <VBars
-                      entries={a.monthlyFinancials.map((d) => [d.label, Math.abs(d.profit)])}
-                      max={a.maxMonthlyProfit}
-                      color="bg-emerald-400"
-                      colors={a.profitColors}
-                      formatValues={a.profitFmtValues}
-                    />
-                    <ChartLegend items={[
-                      { color: "bg-emerald-400", label: "Lucro" },
-                      { color: "bg-red-400",     label: "Prejuízo" },
-                    ]} />
-                  </>
-                )}
+              <SectionCard title="Lucro Por Mês" sub={`${periodLabel} · vs mesmo período do ano anterior`}>
+                <YoYLineChart points={a.yoyProfit} color="#32373c" formatValue={fmtEur}
+                  currentLabel={a.yoyCurrentLabel} previousLabel={a.yoyPreviousLabel} />
               </SectionCard>
             </>
           )}
@@ -1315,6 +1349,8 @@ export function AnalyticsDashboard({
             <p className="text-xs text-white/40 font-semibold uppercase tracking-wide">Análise de lucro</p>
             <IvaToggle value={ivaMode} onChange={setIvaMode} />
           </div>
+
+          {deepDiveCard}
 
           <SectionCard title="Lucro por Serviço" sub={`Receita e custo de transações ligadas a cada serviço · ${periodLabel}`}>
             {!a.hasServiceProfit ? (

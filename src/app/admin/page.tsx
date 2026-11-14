@@ -151,8 +151,13 @@ export default async function AdminDashboard({
   ]);
 
   // ── Derived values ────────────────────────────────────────────────────────
-  const revTrend = trend(monthlyStats.revenue, monthlyStats.lastMonthRevenue);
-  const svcTrend = trend(monthlyStats.serviceCount, monthlyStats.lastMonthServiceCount);
+  // Compare with the same month of the previous year (seasonality makes month-over-month misleading)
+  const revTrend = trend(monthlyStats.revenue, monthlyStats.lastYearRevenue);
+  const svcTrend = trend(monthlyStats.serviceCount, monthlyStats.lastYearServiceCount);
+  const now = new Date();
+  const lyMonthLabel = new Date(now.getFullYear() - 1, now.getMonth(), 1)
+    .toLocaleDateString("pt-PT", { month: "short", year: "numeric" })
+    .replace(".", "");
 
   const financeAlerts = unmatchedBank.length + flaggedTxns.length + guideExpenses.length + invoicesNeeded.length + failedOCR.length + finalisedCount;
   const opsAlerts = incompleteServices.length + missingStaffServices.length + pendingServices.length;
@@ -197,8 +202,9 @@ export default async function AdminDashboard({
             <p className="text-xs text-gray-400 font-medium uppercase tracking-widest mb-1">Receita (mês)</p>
             <p className="text-2xl font-bold text-[#32373c] tabular-nums truncate">{fmtEur(monthlyStats.revenue)}</p>
             <p className={`text-xs mt-1 font-medium ${revTrend.up ? "text-emerald-600" : "text-red-500"}`}>
-              {revTrend.text} vs mês passado
+              {revTrend.text} vs {lyMonthLabel}
             </p>
+            <p className="text-[11px] text-gray-400 mt-0.5 truncate">{lyMonthLabel}: {fmtEur(monthlyStats.lastYearRevenue)}</p>
           </div>
 
           {/* Services */}
@@ -208,8 +214,11 @@ export default async function AdminDashboard({
             <p className="text-xs text-gray-400 mt-1">
               {monthlyStats.totalPax} pax
               <span className={`ml-2 font-medium ${svcTrend.up ? "text-emerald-600" : "text-red-500"}`}>
-                {svcTrend.text}
+                {svcTrend.text} vs {lyMonthLabel}
               </span>
+            </p>
+            <p className="text-[11px] text-gray-400 mt-0.5 truncate">
+              {lyMonthLabel}: {monthlyStats.lastYearServiceCount} serviços · {monthlyStats.lastYearPax} pax
             </p>
           </div>
 
