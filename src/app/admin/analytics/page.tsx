@@ -52,6 +52,7 @@ export default async function AnalyticsPage() {
           teamMap={teamMap}
           clientNameMap={clientNameMap}
           fornecedores={fornecedores}
+          deepDiveBase="/admin/analytics"
         />
       </main>
     </div>

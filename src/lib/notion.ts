@@ -2552,6 +2552,10 @@ export type DashboardMonthlyStats = {
   revenue: number;
   lastMonthRevenue: number;
   lastMonthServiceCount: number;
+  /** Same calendar month, previous year */
+  lastYearRevenue: number;
+  lastYearServiceCount: number;
+  lastYearPax: number;
 };
 
 export async function getDashboardMonthlyStats(): Promise<DashboardMonthlyStats> {
@@ -2565,8 +2569,10 @@ export async function getDashboardMonthlyStats(): Promise<DashboardMonthlyStats>
   const nextMo = mo === 12 ? 1 : mo + 1;
   const nextYr = mo === 12 ? yr + 1 : yr;
   const nextMonthStart = `${nextYr}-${String(nextMo).padStart(2, "0")}-01`;
+  const lyMonthStart = `${yr - 1}-${String(mo).padStart(2, "0")}-01`;
+  const lyNextMonthStart = `${mo === 12 ? yr : yr - 1}-${String(nextMo).padStart(2, "0")}-01`;
 
-  const [salesThis, salesLast, txThis, txLast] = await Promise.all([
+  const [salesThis, salesLast, txThis, txLast, salesLY, txLY] = await Promise.all([
     supabase.from("sales").select("number_of_guests")
       .gte("date", thisMonthStart).lt("date", nextMonthStart)
       .neq("status", "Cancelled"),
@@ -2577,6 +2583,11 @@ export async function getDashboardMonthlyStats(): Promise<DashboardMonthlyStats>
       .gte("data", thisMonthStart).lt("data", nextMonthStart).like("notion_id", "IN -%").gt("valor", 0),
     supabase.from("transactions").select("valor, sales!transactions_sale_id_fkey(status)")
       .gte("data", lastMonthStart).lt("data", thisMonthStart).like("notion_id", "IN -%").gt("valor", 0),
+    supabase.from("sales").select("number_of_guests")
+      .gte("date", lyMonthStart).lt("date", lyNextMonthStart)
+      .neq("status", "Cancelled"),
+    supabase.from("transactions").select("valor, sales!transactions_sale_id_fkey(status)")
+      .gte("data", lyMonthStart).lt("data", lyNextMonthStart).like("notion_id", "IN -%").gt("valor", 0),
   ]);
 
   const notCancelled = (r: { valor: any; sales: any }) =>
@@ -2588,6 +2599,9 @@ export async function getDashboardMonthlyStats(): Promise<DashboardMonthlyStats>
     revenue: (txThis.data ?? []).filter(notCancelled).reduce((s, r) => s + (r.valor ?? 0), 0),
     lastMonthRevenue: (txLast.data ?? []).filter(notCancelled).reduce((s, r) => s + (r.valor ?? 0), 0),
     lastMonthServiceCount: salesLast.data?.length ?? 0,
+    lastYearRevenue: (txLY.data ?? []).filter(notCancelled).reduce((s, r) => s + (r.valor ?? 0), 0),
+    lastYearServiceCount: salesLY.data?.length ?? 0,
+    lastYearPax: (salesLY.data ?? []).reduce((s, r) => s + (r.number_of_guests ?? 0), 0),
   };
 }
 
