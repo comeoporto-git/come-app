@@ -54,9 +54,9 @@ export async function upsertServicePriceYearAction(
   id: string,
   year: number,
   data: {
-    pax_2_3: number | null;
-    pax_4_6: number | null;
-    pax_7_plus: number | null;
+    pax_2_3?: number | null;
+    pax_4_6?: number | null;
+    pax_7_plus?: number | null;
     valor_chef_2_3: number | null;
     valor_chef_4_6: number | null;
     valor_chef_7_10: number | null;

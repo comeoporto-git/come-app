@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-type ServiceType = { id: string; name: string };
+type ServiceType = { id: string; name: string; transportHours: number | null };
 type Client      = { id: string; name: string };
 type Member      = { id: string; name: string };
 type Props = {
@@ -10,11 +10,15 @@ type Props = {
   clients:      Client[];
   guides:       Member[];
   chefs:        Member[];
+  /** Transport add-on vehicles (Carro, Van, Autocarro). */
+  transportVehicles: string[];
   action: (fd: FormData) => Promise<void>;
 };
 
-export default function NewServiceForm({ serviceTypes, clients, guides, chefs, action }: Props) {
+export default function NewServiceForm({ serviceTypes, clients, guides, chefs, transportVehicles, action }: Props) {
   const [loading, setLoading]         = useState(false);
+  const [serviceId, setServiceId]     = useState("");
+  const transportHours = serviceTypes.find((s) => s.id === serviceId)?.transportHours ?? null;
   const [newClient, setNewClient]     = useState(false);
   const [clientQuery, setClientQuery] = useState("");
 
@@ -42,6 +46,8 @@ export default function NewServiceForm({ serviceTypes, clients, guides, chefs, a
             <select
               name="serviceId"
               required
+              value={serviceId}
+              onChange={(e) => setServiceId(e.target.value)}
               className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-[#32373c] bg-white placeholder:text-gray-400 focus:outline-none focus:border-[#667470] transition-colors"
             >
               <option value="">— Selecionar serviço —</option>
@@ -50,6 +56,23 @@ export default function NewServiceForm({ serviceTypes, clients, guides, chefs, a
               ))}
             </select>
           </div>
+
+          {transportHours !== null && (
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Transporte ({transportHours}h)</label>
+              <select
+                name="transportVehicle"
+                defaultValue=""
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-[#32373c] bg-white focus:outline-none focus:border-[#667470] transition-colors"
+              >
+                <option value="">Sem transporte</option>
+                {transportVehicles.map((v) => (
+                  <option key={v} value={v}>{v}</option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-400 mt-1">O preço do transporte é somado à faturação.</p>
+            </div>
+          )}
 
           <div>
             <div className="flex items-center justify-between mb-1">

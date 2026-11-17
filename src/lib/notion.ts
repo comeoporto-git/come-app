@@ -7,6 +7,19 @@
 import { createClient } from "@supabase/supabase-js";
 import { unstable_cache } from "next/cache";
 import {
+  COST_COLUMNS,
+  TIER_COLUMNS,
+  mapCost,
+  mapTier,
+  quote,
+  tierLabel,
+  type PriceTier,
+  type PriceTierRow,
+  type ServiceCost,
+  type ServiceCostRow,
+  type TransportOption,
+} from "@/lib/pricing";
+import {
   PARTNERS, PARTNER_SPLIT_DATE, PARTNER_PAYMENT_METHODS, partnerPaymentByMethod,
   FEE_PAYMENT_METHODS, isMemberFeeMethod,
   REGISTRATION_TICKET_TYPES, REGISTRATION_PAYMENT_STATUSES, REGISTRATION_INVOICE_STATUSES,
@@ -65,6 +78,8 @@ export type Tour = {
   startTime: string | null;
   endTime: string | null;
   expectedRevenue?: number;
+  /** Transport add-on vehicle (Carro / Van / Autocarro), if booked. */
+  transportVehicle: string | null;
 };
 
 export type TeamSlotRole = "Guide" | "Chef" | "Driver" | "Logistics" | "Decorador";
@@ -74,11 +89,16 @@ export type ExtraTeamMember = { teamId: string; name: string; role: TeamSlotRole
 export type TourWithMissingStaff = Tour & { missingRoles: string[] };
 
 export type FinalisedSale = Tour & {
-  price1: number;
-  price23: number;
-  price46: number;
-  price7: number;
+  /** Price per person excl. VAT for the sale's year and tier. */
   pricePerPax: number;
+  /** Tier the group falls in, e.g. "4-6". */
+  priceTierLabel: string;
+  /** People charged (at least the tier's minimum, e.g. Capucine 1-2 = 2). */
+  chargedPax: number;
+  /** pricePerPax × chargedPax, excl. VAT. */
+  serviceTotal: number;
+  /** Transport add-on, excl. VAT. */
+  transportTotal: number;
 };
 
 export type Transaction = {
@@ -183,6 +203,7 @@ function mapSaleRow(row: any): Tour {
       : [],
     startTime: row.start_time ? String(row.start_time).slice(0, 5) : null,
     endTime:   row.end_time   ? String(row.end_time).slice(0, 5)   : null,
+    transportVehicle: row.transport_vehicle ?? null,
   };
 }
 
@@ -360,9 +381,9 @@ export async function createService(data: {
   if (error) throw new Error(`createService: ${error.message}`);
 }
 
-export async function getServiceTypesList(): Promise<{ id: string; name: string }[]> {
-  const { data } = await supabase.from("services").select("id, name").order("name");
-  return (data ?? []).map((r) => ({ id: r.id, name: r.name }));
+export async function getServiceTypesList(): Promise<{ id: string; name: string; transportHours: number | null }[]> {
+  const { data } = await supabase.from("services").select("id, name, transport_hours").order("name");
+  return (data ?? []).map((r) => ({ id: r.id, name: r.name, transportHours: r.transport_hours ?? null }));
 }
 
 // ── Service catalog (product settings: pricing, steps, tasks, restaurants) ────
@@ -431,7 +452,13 @@ export type ServiceDetail = {
   durationMinutes: number | null;
   equipa: string[];
   processo: string;
-  prices: ServicePriceYear[]; // sorted by year, descending
+  prices: ServicePriceYear[]; // sorted by year, descending — team payments per year
+  /** Price per person by group size and year (excl. VAT). */
+  tiers: PriceTier[];
+  /** Estimated costs per year (incl. VAT). */
+  costs: ServiceCost[];
+  /** Hours used to price the transport add-on, if the service offers it. */
+  transportHours: number | null;
   steps: ServiceStep[];
   tasks: ServiceTask[];
   restaurants: ServiceRestaurant[];
@@ -478,7 +505,7 @@ export async function getServiceRestaurants(serviceId: string): Promise<ServiceR
 }
 
 export async function getServiceDetail(id: string): Promise<ServiceDetail | null> {
-  const [{ data: service }, { data: prices }, { data: steps }, { data: tasks }, { data: links }] = await Promise.all([
+  const [{ data: service }, { data: prices }, { data: steps }, { data: tasks }, { data: links }, { data: tiers }, { data: costs }] = await Promise.all([
     supabase.from("services").select("*").eq("id", id).single(),
     supabase
       .from("service_prices")
@@ -492,6 +519,8 @@ export async function getServiceDetail(id: string): Promise<ServiceDetail | null
       .select("sort_order, notes, restaurants(id, name, address, phone, notes, google_url, restaurant_hours(day_of_week, open_time, close_time, open_time_2, close_time_2, closed))")
       .eq("service_id", id)
       .order("sort_order"),
+    supabase.from("service_price_tiers").select(TIER_COLUMNS).eq("service_id", id).order("year", { ascending: false }).order("min_pax"),
+    supabase.from("service_costs").select(COST_COLUMNS).eq("service_id", id).order("year", { ascending: false }).order("sort_order"),
   ]);
   if (!service) return null;
 
@@ -504,6 +533,9 @@ export async function getServiceDetail(id: string): Promise<ServiceDetail | null
     equipa: service.equipa ?? [],
     processo: service.processo ?? "",
     prices: prices ?? [],
+    tiers: ((tiers ?? []) as PriceTierRow[]).map(mapTier),
+    costs: ((costs ?? []) as ServiceCostRow[]).map(mapCost),
+    transportHours: service.transport_hours ?? null,
     steps: (steps ?? []).map((s) => ({ id: s.id, sortOrder: s.sort_order, title: s.title, description: s.description ?? "" })),
     tasks: (tasks ?? []).map((t) => ({ id: t.id, sortOrder: t.sort_order, name: t.name, description: t.description ?? "", role: t.role })),
     restaurants: ((links ?? []) as unknown as { sort_order: number; notes: string | null; restaurants: RestaurantRow | null }[])
@@ -967,21 +999,23 @@ export async function updateServiceCore(id: string, data: {
 }
 
 export async function upsertServicePriceYear(serviceId: string, year: number, data: {
-  pax_2_3: number | null;
-  pax_4_6: number | null;
-  pax_7_plus: number | null;
+  pax_2_3?: number | null;
+  pax_4_6?: number | null;
+  pax_7_plus?: number | null;
   valor_chef_2_3: number | null;
   valor_chef_4_6: number | null;
   valor_chef_7_10: number | null;
   valor_copa: number | null;
   valor_driver: number | null;
 }): Promise<void> {
+  // Prices per person now live in service_price_tiers; this row keeps the team
+  // payments. The old pax_* columns are only written when given.
   const { error } = await supabase.from("service_prices").upsert({
     service_id:      serviceId,
     year,
-    pax_2_3:         data.pax_2_3,
-    pax_4_6:         data.pax_4_6,
-    pax_7_plus:      data.pax_7_plus,
+    ...(data.pax_2_3    !== undefined ? { pax_2_3:    data.pax_2_3 }    : {}),
+    ...(data.pax_4_6    !== undefined ? { pax_4_6:    data.pax_4_6 }    : {}),
+    ...(data.pax_7_plus !== undefined ? { pax_7_plus: data.pax_7_plus } : {}),
     valor_chef_2_3:  data.valor_chef_2_3,
     valor_chef_4_6:  data.valor_chef_4_6,
     valor_chef_7_10: data.valor_chef_7_10,
@@ -1236,6 +1270,8 @@ export async function createSale(data: {
   names?: string;
   startTime?: string;
   endTime?: string;
+  /** Transport add-on vehicle; billed by the earning trigger. */
+  transportVehicle?: string;
 }): Promise<void> {
   const saleId = crypto.randomUUID();
   const { error: saleError } = await supabase.from("sales").insert({
@@ -1254,6 +1290,7 @@ export async function createSale(data: {
     names:            data.names        || null,
     start_time:       data.startTime    || null,
     end_time:         data.endTime      || null,
+    transport_vehicle: data.transportVehicle || null,
   });
   if (saleError) throw new Error(`createSale: ${saleError.message}`);
 
@@ -1459,7 +1496,7 @@ export async function updateTourTeam(
 const SALE_SELECT_WITH_PRICES = `
   *,
   clients(name),
-  services(name, type, equipa, service_prices(year, pax_2_3, pax_4_6, pax_7_plus)),
+  services(name, type, equipa, transport_hours, service_price_tiers(year, min_pax, max_pax, price_per_pax, min_charged_pax)),
   guide:team!sales_guide_id_fkey(name),
   chef:team!sales_chef_id_fkey(name),
   driver:team!sales_driver_id_fkey(name),
@@ -1468,31 +1505,30 @@ const SALE_SELECT_WITH_PRICES = `
   sale_team_members(team_id, role, created_at, member:team(name))
 `.trim();
 
-type YearPriceRow = { year: number; pax_2_3: number | null; pax_4_6: number | null; pax_7_plus: number | null };
+type SaleServicePricing = { transport_hours?: number | null; service_price_tiers?: PriceTierRow[] };
 
-/** Picks the price row whose year is closest to the sale's year, preferring the earlier one on a tie. */
-function pickPriceForYear(prices: YearPriceRow[], year: number): YearPriceRow | undefined {
-  if (!prices.length) return undefined;
-  return [...prices].sort((a, b) => {
-    const diff = Math.abs(a.year - year) - Math.abs(b.year - year);
-    return diff !== 0 ? diff : a.year - b.year;
-  })[0];
+async function fetchTransportOptions(): Promise<TransportOption[]> {
+  const { data } = await supabase.from("transport_options").select("id, vehicle, hours, price, sort_order");
+  return (data ?? []).map((r) => ({ id: r.id, vehicle: r.vehicle, hours: r.hours, price: r.price === null ? null : Number(r.price), sortOrder: r.sort_order }));
 }
 
-function pricePerPaxForTour(
-  svc: { service_prices?: YearPriceRow[] },
-  tour: Tour,
-): { price1: number; price23: number; price46: number; price7: number; pricePerPax: number } {
-  const year = tour.date ? new Date(tour.date).getFullYear() : new Date().getFullYear();
-  const price = pickPriceForYear(svc.service_prices ?? [], year);
-  const p1  = (price?.pax_2_3 ?? 0) * 2;
-  const p23 = price?.pax_2_3    ?? 0;
-  const p46 = price?.pax_4_6    ?? 0;
-  const p7  = price?.pax_7_plus ?? 0;
-  const pricePerPax = tour.numGuests >= 7 ? p7
-                    : tour.numGuests >= 4 ? p46
-                    : tour.numGuests >= 2 ? p23 : p1;
-  return { price1: p1, price23: p23, price46: p46, price7: p7, pricePerPax };
+/** Same rules as the sale_pricing() SQL function that creates the sale's earning. */
+function salePricing(svc: SaleServicePricing, tour: Tour, transport: TransportOption[]) {
+  const q = quote({
+    tiers: (svc.service_price_tiers ?? []).map(mapTier),
+    date: tour.date,
+    guests: tour.numGuests,
+    transportVehicle: tour.transportVehicle,
+    transportHours: svc.transport_hours ?? null,
+    transportOptions: transport,
+  });
+  return {
+    pricePerPax: q.pricePerPax,
+    priceTierLabel: q.tier ? tierLabel(q.tier) : "",
+    chargedPax: q.chargedPax,
+    serviceTotal: q.serviceTotal,
+    transportTotal: q.transportTotal,
+  };
 }
 
 export async function getFinalisedSales(): Promise<FinalisedSale[]> {
@@ -1500,12 +1536,13 @@ export async function getFinalisedSales(): Promise<FinalisedSale[]> {
     .select(SALE_SELECT_WITH_PRICES)
     .eq("status", "Finalised")
     .order("date", { ascending: false });
+  const transport = await fetchTransportOptions();
 
   return (data ?? []).map((row) => {
     const tour = mapSaleRow(row);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const svc  = (row as any).services ?? {};
-    return { ...tour, ...pricePerPaxForTour(svc, tour) };
+    return { ...tour, ...salePricing(svc, tour, transport) };
   });
 }
 
@@ -1514,12 +1551,13 @@ export async function getInvoicedSales(): Promise<FinalisedSale[]> {
     .select(SALE_SELECT_WITH_PRICES)
     .eq("status", "Invoiced")
     .order("date", { ascending: false });
+  const transport = await fetchTransportOptions();
 
   return (data ?? []).map((row) => {
     const tour = mapSaleRow(row);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const svc  = (row as any).services ?? {};
-    return { ...tour, ...pricePerPaxForTour(svc, tour) };
+    return { ...tour, ...salePricing(svc, tour, transport) };
   });
 }
 
@@ -1535,6 +1573,7 @@ export async function getFinalisedSalesCount(): Promise<number> {
 export async function getAnalyticsTours(): Promise<Tour[]> {
   try {
     const all: Tour[] = [];
+    const transport = await fetchTransportOptions();
     let from = 0;
     const PAGE = 1000;
     while (true) {
@@ -1547,8 +1586,8 @@ export async function getAnalyticsTours(): Promise<Tour[]> {
       all.push(...data.map((row: any) => {
         const tour = mapSaleRow(row);
         const svc  = row.services ?? {};
-        const { pricePerPax } = pricePerPaxForTour(svc, tour);
-        return { ...tour, expectedRevenue: pricePerPax * tour.numGuests };
+        const { serviceTotal, transportTotal } = salePricing(svc, tour, transport);
+        return { ...tour, expectedRevenue: serviceTotal + transportTotal };
       }));
       if (data.length < PAGE) break;
       from += PAGE;

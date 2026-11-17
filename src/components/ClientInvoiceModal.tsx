@@ -19,7 +19,7 @@ export function ClientInvoiceModal({
 
   const today = new Date().toISOString().slice(0, 10);
   const [date, setDate] = useState(today);
-  const defaultBase = sale.pricePerPax > 0 ? sale.pricePerPax * Math.max(sale.numGuests, 1) : 0;
+  const defaultBase = sale.serviceTotal + sale.transportTotal;
   const [base, setBase] = useState(defaultBase > 0 ? defaultBase.toFixed(2) : "");
   const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
@@ -65,8 +65,6 @@ export function ClientInvoiceModal({
     }
   }
 
-  const priceLabel = sale.numGuests >= 7 ? "7-" : sale.numGuests >= 4 ? "4-6" : sale.numGuests >= 2 ? "2-3" : "1";
-
   return (
     <div className="fixed inset-0 z-50 flex items-end bg-black/50" onClick={onClose}>
       <div
@@ -110,8 +108,20 @@ export function ClientInvoiceModal({
             </div>
             {sale.pricePerPax > 0 && (
               <div className="flex justify-between">
-                <span className="text-gray-500">Preço/pax ({priceLabel} pax)</span>
+                <span className="text-gray-500">Preço/pax ({sale.priceTierLabel} pax)</span>
                 <span className="font-semibold text-gray-900">€{sale.pricePerPax.toFixed(2)}</span>
+              </div>
+            )}
+            {sale.chargedPax > sale.numGuests && (
+              <div className="flex justify-between">
+                <span className="text-gray-500">Pax cobrados (mínimo)</span>
+                <span className="font-semibold text-gray-900">{sale.chargedPax}</span>
+              </div>
+            )}
+            {sale.transportTotal > 0 && (
+              <div className="flex justify-between">
+                <span className="text-gray-500">Transporte ({sale.transportVehicle})</span>
+                <span className="font-semibold text-gray-900">€{sale.transportTotal.toFixed(2)}</span>
               </div>
             )}
           </div>
