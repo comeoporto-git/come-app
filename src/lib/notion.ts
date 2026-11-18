@@ -1438,6 +1438,8 @@ export async function updateTourServiceInfo(
     date?: string;
     startTime?: string | null;
     endTime?: string | null;
+    /** Transport add-on; the sales trigger adjusts the earning (IN-) for the change. */
+    transportVehicle?: string | null;
   },
 ): Promise<void> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1456,6 +1458,7 @@ export async function updateTourServiceInfo(
   if (data.date      !== undefined) updates.date        = data.date      || null;
   if (data.startTime !== undefined) updates.start_time  = data.startTime || null;
   if (data.endTime   !== undefined) updates.end_time    = data.endTime   || null;
+  if (data.transportVehicle !== undefined) updates.transport_vehicle = data.transportVehicle || null;
 
   const { error } = await supabase.from("sales").update(updates).eq("id", tourId);
   if (error) throw new Error(`updateTourServiceInfo: ${error.message}`);
