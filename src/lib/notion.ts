@@ -1198,29 +1198,6 @@ export async function createNewClient(name: string): Promise<string> {
   return data.id;
 }
 
-/** Copies a service's task templates (service_tasks) into real tasks for a new booking. */
-async function populateSaleTasksFromTemplate(saleId: string, serviceId: string): Promise<void> {
-  const { data: templates } = await supabase
-    .from("service_tasks")
-    .select("name, description, role")
-    .eq("service_id", serviceId)
-    .order("sort_order");
-  if (!templates || templates.length === 0) return;
-
-  const { error } = await supabase.from("tasks").insert(
-    templates.map((t, i) => ({
-      id:                crypto.randomUUID(),
-      sale_id:           saleId,
-      sort_order:        i,
-      name:              t.name,
-      task_description:  t.description,
-      role:              t.role,
-      status:            "To do",
-    })),
-  );
-  if (error) throw new Error(`populateSaleTasksFromTemplate: ${error.message}`);
-}
-
 export async function createSale(data: {
   serviceId: string;
   date: string;
@@ -1256,8 +1233,9 @@ export async function createSale(data: {
     end_time:         data.endTime      || null,
   });
   if (saleError) throw new Error(`createSale: ${saleError.message}`);
-
-  await populateSaleTasksFromTemplate(saleId, data.serviceId);
+  // Default tasks are copied from the service's templates by the
+  // trigger_sales_copy_service_tasks DB trigger, so every insert path
+  // (including the Notion sync) gets them.
 }
 
 export async function deleteSale(id: string): Promise<void> {
