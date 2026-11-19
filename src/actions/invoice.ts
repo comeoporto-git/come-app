@@ -54,11 +54,17 @@ Rules:
 5. If you cannot read a value clearly, use 0 for numbers and "" for strings
 6. For supplier: always prefer an exact match from the KNOWN SUPPLIERS list over raw receipt text`;
 
+/** Accepts base64 (server callers) or a Blob (client callers — see lib/fileBlob.ts). */
+async function toBase64(file: string | Blob): Promise<string> {
+  return typeof file === "string" ? file : Buffer.from(await file.arrayBuffer()).toString("base64");
+}
+
 export async function analyzeInvoice(
-  fileBase64: string,
+  file: string | Blob,
   mediaType: "image/jpeg" | "image/png" | "image/webp" | "image/gif" | "application/pdf",
   fornecedorNames: string[] = []
 ): Promise<InvoiceData> {
+  const fileBase64 = await toBase64(file);
   const [fewShot, supplierContext] = await Promise.all([
     buildFewShotExamples(),
     buildSupplierContext(fornecedorNames),
@@ -144,9 +150,10 @@ export type ComprovativoData = {
 
 /** Extracts the transfer date printed on a bank transfer proof (comprovativo) file. */
 export async function analyzeComprovativo(
-  fileBase64: string,
+  file: string | Blob,
   mediaType: "image/jpeg" | "image/png" | "image/webp" | "image/gif" | "application/pdf",
 ): Promise<ComprovativoData> {
+  const fileBase64 = await toBase64(file);
   const contentBlock = mediaType === "application/pdf"
     ? { type: "document" as const, source: { type: "base64" as const, media_type: "application/pdf" as const, data: fileBase64 } }
     : { type: "image" as const, source: { type: "base64" as const, media_type: mediaType, data: fileBase64 } };

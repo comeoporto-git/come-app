@@ -1,5 +1,6 @@
 "use client";
 
+import { base64ToBlob } from "@/lib/fileBlob";
 import { useState, useRef } from "react";
 import { analyzeInvoice, submitAiCorrection, type InvoiceData } from "@/actions/invoice";
 import { logExpenseAction, finishPendingExpenseAction, createFornecedorAction } from "@/actions/transactions";
@@ -130,7 +131,7 @@ export function AddExpenseModal({
         setImageBase64(base64);
 
         try {
-          const result = await analyzeInvoice(base64, "application/pdf", fornecedores.map((f) => f.name));
+          const result = await analyzeInvoice(file, "application/pdf", fornecedores.map((f) => f.name));
           const finalResult = honorariosMember ? { ...result, supplier: honorariosMember } : result;
           setAiResult(finalResult);
           setForm(finalResult);
@@ -160,7 +161,7 @@ export function AddExpenseModal({
       setImageBase64(base64);
 
       try {
-        const result = await analyzeInvoice(base64, mediaType, fornecedores.map((f) => f.name));
+        const result = await analyzeInvoice(base64ToBlob(base64, mediaType), mediaType, fornecedores.map((f) => f.name));
         const finalResult = honorariosMember ? { ...result, supplier: honorariosMember } : result;
         setAiResult(finalResult);
         setForm(finalResult);

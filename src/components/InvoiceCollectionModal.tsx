@@ -1,5 +1,6 @@
 "use client";
 
+import { base64ToBlob } from "@/lib/fileBlob";
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { analyzeInvoice, type InvoiceData } from "@/actions/invoice";
@@ -100,7 +101,7 @@ export function InvoiceCollectionModal({
     setImageDataUrl(dataUrl);
 
     try {
-      const result = await analyzeInvoice(base64, mediaType, fornecedores.map((f) => f.name));
+      const result = await analyzeInvoice(base64ToBlob(base64, mediaType), mediaType, fornecedores.map((f) => f.name));
       setForm((f) => ({ ...f, ...result }));
       const matched = fornecedores.find(
         (f) => f.name.toLowerCase() === result.supplier?.toLowerCase()

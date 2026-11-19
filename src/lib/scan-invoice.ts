@@ -1,4 +1,5 @@
 import { analyzeInvoice } from "@/actions/invoice";
+import { base64ToBlob } from "@/lib/fileBlob";
 import { normalizeImage } from "@/lib/image";
 
 export type ScannedInvoice = {
@@ -61,7 +62,7 @@ export async function scanInvoiceFile(file: File): Promise<InvoiceScanResult> {
   }
 
   try {
-    const result = await analyzeInvoice(base64, mediaType);
+    const result = await analyzeInvoice(base64ToBlob(base64, mediaType), mediaType);
     const base6 = r2(result.base6), base13 = r2(result.base13), base23 = r2(result.base23);
     const iva6  = r2(result.iva6),  iva13  = r2(result.iva13),  iva23  = r2(result.iva23);
     const taxFree = r2(base6 + base13 + base23);

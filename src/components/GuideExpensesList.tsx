@@ -1,5 +1,6 @@
 "use client";
 
+import { base64ToBlob } from "@/lib/fileBlob";
 import { useState, useRef } from "react";
 import Link from "next/link";
 import type { Transaction, Fornecedor } from "@/lib/notion";
@@ -26,7 +27,7 @@ async function uploadAndScanComprovativo(file: File): Promise<{ url: string; tra
       reader.readAsDataURL(file);
     });
     const mediaType = file.type as "image/jpeg" | "image/png" | "image/webp" | "application/pdf";
-    const scanned = await analyzeComprovativo(base64, mediaType);
+    const scanned = await analyzeComprovativo(base64ToBlob(base64, mediaType), mediaType);
     if (scanned.transferDate) transferDate = scanned.transferDate;
   } catch (err) {
     console.error("[GuideExpensesList] comprovativo date scan failed:", err);
