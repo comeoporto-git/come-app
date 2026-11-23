@@ -1,13 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import type { ServiceDetail, ServicePriceYear } from "@/lib/notion";
+import type { ServiceDetail } from "@/lib/notion";
 import { SERVICE_TEAM_ROLES, TASK_ROLE_OPTIONS, WEEKDAY_LABELS } from "@/lib/constants";
 import { getOpenStatusForDate, isRowClosed, formatDayHours } from "@/lib/restaurantOpenStatus";
 import {
   updateServiceCoreAction,
-  upsertServicePriceYearAction,
-  deleteServicePriceYearAction,
   addServiceStepAction,
   updateServiceStepAction,
   deleteServiceStepAction,
@@ -53,10 +51,10 @@ export function ServiceCatalogDetail({ service, canEdit, showAdminSections }: Pr
           costs={service.costs}
           transportHours={service.transportHours}
           availableUntil={service.availableUntil}
+          teamPayments={service.teamPayments}
           canEdit={canEdit}
         />
       )}
-      {showAdminSections && <PricingSection service={service} canEdit={canEdit} />}
       {showAdminSections && <TasksSection service={service} canEdit={canEdit} />}
       <RestaurantsSection service={service} canEdit={canEdit} />
     </div>
@@ -387,236 +385,6 @@ function DeleteButton({ onConfirm }: { onConfirm: () => Promise<{ error?: string
         Confirmar
       </button>
       <button type="button" onClick={() => setConfirming(false)} className="text-xs text-gray-400 hover:text-gray-600">Cancelar</button>
-    </div>
-  );
-}
-
-// ── Pricing (Admin only) ───────────────────────────────────────────────────────
-
-type PriceDraft = {
-  chef23: string | number;
-  chef46: string | number;
-  chef710: string | number;
-  copa: string | number;
-  driver: string | number;
-};
-
-function draftFromPrice(price?: ServicePriceYear): PriceDraft {
-  return {
-    chef23: price?.valor_chef_2_3 ?? "",
-    chef46: price?.valor_chef_4_6 ?? "",
-    chef710: price?.valor_chef_7_10 ?? "",
-    copa: price?.valor_copa ?? "",
-    driver: price?.valor_driver ?? "",
-  };
-}
-
-function num(v: string | number): number | null {
-  if (v === "" || v === null || v === undefined) return null;
-  const n = Number(v);
-  return isNaN(n) ? null : n;
-}
-
-function draftToPricingData(draft: PriceDraft) {
-  return {
-    valor_chef_2_3: num(draft.chef23),
-    valor_chef_4_6: num(draft.chef46),
-    valor_chef_7_10: num(draft.chef710),
-    valor_copa: num(draft.copa),
-    valor_driver: num(draft.driver),
-  };
-}
-
-function PricingSection({ service, canEdit }: { service: ServiceDetail; canEdit: boolean }) {
-  const years = service.prices.map((p) => p.year);
-  const [selectedYear, setSelectedYear] = useState<number | null>(years[0] ?? null);
-  const [addingYear, setAddingYear] = useState(false);
-
-  const selected = service.prices.find((p) => p.year === selectedYear);
-
-  return (
-    <section className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-      <div className="px-5 py-4 border-b border-gray-50 flex items-center justify-between flex-wrap gap-2">
-        <div>
-          <h2 className="text-sm font-semibold text-[#32373c]">Pagamento à equipa</h2>
-          <p className="text-xs text-gray-400 mt-0.5">Admin</p>
-        </div>
-        {canEdit && !addingYear && (
-          <button type="button" onClick={() => setAddingYear(true)} className="text-xs text-[#667470] hover:text-[#32373c] font-medium">
-            + Novo ano
-          </button>
-        )}
-      </div>
-      {years.length > 0 && !addingYear && (
-        <div className="px-5 pt-3 flex flex-wrap gap-1.5">
-          {years.map((year) => (
-            <button
-              key={year}
-              type="button"
-              onClick={() => setSelectedYear(year)}
-              className={`text-xs px-2.5 py-1 rounded-full font-semibold transition-colors ${
-                year === selectedYear ? "bg-[#32373c] text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-              }`}
-            >
-              {year}
-            </button>
-          ))}
-        </div>
-      )}
-      <div className="px-5 py-4">
-        {addingYear ? (
-          <NewPriceYearForm
-            serviceId={service.id}
-            existingYears={years}
-            copyFrom={service.prices[0]}
-            onSaved={(year) => { setSelectedYear(year); setAddingYear(false); }}
-            onCancel={() => setAddingYear(false)}
-          />
-        ) : selected ? (
-          <PriceYearEditor key={selected.id} serviceId={service.id} price={selected} canEdit={canEdit} />
-        ) : (
-          <p className="text-sm text-gray-400 text-center py-4">Sem pagamentos definidos</p>
-        )}
-      </div>
-    </section>
-  );
-}
-
-function PriceYearEditor({ serviceId, price, canEdit }: { serviceId: string; price: ServicePriceYear; canEdit: boolean }) {
-  const [editing, setEditing] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [draft, setDraft] = useState<PriceDraft>(draftFromPrice(price));
-
-  async function handleSave() {
-    setSaving(true);
-    setError(null);
-    const result = await upsertServicePriceYearAction(serviceId, price.year, draftToPricingData(draft));
-    setSaving(false);
-    if (result.error) setError(result.error);
-    else { window.location.reload(); }
-  }
-
-  const money = (v: number | null) => (v === null ? "—" : `€${v}`);
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-xs text-gray-400">Pagamentos para {price.year}</p>
-        {canEdit && !editing && (
-          <div className="flex items-center gap-3">
-            <button type="button" onClick={() => setEditing(true)} className="text-xs text-[#667470] hover:text-[#32373c] font-medium">Editar</button>
-            <DeleteButton onConfirm={() => deleteServicePriceYearAction(serviceId, price.id)} />
-          </div>
-        )}
-      </div>
-      {!editing ? (
-        <>
-          <div>
-            <div className="grid grid-cols-2 gap-3">
-              <PriceTile label="Chef 2–3" value={money(price.valor_chef_2_3)} small />
-              <PriceTile label="Chef 4–6" value={money(price.valor_chef_4_6)} small />
-              <PriceTile label="Chef 7–10" value={money(price.valor_chef_7_10)} small />
-              <PriceTile label="Copa" value={money(price.valor_copa)} small />
-              <PriceTile label="Driver" value={money(price.valor_driver)} small />
-            </div>
-          </div>
-        </>
-      ) : (
-        <>
-          <PriceFieldsGrid draft={draft} onChange={(patch) => setDraft((d) => ({ ...d, ...patch }))} />
-          {error && <p className="text-xs text-red-500 font-medium">{error}</p>}
-          <div className="flex gap-2 pt-1">
-            <button onClick={handleSave} disabled={saving} className="flex-1 bg-[#32373c] text-white text-xs font-semibold py-2 rounded-xl disabled:opacity-50 hover:bg-[#1a2018] transition-colors">
-              {saving ? "A guardar…" : "Guardar"}
-            </button>
-            <button onClick={() => { setEditing(false); setDraft(draftFromPrice(price)); }} disabled={saving} className="flex-1 border border-gray-200 text-gray-600 text-xs font-semibold py-2 rounded-xl hover:bg-gray-50 transition-colors">
-              Cancelar
-            </button>
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-function NewPriceYearForm({
-  serviceId, existingYears, copyFrom, onSaved, onCancel,
-}: {
-  serviceId: string;
-  existingYears: number[];
-  copyFrom?: ServicePriceYear;
-  onSaved: (year: number) => void;
-  onCancel: () => void;
-}) {
-  const [year, setYear] = useState(existingYears.length ? Math.max(...existingYears) + 1 : new Date().getFullYear());
-  const [draft, setDraft] = useState<PriceDraft>(draftFromPrice(copyFrom));
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function handleSave() {
-    if (existingYears.includes(year)) { setError("Já existem preços para este ano"); return; }
-    setSaving(true);
-    setError(null);
-    const result = await upsertServicePriceYearAction(serviceId, year, draftToPricingData(draft));
-    setSaving(false);
-    if (result.error) setError(result.error);
-    else { onSaved(year); window.location.reload(); }
-  }
-
-  return (
-    <div className="space-y-4">
-      <div>
-        <label className="block text-xs font-medium text-gray-500 mb-1">Ano</label>
-        <input
-          type="number"
-          value={year}
-          onChange={(e) => setYear(Number(e.target.value))}
-          className={`${inputCls} max-w-[120px]`}
-        />
-      </div>
-      <PriceFieldsGrid draft={draft} onChange={(patch) => setDraft((d) => ({ ...d, ...patch }))} />
-      {error && <p className="text-xs text-red-500 font-medium">{error}</p>}
-      <div className="flex gap-2 pt-1">
-        <button onClick={handleSave} disabled={saving} className="flex-1 bg-[#32373c] text-white text-xs font-semibold py-2 rounded-xl disabled:opacity-50 hover:bg-[#1a2018] transition-colors">
-          {saving ? "A guardar…" : "Guardar"}
-        </button>
-        <button onClick={onCancel} disabled={saving} className="flex-1 border border-gray-200 text-gray-600 text-xs font-semibold py-2 rounded-xl hover:bg-gray-50 transition-colors">
-          Cancelar
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function PriceFieldsGrid({ draft, onChange }: { draft: PriceDraft; onChange: (patch: Partial<PriceDraft>) => void }) {
-  return (
-    <>
-      <div className="grid grid-cols-2 gap-3">
-        <NumField label="Chef 2–3 (€)" value={draft.chef23} onChange={(v) => onChange({ chef23: v })} />
-        <NumField label="Chef 4–6 (€)" value={draft.chef46} onChange={(v) => onChange({ chef46: v })} />
-        <NumField label="Chef 7–10 (€)" value={draft.chef710} onChange={(v) => onChange({ chef710: v })} />
-        <NumField label="Copa (€)" value={draft.copa} onChange={(v) => onChange({ copa: v })} />
-        <NumField label="Driver (€)" value={draft.driver} onChange={(v) => onChange({ driver: v })} />
-      </div>
-    </>
-  );
-}
-
-function PriceTile({ label, value, small }: { label: string; value: string; small?: boolean }) {
-  return (
-    <div className="bg-gray-50 rounded-xl px-3 py-2">
-      <p className="text-xs text-gray-400">{label}</p>
-      <p className={`font-semibold text-[#32373c] ${small ? "text-sm" : "text-base"}`}>{value}</p>
-    </div>
-  );
-}
-
-function NumField({ label, value, onChange }: { label: string; value: string | number; onChange: (v: string) => void }) {
-  return (
-    <div>
-      <label className="block text-xs font-medium text-gray-500 mb-1">{label}</label>
-      <input type="number" min={0} step="0.01" value={value} onChange={(e) => onChange(e.target.value)} className={inputCls} />
     </div>
   );
 }

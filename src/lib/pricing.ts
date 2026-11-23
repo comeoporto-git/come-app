@@ -27,6 +27,17 @@ export type ServiceCost = {
   sortOrder: number;
 };
 
+/** What a team member is paid per service (Chef, Copa, Driver…). NULL tier = every group. */
+export type TeamPayment = {
+  id?: string;
+  year: number;
+  role: string;
+  tierMin: number | null;
+  tierMax: number | null;
+  amount: number;
+  sortOrder: number;
+};
+
 export type TransportOption = {
   id: string;
   vehicle: string;
@@ -74,6 +85,30 @@ export type ServiceCostRow = {
 
 export const TIER_COLUMNS = "id, year, min_pax, max_pax, price_per_pax, min_charged_pax";
 export const COST_COLUMNS = "id, year, tier_min, tier_max, item, cost_type, amount, sort_order";
+
+export type TeamPaymentRow = {
+  id?: string;
+  year: number;
+  role: string;
+  tier_min: number | null;
+  tier_max: number | null;
+  amount: number | string;
+  sort_order: number;
+};
+
+export const TEAM_PAYMENT_COLUMNS = "id, year, role, tier_min, tier_max, amount, sort_order";
+
+export function mapTeamPayment(r: TeamPaymentRow): TeamPayment {
+  return {
+    id: r.id,
+    year: r.year,
+    role: r.role,
+    tierMin: r.tier_min,
+    tierMax: r.tier_max,
+    amount: Number(r.amount),
+    sortOrder: r.sort_order,
+  };
+}
 
 export function mapTier(r: PriceTierRow): PriceTier {
   return {

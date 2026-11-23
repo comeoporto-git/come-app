@@ -10,13 +10,17 @@ import {
   COST_COLUMNS,
   TIER_COLUMNS,
   mapCost,
+  mapTeamPayment,
   mapTier,
   quote,
+  TEAM_PAYMENT_COLUMNS,
   tierLabel,
   type PriceTier,
   type PriceTierRow,
   type ServiceCost,
   type ServiceCostRow,
+  type TeamPayment,
+  type TeamPaymentRow,
   type TransportOption,
 } from "@/lib/pricing";
 import {
@@ -460,6 +464,8 @@ export type ServiceDetail = {
   tiers: PriceTier[];
   /** Estimated costs per year (incl. VAT). */
   costs: ServiceCost[];
+  /** What each team member is paid per service, by year and group size. */
+  teamPayments: TeamPayment[];
   /** Hours used to price the transport add-on, if the service offers it. */
   transportHours: number | null;
   /** Last year the service is offered; null = still offered. */
@@ -510,7 +516,7 @@ export async function getServiceRestaurants(serviceId: string): Promise<ServiceR
 }
 
 export async function getServiceDetail(id: string): Promise<ServiceDetail | null> {
-  const [{ data: service }, { data: prices }, { data: steps }, { data: tasks }, { data: links }, { data: tiers }, { data: costs }] = await Promise.all([
+  const [{ data: service }, { data: prices }, { data: steps }, { data: tasks }, { data: links }, { data: tiers }, { data: costs }, { data: teamPayments }] = await Promise.all([
     supabase.from("services").select("*").eq("id", id).single(),
     supabase
       .from("service_prices")
@@ -526,6 +532,7 @@ export async function getServiceDetail(id: string): Promise<ServiceDetail | null
       .order("sort_order"),
     supabase.from("service_price_tiers").select(TIER_COLUMNS).eq("service_id", id).order("year", { ascending: false }).order("min_pax"),
     supabase.from("service_costs").select(COST_COLUMNS).eq("service_id", id).order("year", { ascending: false }).order("sort_order"),
+    supabase.from("service_team_payments").select(TEAM_PAYMENT_COLUMNS).eq("service_id", id).order("year", { ascending: false }).order("sort_order"),
   ]);
   if (!service) return null;
 
@@ -540,6 +547,7 @@ export async function getServiceDetail(id: string): Promise<ServiceDetail | null
     prices: prices ?? [],
     tiers: ((tiers ?? []) as PriceTierRow[]).map(mapTier),
     costs: ((costs ?? []) as ServiceCostRow[]).map(mapCost),
+    teamPayments: ((teamPayments ?? []) as TeamPaymentRow[]).map(mapTeamPayment),
     transportHours: service.transport_hours ?? null,
     availableUntil: service.available_until ?? null,
     steps: (steps ?? []).map((s) => ({ id: s.id, sortOrder: s.sort_order, title: s.title, description: s.description ?? "" })),

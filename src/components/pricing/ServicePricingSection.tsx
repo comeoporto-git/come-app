@@ -11,10 +11,12 @@ import {
   tierLabel,
   type PriceTier,
   type ServiceCost,
+  type TeamPayment,
 } from "@/lib/pricing";
 import {
   saveServiceAvailableUntilAction,
   saveServiceCostsAction,
+  saveServiceTeamPaymentsAction,
   saveServiceTiersAction,
   saveServiceTransportHoursAction,
 } from "@/actions/pricing";
@@ -33,15 +35,16 @@ type Props = {
   costs: ServiceCost[];
   transportHours: number | null;
   availableUntil: number | null;
+  teamPayments: TeamPayment[];
   canEdit: boolean;
 };
 
 const numOrNull = (v: string): number | null => (v.trim() === "" || isNaN(Number(v)) ? null : Number(v));
 
-export function ServicePricingSection({ serviceId, tiers, costs, transportHours, availableUntil, canEdit }: Props) {
+export function ServicePricingSection({ serviceId, tiers, costs, transportHours, availableUntil, teamPayments, canEdit }: Props) {
   const savedYears = useMemo(
-    () => [...new Set([...tiers.map((t) => t.year), ...costs.map((c) => c.year)])].sort((a, b) => b - a),
-    [tiers, costs],
+    () => [...new Set([...tiers.map((t) => t.year), ...costs.map((c) => c.year), ...teamPayments.map((p) => p.year)])].sort((a, b) => b - a),
+    [tiers, costs, teamPayments],
   );
   const [extraYear, setExtraYear] = useState<number | null>(null);
   const years = extraYear && !savedYears.includes(extraYear) ? [extraYear, ...savedYears] : savedYears;
@@ -54,6 +57,8 @@ export function ServicePricingSection({ serviceId, tiers, costs, transportHours,
   const sourceYear = savedYears[0] ?? null;
   const seedTiers = isNewYear ? tiers.filter((t) => t.year === sourceYear) : yearTiers;
   const seedCosts = isNewYear ? costs.filter((c) => c.year === sourceYear) : yearCosts;
+  const yearPayments = teamPayments.filter((p) => p.year === year).sort((a, b) => a.sortOrder - b.sortOrder);
+  const seedPayments = isNewYear ? teamPayments.filter((p) => p.year === sourceYear) : yearPayments;
 
   function addYear() {
     const next = savedYears.length ? Math.max(...savedYears) + 1 : new Date().getFullYear();
@@ -101,6 +106,7 @@ export function ServicePricingSection({ serviceId, tiers, costs, transportHours,
           )}
           <TiersBlock key={`t-${year}`} serviceId={serviceId} year={year} tiers={seedTiers} startEditing={isNewYear} canEdit={canEdit} />
           <CostsBlock key={`c-${year}`} serviceId={serviceId} year={year} costs={seedCosts} tiers={isNewYear ? seedTiers : yearTiers} startEditing={isNewYear} canEdit={canEdit} />
+          <TeamPaymentsBlock key={`p-${year}`} serviceId={serviceId} year={year} payments={seedPayments} tiers={isNewYear ? seedTiers : yearTiers} startEditing={isNewYear} canEdit={canEdit} />
           {!isNewYear && yearTiers.length > 0 && <MarginBlock tiers={yearTiers} costs={yearCosts} year={year} />}
           <TransportHoursBlock serviceId={serviceId} hours={transportHours} canEdit={canEdit} />
           <AvailableUntilBlock serviceId={serviceId} year={availableUntil} canEdit={canEdit} />
@@ -348,6 +354,134 @@ function CostsBlock({ serviceId, year, costs, tiers, startEditing, canEdit }: {
             <button type="button" onClick={save} disabled={saving} className={btnPrimary}>{saving ? "A guardar…" : "Guardar custos"}</button>
             {!startEditing && (
               <button type="button" onClick={() => { setEditing(false); setRows(costs.map(toCostDraft)); setError(null); }} className={btnSecondary}>Cancelar</button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Team payments ────────────────────────────────────────────────────────────
+
+type PaymentDraft = { role: string; tierMin: string; tierMax: string; amount: string };
+
+const toPaymentDraft = (p: TeamPayment): PaymentDraft => ({
+  role: p.role,
+  tierMin: p.tierMin === null ? "" : String(p.tierMin),
+  tierMax: p.tierMax === null ? "" : String(p.tierMax),
+  amount: String(p.amount),
+});
+
+const TEAM_ROLES = ["Chef", "Guia", "Copa", "Driver", "Logistics", "Decorador"];
+
+function TeamPaymentsBlock({ serviceId, year, payments, tiers, startEditing, canEdit }: {
+  serviceId: string; year: number; payments: TeamPayment[]; tiers: PriceTier[]; startEditing: boolean; canEdit: boolean;
+}) {
+  const router = useRouter();
+  const [editing, setEditing] = useState(startEditing);
+  const [rows, setRows] = useState<PaymentDraft[]>(payments.map(toPaymentDraft));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const update = (i: number, patch: Partial<PaymentDraft>) => setRows((r) => r.map((row, j) => (j === i ? { ...row, ...patch } : row)));
+  const tierKey = (r: PaymentDraft) => (r.tierMin === "" ? "" : `${r.tierMin}|${r.tierMax}`);
+  const tierOptions = tiers.map((t) => ({ key: `${t.minPax}|${t.maxPax ?? ""}`, label: tierLabel(t) }));
+
+  async function save() {
+    setError(null);
+    if (rows.some((r) => !r.role.trim() || r.amount.trim() === "" || isNaN(Number(r.amount)))) {
+      setError("Preenche a função e o valor de cada pagamento");
+      return;
+    }
+    setSaving(true);
+    const res = await saveServiceTeamPaymentsAction(
+      serviceId,
+      year,
+      rows.map((r, i) => ({
+        role: r.role,
+        tierMin: numOrNull(r.tierMin),
+        tierMax: numOrNull(r.tierMax),
+        amount: Number(r.amount),
+        sortOrder: i + 1,
+      })),
+    );
+    setSaving(false);
+    if (res.error) setError(res.error);
+    else { setEditing(false); router.refresh(); }
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Pagamento à equipa {year}</p>
+        {canEdit && !editing && <button type="button" onClick={() => setEditing(true)} className={linkBtn}>Editar</button>}
+      </div>
+
+      {!editing ? (
+        payments.length === 0 ? (
+          <p className="text-sm text-gray-400">Sem pagamentos definidos para {year}</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm tabular-nums">
+              <thead>
+                <tr className="text-xs text-gray-400 text-left">
+                  <th className="font-medium py-1 pr-3">Função</th>
+                  <th className="font-medium py-1 pr-3">Pessoas</th>
+                  <th className="font-medium py-1 text-right">Valor por serviço</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {payments.map((p, i) => (
+                  <tr key={p.id ?? i}>
+                    <td className="py-1.5 pr-3 font-medium text-[#32373c]">{p.role}</td>
+                    <td className="py-1.5 pr-3 text-gray-500">{costTierLabel(p)}</td>
+                    <td className="py-1.5 text-right font-semibold text-[#32373c]">{eur(p.amount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
+      ) : (
+        <div className="space-y-2">
+          <div className="grid grid-cols-[1.4fr_1fr_1fr_auto] gap-2 text-[11px] text-gray-400 font-medium">
+            <span>Função</span><span>Pessoas</span><span>€ por serviço</span><span />
+          </div>
+          <datalist id={`team-roles-${serviceId}`}>
+            {TEAM_ROLES.map((r) => <option key={r} value={r} />)}
+          </datalist>
+          {rows.map((r, i) => (
+            <div key={i} className="grid grid-cols-[1.4fr_1fr_1fr_auto] gap-2 items-center">
+              <input aria-label="Função" list={`team-roles-${serviceId}`} value={r.role} onChange={(e) => update(i, { role: e.target.value })} className={inputCls} placeholder="Chef" />
+              <select
+                aria-label="Pessoas"
+                value={tierKey(r)}
+                onChange={(e) => {
+                  const [min, max] = e.target.value ? e.target.value.split("|") : ["", ""];
+                  update(i, { tierMin: min, tierMax: max });
+                }}
+                className={inputCls}
+              >
+                <option value="">Todos</option>
+                {tierOptions.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
+                {tierKey(r) && !tierOptions.some((o) => o.key === tierKey(r)) && (
+                  <option value={tierKey(r)}>{costTierLabel({ tierMin: numOrNull(r.tierMin), tierMax: numOrNull(r.tierMax) })}</option>
+                )}
+              </select>
+              <input aria-label="Valor" type="number" min={0} step="0.01" value={r.amount} onChange={(e) => update(i, { amount: e.target.value })} className={inputCls} />
+              <button type="button" aria-label="Remover pagamento" onClick={() => setRows((rs) => rs.filter((_, j) => j !== i))} className="text-gray-300 hover:text-red-500 px-1 text-lg leading-none">×</button>
+            </div>
+          ))}
+          <button type="button" onClick={() => setRows((rs) => [...rs, { role: "", tierMin: "", tierMax: "", amount: "" }])} className={linkBtn}>
+            + Pagamento
+          </button>
+          <p className="text-[11px] text-gray-400">Os escalões são os do preço deste ano. &quot;Todos&quot; aplica-se a qualquer grupo; um escalão soma-se ao &quot;Todos&quot; da mesma função.</p>
+          {error && <p className="text-xs text-red-500 font-medium">{error}</p>}
+          <div className="flex gap-2">
+            <button type="button" onClick={save} disabled={saving} className={btnPrimary}>{saving ? "A guardar…" : "Guardar pagamentos"}</button>
+            {!startEditing && (
+              <button type="button" onClick={() => { setEditing(false); setRows(payments.map(toPaymentDraft)); setError(null); }} className={btnSecondary}>Cancelar</button>
             )}
           </div>
         </div>

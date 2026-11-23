@@ -2,9 +2,10 @@
 
 import { auth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
-import type { PriceTier, ServiceCost } from "@/lib/pricing";
+import type { PriceTier, ServiceCost, TeamPayment } from "@/lib/pricing";
 import {
   replaceServiceCosts,
+  replaceServiceTeamPayments,
   replaceServiceTiers,
   updateServiceAvailableUntil,
   updateServiceTransportHours,
@@ -73,6 +74,28 @@ export async function saveServiceCostsAction(serviceId: string, year: number, co
       if (c.tierMin === null && c.tierMax !== null) return { error: `${c.item}: escalão inválido` };
     }
     await replaceServiceCosts(serviceId, year, costs.map((c) => ({ ...c, item: c.item.trim() })));
+    revalidatePricing(serviceId);
+    return {};
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+export async function saveServiceTeamPaymentsAction(
+  serviceId: string,
+  year: number,
+  payments: Omit<TeamPayment, "id" | "year">[],
+): Promise<{ error?: string }> {
+  try {
+    await requireAdmin();
+    checkYear(year);
+    for (const p of payments) {
+      if (!p.role.trim()) return { error: "Cada pagamento precisa de uma função (ex.: Chef)" };
+      if (!(p.amount >= 0)) return { error: `${p.role}: valor inválido` };
+      if (p.tierMin === null && p.tierMax !== null) return { error: `${p.role}: escalão inválido` };
+      if (p.tierMin !== null && p.tierMax !== null && p.tierMax < p.tierMin) return { error: `${p.role}: escalão inválido` };
+    }
+    await replaceServiceTeamPayments(serviceId, year, payments.map((p) => ({ ...p, role: p.role.trim() })));
     revalidatePricing(serviceId);
     return {};
   } catch (e) {
