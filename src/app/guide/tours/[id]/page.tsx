@@ -32,6 +32,7 @@ import { EarningList } from "@/components/EarningList";
 import { TourTaskList } from "@/components/TourTaskList";
 import { EventRegistrations } from "@/components/EventRegistrations";
 import { SaleEmails } from "@/components/SaleEmails";
+import { getTransportOptions } from "@/lib/pricingData";
 import { getSaleEmails } from "@/lib/integration";
 
 function formatDate(iso: string | null, startTime: string | null): string {
@@ -165,7 +166,7 @@ async function TourPageContent({
   const canEditTeam = role === "Super Guide" || role === "Admin";
   const canSeeFinancials = role === "Super Guide" || role === "Admin";
 
-  const [tour, txResult, fornecedores, teamMembers, emails, servicesList, clientsList, tasks] = await Promise.all([
+  const [tour, txResult, fornecedores, teamMembers, emails, servicesList, clientsList, tasks, transportOptions] = await Promise.all([
     getTourById(id),
     isTeamMember
       ? getMemberTransactionsForTour(id, memberId).then((t) => ({ expenses: t, earnings: [] as Transaction[] }))
@@ -176,7 +177,9 @@ async function TourPageContent({
     canEditTeam ? getServiceTypesList() : Promise.resolve([]),
     canEditTeam ? getClientsList()      : Promise.resolve([]),
     getTasksForSale(id, role),
+    canEditTeam ? getTransportOptions() : Promise.resolve([]),
   ]);
+  const transportVehicles = [...new Set(transportOptions.map((o) => o.vehicle))];
 
   const transactions = canSeeFinancials ? txResult.expenses : txResult.expenses;
   const earnings     = canSeeFinancials ? txResult.earnings : [];
@@ -281,6 +284,8 @@ async function TourPageContent({
                   endTime={tour.endTime}
                   services={servicesList}
                   clients={clientsList}
+                  transportVehicle={tour.transportVehicle}
+                  transportVehicles={transportVehicles}
                 />
               ) : (
                 <>

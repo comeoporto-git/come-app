@@ -14,11 +14,7 @@ function SaleCard({
   earningsBySale: Record<string, Transaction>;
   onClick: () => void;
 }) {
-  const priceLabel = sale.numGuests >= 7 ? "7-"
-                   : sale.numGuests >= 4 ? "4-6"
-                   : sale.numGuests >= 2 ? "2-3"
-                   : "1";
-  const base = sale.pricePerPax * Math.max(sale.numGuests, 1);
+  const base = sale.serviceTotal + sale.transportTotal;
   const estimatedTotal = Math.round(base * 1.23 * 100) / 100;
   const existing = earningsBySale[sale.id];
   const existingTotal = existing ? Math.abs(existing.totalCost) : null;
@@ -58,7 +54,7 @@ function SaleCard({
 
       {sale.pricePerPax > 0 && sale.numGuests > 0 && (
         <div className="mt-2 pt-2 border-t border-gray-100 text-xs text-gray-400">
-          <span>{sale.numGuests} × €{sale.pricePerPax.toFixed(2)}/pax ({priceLabel} pax) + IVA 23%</span>
+          <SaleBreakdown sale={sale} />
         </div>
       )}
 
@@ -77,7 +73,17 @@ function SaleCard({
 function saleValue(sale: FinalisedSale, earningsBySale: Record<string, Transaction>): number {
   const existing = earningsBySale[sale.id];
   if (existing) return Math.abs(existing.totalCost);
-  return Math.round(sale.pricePerPax * Math.max(sale.numGuests, 1) * 1.23 * 100) / 100;
+  return Math.round((sale.serviceTotal + sale.transportTotal) * 1.23 * 100) / 100;
+}
+
+function SaleBreakdown({ sale }: { sale: FinalisedSale }) {
+  return (
+    <span>
+      {sale.chargedPax} × €{sale.pricePerPax.toFixed(2)}/pax ({sale.priceTierLabel} pax)
+      {sale.transportTotal > 0 && <> + transporte {sale.transportVehicle} €{sale.transportTotal.toFixed(2)}</>}
+      {" "}+ IVA 23%
+    </span>
+  );
 }
 
 export function FaturasClientesList({
@@ -135,12 +141,8 @@ export function FaturasClientesList({
             {invoicedSales.map((sale) => {
               const existing = earningsBySale[sale.id];
               const existingTotal = existing ? Math.abs(existing.totalCost) : null;
-              const base = sale.pricePerPax * Math.max(sale.numGuests, 1);
+              const base = sale.serviceTotal + sale.transportTotal;
               const estimatedTotal = Math.round(base * 1.23 * 100) / 100;
-              const priceLabel = sale.numGuests >= 7 ? "7-"
-                               : sale.numGuests >= 4 ? "4-6"
-                               : sale.numGuests >= 2 ? "2-3"
-                               : "1";
 
               return (
                 <li
@@ -180,7 +182,7 @@ export function FaturasClientesList({
 
                   {sale.pricePerPax > 0 && sale.numGuests > 0 && (
                     <div className="mt-2 pt-2 border-t border-gray-100 text-xs text-gray-400">
-                      <span>{sale.numGuests} × €{sale.pricePerPax.toFixed(2)}/pax ({priceLabel} pax) + IVA 23%</span>
+                      <SaleBreakdown sale={sale} />
                     </div>
                   )}
 

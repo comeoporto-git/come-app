@@ -21,6 +21,12 @@ export default async function ProdutosServicosPage() {
             <h1 className="text-lg font-bold text-white">Produtos & Serviços</h1>
             <p className="text-sm text-white/60">Catálogo de tipos de serviço, preços, passos e restaurantes sugeridos</p>
           </div>
+          {role === "Admin" && (
+            <div className="flex items-center gap-4 text-sm font-medium">
+              <Link href="/admin/calculadora" className="text-white/80 hover:text-white">Calculadora</Link>
+              <Link href="/admin/precos" className="text-white/80 hover:text-white">Tabela de preços</Link>
+            </div>
+          )}
         </div>
 
         <div className="space-y-6">

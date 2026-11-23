@@ -22,6 +22,7 @@ import {
   unlinkServiceRestaurantAction,
   reorderServiceRestaurantsAction,
 } from "@/actions/services";
+import { ServicePricingSection } from "@/components/pricing/ServicePricingSection";
 
 type Props = {
   service: ServiceDetail;
@@ -45,6 +46,15 @@ export function ServiceCatalogDetail({ service, canEdit, showAdminSections }: Pr
     <div className="space-y-6">
       <CoreSection service={service} canEdit={canEdit} />
       <StepsSection service={service} canEdit={canEdit} />
+      {showAdminSections && (
+        <ServicePricingSection
+          serviceId={service.id}
+          tiers={service.tiers}
+          costs={service.costs}
+          transportHours={service.transportHours}
+          canEdit={canEdit}
+        />
+      )}
       {showAdminSections && <PricingSection service={service} canEdit={canEdit} />}
       {showAdminSections && <TasksSection service={service} canEdit={canEdit} />}
       <RestaurantsSection service={service} canEdit={canEdit} />
@@ -383,9 +393,6 @@ function DeleteButton({ onConfirm }: { onConfirm: () => Promise<{ error?: string
 // ── Pricing (Admin only) ───────────────────────────────────────────────────────
 
 type PriceDraft = {
-  pax23: string | number;
-  pax46: string | number;
-  pax7: string | number;
   chef23: string | number;
   chef46: string | number;
   chef710: string | number;
@@ -395,9 +402,6 @@ type PriceDraft = {
 
 function draftFromPrice(price?: ServicePriceYear): PriceDraft {
   return {
-    pax23: price?.pax_2_3 ?? "",
-    pax46: price?.pax_4_6 ?? "",
-    pax7: price?.pax_7_plus ?? "",
     chef23: price?.valor_chef_2_3 ?? "",
     chef46: price?.valor_chef_4_6 ?? "",
     chef710: price?.valor_chef_7_10 ?? "",
@@ -414,9 +418,6 @@ function num(v: string | number): number | null {
 
 function draftToPricingData(draft: PriceDraft) {
   return {
-    pax_2_3: num(draft.pax23),
-    pax_4_6: num(draft.pax46),
-    pax_7_plus: num(draft.pax7),
     valor_chef_2_3: num(draft.chef23),
     valor_chef_4_6: num(draft.chef46),
     valor_chef_7_10: num(draft.chef710),
@@ -436,7 +437,7 @@ function PricingSection({ service, canEdit }: { service: ServiceDetail; canEdit:
     <section className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
       <div className="px-5 py-4 border-b border-gray-50 flex items-center justify-between flex-wrap gap-2">
         <div>
-          <h2 className="text-sm font-semibold text-[#32373c]">Preço por Pax</h2>
+          <h2 className="text-sm font-semibold text-[#32373c]">Pagamento à equipa</h2>
           <p className="text-xs text-gray-400 mt-0.5">Admin</p>
         </div>
         {canEdit && !addingYear && (
@@ -473,7 +474,7 @@ function PricingSection({ service, canEdit }: { service: ServiceDetail; canEdit:
         ) : selected ? (
           <PriceYearEditor key={selected.id} serviceId={service.id} price={selected} canEdit={canEdit} />
         ) : (
-          <p className="text-sm text-gray-400 text-center py-4">Sem preços definidos</p>
+          <p className="text-sm text-gray-400 text-center py-4">Sem pagamentos definidos</p>
         )}
       </div>
     </section>
@@ -500,7 +501,7 @@ function PriceYearEditor({ serviceId, price, canEdit }: { serviceId: string; pri
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-xs text-gray-400">Preços para {price.year}</p>
+        <p className="text-xs text-gray-400">Pagamentos para {price.year}</p>
         {canEdit && !editing && (
           <div className="flex items-center gap-3">
             <button type="button" onClick={() => setEditing(true)} className="text-xs text-[#667470] hover:text-[#32373c] font-medium">Editar</button>
@@ -510,13 +511,7 @@ function PriceYearEditor({ serviceId, price, canEdit }: { serviceId: string; pri
       </div>
       {!editing ? (
         <>
-          <div className="grid grid-cols-3 gap-3">
-            <PriceTile label="2–3 pax" value={money(price.pax_2_3)} />
-            <PriceTile label="4–6 pax" value={money(price.pax_4_6)} />
-            <PriceTile label="7+ pax" value={money(price.pax_7_plus)} />
-          </div>
           <div>
-            <p className="text-xs text-gray-500 mb-2">Pagamento à equipa</p>
             <div className="grid grid-cols-2 gap-3">
               <PriceTile label="Chef 2–3" value={money(price.valor_chef_2_3)} small />
               <PriceTile label="Chef 4–6" value={money(price.valor_chef_4_6)} small />
@@ -596,12 +591,6 @@ function NewPriceYearForm({
 function PriceFieldsGrid({ draft, onChange }: { draft: PriceDraft; onChange: (patch: Partial<PriceDraft>) => void }) {
   return (
     <>
-      <div className="grid grid-cols-3 gap-3">
-        <NumField label="2–3 pax (€)" value={draft.pax23} onChange={(v) => onChange({ pax23: v })} />
-        <NumField label="4–6 pax (€)" value={draft.pax46} onChange={(v) => onChange({ pax46: v })} />
-        <NumField label="7+ pax (€)" value={draft.pax7} onChange={(v) => onChange({ pax7: v })} />
-      </div>
-      <p className="text-xs text-gray-500 -mb-2">Pagamento à equipa</p>
       <div className="grid grid-cols-2 gap-3">
         <NumField label="Chef 2–3 (€)" value={draft.chef23} onChange={(v) => onChange({ chef23: v })} />
         <NumField label="Chef 4–6 (€)" value={draft.chef46} onChange={(v) => onChange({ chef46: v })} />

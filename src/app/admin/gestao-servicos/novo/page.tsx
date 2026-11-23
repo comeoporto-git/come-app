@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { getServiceTypesList, getClientsList, getTeamMembers, createNewClient, createSale } from "@/lib/notion";
 import NewServiceForm from "./NewServiceForm";
+import { getTransportOptions } from "@/lib/pricingData";
 
 export default async function NovoServicoPage() {
   const session = await auth();
@@ -11,11 +12,13 @@ export default async function NovoServicoPage() {
   const role = session.user.role;
   if (role !== "Admin") redirect("/admin/gestao-servicos");
 
-  const [serviceTypes, clients, teamMembers] = await Promise.all([
+  const [serviceTypes, clients, teamMembers, transportOptions] = await Promise.all([
     getServiceTypesList(),
     getClientsList(),
     getTeamMembers(),
+    getTransportOptions(),
   ]);
+  const transportVehicles = [...new Set(transportOptions.map((o) => o.vehicle))];
   const guides = teamMembers.filter(m => m.role === "Guide" || m.role === "Super Guide");
   const chefs  = teamMembers.filter(m => m.role === "Chef");
 
@@ -54,6 +57,7 @@ export default async function NovoServicoPage() {
       notes:        (formData.get("notes")         as string)?.trim() || undefined,
       phoneNumber:  (formData.get("phoneNumber")   as string)?.trim() || undefined,
       names:        (formData.get("names")         as string)?.trim() || undefined,
+      transportVehicle: (formData.get("transportVehicle") as string)?.trim() || undefined,
     });
 
     redirect("/admin/servicos");
@@ -62,7 +66,7 @@ export default async function NovoServicoPage() {
   return (
     <div className="min-h-screen bg-[#667470] text-[#32373c]">
       <main className="max-w-2xl mx-auto px-4 py-8">
-        <NewServiceForm serviceTypes={serviceTypes} clients={clients} guides={guides} chefs={chefs} action={handleCreate} />
+        <NewServiceForm serviceTypes={serviceTypes} clients={clients} guides={guides} chefs={chefs} transportVehicles={transportVehicles} action={handleCreate} />
       </main>
     </div>
   );

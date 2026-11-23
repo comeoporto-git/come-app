@@ -33,8 +33,12 @@ interface Props {
   date?: string | null;
   startTime?: string | null;
   endTime?: string | null;
-  services?: { id: string; name: string }[];
+  services?: { id: string; name: string; transportHours?: number | null }[];
   clients?: { id: string; name: string }[];
+  /** Transport add-on booked for this service (Carro / Van / Autocarro). */
+  transportVehicle?: string | null;
+  /** Vehicles that can be booked as transport. */
+  transportVehicles?: string[];
 }
 
 export function ServiceInfoEditor({
@@ -56,6 +60,8 @@ export function ServiceInfoEditor({
   endTime,
   services = [],
   clients = [],
+  transportVehicle = null,
+  transportVehicles = [],
 }: Props) {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving]   = useState(false);
@@ -75,6 +81,9 @@ export function ServiceInfoEditor({
   const [draftPhone,     setDraftPhone]     = useState(phoneNumber);
   const [draftNotes,     setDraftNotes]     = useState(notes);
   const [draftMeeting,   setDraftMeeting]   = useState(meetingPoint);
+  const [draftTransport, setDraftTransport] = useState(transportVehicle ?? "");
+  const currentTransportHours = services.find((s) => s.id === serviceId)?.transportHours ?? null;
+  const draftTransportHours   = services.find((s) => s.id === draftServiceId)?.transportHours ?? null;
 
   async function handleSave() {
     setSaving(true);
@@ -98,6 +107,7 @@ export function ServiceInfoEditor({
         date:        draftDate || undefined,
         startTime:   draftStart || null,
         endTime:     draftEnd   || null,
+        transportVehicle: draftTransportHours ? (draftTransport || null) : null,
       });
       if (result.error) {
         setError(result.error);
@@ -125,6 +135,7 @@ export function ServiceInfoEditor({
     setDraftPhone(phoneNumber);
     setDraftNotes(notes);
     setDraftMeeting(meetingPoint);
+    setDraftTransport(transportVehicle ?? "");
     setNewClient(false);
     setEditing(false);
   }
@@ -174,6 +185,12 @@ export function ServiceInfoEditor({
             )}
           </div>
           <ReadField label="Nº de Pax" value={numGuests ? String(numGuests) : "—"} />
+          {(transportVehicle || currentTransportHours) && (
+            <ReadField
+              label="Transporte"
+              value={transportVehicle ? `${transportVehicle}${currentTransportHours ? ` (${currentTransportHours}h)` : ""}` : "Sem transporte"}
+            />
+          )}
           <ReadField label="Nomes"    value={names || "—"} />
           <div>
             <p className="text-xs text-gray-500 mb-1">Contacto</p>
@@ -219,6 +236,18 @@ export function ServiceInfoEditor({
                 <option value="">— Selecionar —</option>
                 {services.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
+            </div>
+          )}
+
+          {/* Transport add-on */}
+          {draftTransportHours !== null && transportVehicles.length > 0 && (
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Transporte ({draftTransportHours}h)</label>
+              <select value={draftTransport} onChange={(e) => setDraftTransport(e.target.value)} className="input bg-white">
+                <option value="">Sem transporte</option>
+                {transportVehicles.map(v => <option key={v} value={v}>{v}</option>)}
+              </select>
+              <p className="text-xs text-gray-400 mt-1">Ao mudar o transporte, a faturação (IN-) é atualizada, exceto se o serviço já estiver faturado ou pago.</p>
             </div>
           )}
 
