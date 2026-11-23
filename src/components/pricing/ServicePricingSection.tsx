@@ -13,6 +13,7 @@ import {
   type ServiceCost,
 } from "@/lib/pricing";
 import {
+  saveServiceAvailableUntilAction,
   saveServiceCostsAction,
   saveServiceTiersAction,
   saveServiceTransportHoursAction,
@@ -31,12 +32,13 @@ type Props = {
   tiers: PriceTier[];
   costs: ServiceCost[];
   transportHours: number | null;
+  availableUntil: number | null;
   canEdit: boolean;
 };
 
 const numOrNull = (v: string): number | null => (v.trim() === "" || isNaN(Number(v)) ? null : Number(v));
 
-export function ServicePricingSection({ serviceId, tiers, costs, transportHours, canEdit }: Props) {
+export function ServicePricingSection({ serviceId, tiers, costs, transportHours, availableUntil, canEdit }: Props) {
   const savedYears = useMemo(
     () => [...new Set([...tiers.map((t) => t.year), ...costs.map((c) => c.year)])].sort((a, b) => b - a),
     [tiers, costs],
@@ -101,6 +103,7 @@ export function ServicePricingSection({ serviceId, tiers, costs, transportHours,
           <CostsBlock key={`c-${year}`} serviceId={serviceId} year={year} costs={seedCosts} tiers={isNewYear ? seedTiers : yearTiers} startEditing={isNewYear} canEdit={canEdit} />
           {!isNewYear && yearTiers.length > 0 && <MarginBlock tiers={yearTiers} costs={yearCosts} year={year} />}
           <TransportHoursBlock serviceId={serviceId} hours={transportHours} canEdit={canEdit} />
+          <AvailableUntilBlock serviceId={serviceId} year={availableUntil} canEdit={canEdit} />
         </div>
       )}
     </section>
@@ -428,6 +431,48 @@ function TransportHoursBlock({ serviceId, hours, canEdit }: { serviceId: string;
           <input aria-label="Horas de transporte" type="number" min={1} placeholder="sem transporte" value={value} onChange={(e) => setValue(e.target.value)} className={`${inputCls} w-32`} />
           <button type="button" onClick={save} disabled={saving} className={btnPrimary}>{saving ? "…" : "Guardar"}</button>
           <button type="button" onClick={() => { setEditing(false); setValue(hours === null ? "" : String(hours)); }} className={btnSecondary}>Cancelar</button>
+        </div>
+      ) : (
+        canEdit && <button type="button" onClick={() => setEditing(true)} className={linkBtn}>Editar</button>
+      )}
+      {error && <p className="w-full text-xs text-red-500 font-medium">{error}</p>}
+    </div>
+  );
+}
+
+// ── Last year offered ───────────────────────────────────────────────────────
+
+function AvailableUntilBlock({ serviceId, year, canEdit }: { serviceId: string; year: number | null; canEdit: boolean }) {
+  const router = useRouter();
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(year === null ? "" : String(year));
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  async function save() {
+    setSaving(true);
+    setError(null);
+    const res = await saveServiceAvailableUntilAction(serviceId, numOrNull(value));
+    setSaving(false);
+    if (res.error) setError(res.error);
+    else { setEditing(false); router.refresh(); }
+  }
+
+  return (
+    <div className="flex items-center justify-between gap-3 flex-wrap border-t border-gray-50 pt-4">
+      <div>
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Oferecido até</p>
+        {!editing && (
+          <p className={`text-sm mt-0.5 ${year ? "text-amber-700" : "text-[#32373c]"}`}>
+            {year ? `${year} — já não aparece na tabela de preços nem na calculadora para anos seguintes` : "Sem data de fim"}
+          </p>
+        )}
+      </div>
+      {editing ? (
+        <div className="flex items-center gap-2">
+          <input aria-label="Último ano oferecido" type="number" min={2000} max={2100} placeholder="sem fim" value={value} onChange={(e) => setValue(e.target.value)} className={`${inputCls} w-32`} />
+          <button type="button" onClick={save} disabled={saving} className={btnPrimary}>{saving ? "…" : "Guardar"}</button>
+          <button type="button" onClick={() => { setEditing(false); setValue(year === null ? "" : String(year)); }} className={btnSecondary}>Cancelar</button>
         </div>
       ) : (
         canEdit && <button type="button" onClick={() => setEditing(true)} className={linkBtn}>Editar</button>
