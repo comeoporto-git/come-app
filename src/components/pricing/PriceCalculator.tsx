@@ -17,6 +17,8 @@ export type CalculatorService = {
   name: string;
   type: string;
   transportHours: number | null;
+  /** Last year offered; null = still offered. */
+  availableUntil: number | null;
   tiers: PriceTier[];
 };
 
@@ -24,7 +26,7 @@ const fieldCls =
   "w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-[#32373c] bg-white focus:outline-none focus:border-[#667470] transition-colors";
 
 export function PriceCalculator({ services, transport }: { services: CalculatorService[]; transport: TransportOption[] }) {
-  const [serviceId, setServiceId] = useState(services[0]?.id ?? "");
+  const [serviceId, setServiceId] = useState((services.find((s) => s.availableUntil === null) ?? services[0])?.id ?? "");
   const service = services.find((s) => s.id === serviceId) ?? null;
   const years = useMemo(() => (service ? yearsOf(service.tiers) : []), [service]);
   const thisYear = new Date().getFullYear();
@@ -54,8 +56,11 @@ export function PriceCalculator({ services, transport }: { services: CalculatorS
 
   const groups = useMemo(() => {
     const m = new Map<string, CalculatorService[]>();
-    for (const s of services) m.set(s.type || "Outros", [...(m.get(s.type || "Outros") ?? []), s]);
-    return [...m.entries()];
+    for (const s of services) {
+      const key = s.availableUntil === null ? s.type || "Outros" : "Já não oferecidos";
+      m.set(key, [...(m.get(key) ?? []), s]);
+    }
+    return [...m.entries()].sort(([a], [b]) => (a === "Já não oferecidos" ? 1 : b === "Já não oferecidos" ? -1 : 0));
   }, [services]);
 
   function onServiceChange(id: string) {
@@ -101,7 +106,9 @@ export function PriceCalculator({ services, transport }: { services: CalculatorS
           <select id="calc-service" value={serviceId} onChange={(e) => onServiceChange(e.target.value)} className={fieldCls}>
             {groups.map(([type, items]) => (
               <optgroup key={type} label={type}>
-                {items.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                {items.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}{s.availableUntil !== null ? ` (até ${s.availableUntil})` : ""}</option>
+                ))}
               </optgroup>
             ))}
           </select>

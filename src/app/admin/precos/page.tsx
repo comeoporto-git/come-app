@@ -34,7 +34,7 @@ export default async function TabelaPrecosPage({
           year={year}
           years={years}
           services={services
-            .filter((s) => s.tiers.some((t) => t.year === year))
+            .filter((s) => s.tiers.some((t) => t.year === year) && (s.availableUntil === null || s.availableUntil >= year))
             .map((s) => ({
               id: s.id,
               name: s.name,

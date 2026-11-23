@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-type ServiceType = { id: string; name: string; transportHours: number | null };
+type ServiceType = { id: string; name: string; transportHours: number | null; availableUntil: number | null };
 type Client      = { id: string; name: string };
 type Member      = { id: string; name: string };
 type Props = {
@@ -18,7 +18,11 @@ type Props = {
 export default function NewServiceForm({ serviceTypes, clients, guides, chefs, transportVehicles, action }: Props) {
   const [loading, setLoading]         = useState(false);
   const [serviceId, setServiceId]     = useState("");
-  const transportHours = serviceTypes.find((s) => s.id === serviceId)?.transportHours ?? null;
+  const [date, setDate]               = useState("");
+  const selectedService = serviceTypes.find((s) => s.id === serviceId);
+  const transportHours = selectedService?.transportHours ?? null;
+  const bookingYear = date ? Number(date.slice(0, 4)) : null;
+  const discontinued = selectedService?.availableUntil != null && bookingYear !== null && bookingYear > selectedService.availableUntil;
   const [newClient, setNewClient]     = useState(false);
   const [clientQuery, setClientQuery] = useState("");
 
@@ -52,9 +56,14 @@ export default function NewServiceForm({ serviceTypes, clients, guides, chefs, t
             >
               <option value="">— Selecionar serviço —</option>
               {serviceTypes.map((s) => (
-                <option key={s.id} value={s.id}>{s.name}</option>
+                <option key={s.id} value={s.id}>{s.name}{s.availableUntil !== null ? ` (até ${s.availableUntil})` : ""}</option>
               ))}
             </select>
+            {discontinued && (
+              <p className="text-xs text-amber-700 font-medium mt-1">
+                Este serviço só é oferecido até {selectedService?.availableUntil}. Em {bookingYear} será faturado aos preços de {selectedService?.availableUntil}.
+              </p>
+            )}
           </div>
 
           {transportHours !== null && (
@@ -111,6 +120,8 @@ export default function NewServiceForm({ serviceTypes, clients, guides, chefs, t
             <input
               name="date"
               type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
               required
               className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-[#32373c] bg-white placeholder:text-gray-400 focus:outline-none focus:border-[#667470] transition-colors"
             />

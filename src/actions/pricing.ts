@@ -6,6 +6,7 @@ import type { PriceTier, ServiceCost } from "@/lib/pricing";
 import {
   replaceServiceCosts,
   replaceServiceTiers,
+  updateServiceAvailableUntil,
   updateServiceTransportHours,
   updateTransportPrices,
 } from "@/lib/pricingData";
@@ -85,6 +86,18 @@ export async function saveTransportPricesAction(prices: { id: string; price: num
     if (prices.some((p) => p.price !== null && !(p.price >= 0))) return { error: "Preço de transporte inválido" };
     await updateTransportPrices(prices);
     revalidatePricing();
+    return {};
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+export async function saveServiceAvailableUntilAction(serviceId: string, year: number | null): Promise<{ error?: string }> {
+  try {
+    await requireAdmin();
+    if (year !== null) checkYear(year);
+    await updateServiceAvailableUntil(serviceId, year);
+    revalidatePricing(serviceId);
     return {};
   } catch (e) {
     return { error: e instanceof Error ? e.message : String(e) };

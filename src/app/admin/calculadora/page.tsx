@@ -22,7 +22,7 @@ export default async function CalculadoraPage() {
           <Link href="/admin/precos" className="text-sm text-white/80 hover:text-white font-medium">Tabela de preços →</Link>
         </div>
         <PriceCalculator
-          services={services.map((s) => ({ id: s.id, name: s.name, type: s.type, transportHours: s.transportHours, tiers: s.tiers }))}
+          services={services.map((s) => ({ id: s.id, name: s.name, type: s.type, transportHours: s.transportHours, availableUntil: s.availableUntil, tiers: s.tiers }))}
           transport={transport}
         />
       </main>

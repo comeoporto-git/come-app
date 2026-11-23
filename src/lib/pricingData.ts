@@ -20,6 +20,8 @@ export type PricedService = {
   description: string;
   durationMinutes: number | null;
   transportHours: number | null;
+  /** Last year the service is offered; null = still offered. */
+  availableUntil: number | null;
   tiers: PriceTier[];
   costs: ServiceCost[];
 };
@@ -28,7 +30,7 @@ export type PricedService = {
 export async function getPricedServices(): Promise<PricedService[]> {
   const { data, error } = await supabase
     .from("services")
-    .select(`id, name, type, description, duration_minutes, transport_hours,
+    .select(`id, name, type, description, duration_minutes, transport_hours, available_until,
       service_price_tiers(${TIER_COLUMNS}),
       service_costs(${COST_COLUMNS})`)
     .order("name");
@@ -42,6 +44,7 @@ export async function getPricedServices(): Promise<PricedService[]> {
       description: s.description ?? "",
       durationMinutes: s.duration_minutes ?? null,
       transportHours: s.transport_hours ?? null,
+      availableUntil: s.available_until ?? null,
       tiers: ((s.service_price_tiers ?? []) as PriceTierRow[]).map(mapTier),
       costs: ((s.service_costs ?? []) as ServiceCostRow[]).map(mapCost).sort((a, b) => a.sortOrder - b.sortOrder),
     }))
@@ -108,6 +111,11 @@ export async function updateTransportPrices(prices: { id: string; price: number 
     const { error } = await supabase.from("transport_options").update({ price: p.price }).eq("id", p.id);
     if (error) throw new Error(`updateTransportPrices: ${error.message}`);
   }
+}
+
+export async function updateServiceAvailableUntil(serviceId: string, year: number | null): Promise<void> {
+  const { error } = await supabase.from("services").update({ available_until: year }).eq("id", serviceId);
+  if (error) throw new Error(`updateServiceAvailableUntil: ${error.message}`);
 }
 
 export async function updateServiceTransportHours(serviceId: string, hours: number | null): Promise<void> {

@@ -52,6 +52,7 @@ export function ServiceCatalogDetail({ service, canEdit, showAdminSections }: Pr
           tiers={service.tiers}
           costs={service.costs}
           transportHours={service.transportHours}
+          availableUntil={service.availableUntil}
           canEdit={canEdit}
         />
       )}

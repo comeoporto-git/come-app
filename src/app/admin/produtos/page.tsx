@@ -45,7 +45,12 @@ export default async function ProdutosServicosPage() {
                           href={`/admin/produtos/${s.id}`}
                           className="flex items-center justify-between gap-3 px-5 py-3 hover:bg-gray-50 transition-colors"
                         >
-                          <span className="font-medium text-[#32373c]">{s.name}</span>
+                          <span className="font-medium text-[#32373c]">
+                            {s.name}
+                            {s.availableUntil !== null && (
+                              <span className="ml-2 text-[11px] font-semibold text-amber-700 bg-amber-50 rounded-full px-2 py-0.5">Até {s.availableUntil}</span>
+                            )}
+                          </span>
                           <span className="flex items-center gap-3 shrink-0">
                             <span className="text-xs text-gray-400">{formatDuration(s.durationMinutes)}</span>
                             <span className="text-gray-300">→</span>

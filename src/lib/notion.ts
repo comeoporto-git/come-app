@@ -381,9 +381,9 @@ export async function createService(data: {
   if (error) throw new Error(`createService: ${error.message}`);
 }
 
-export async function getServiceTypesList(): Promise<{ id: string; name: string; transportHours: number | null }[]> {
-  const { data } = await supabase.from("services").select("id, name, transport_hours").order("name");
-  return (data ?? []).map((r) => ({ id: r.id, name: r.name, transportHours: r.transport_hours ?? null }));
+export async function getServiceTypesList(): Promise<{ id: string; name: string; transportHours: number | null; availableUntil: number | null }[]> {
+  const { data } = await supabase.from("services").select("id, name, transport_hours, available_until").order("name");
+  return (data ?? []).map((r) => ({ id: r.id, name: r.name, transportHours: r.transport_hours ?? null, availableUntil: r.available_until ?? null }));
 }
 
 // ── Service catalog (product settings: pricing, steps, tasks, restaurants) ────
@@ -393,18 +393,21 @@ export type ServiceCatalogItem = {
   name: string;
   type: string;
   durationMinutes: number | null;
+  /** Last year the service is offered; null = still offered. */
+  availableUntil: number | null;
 };
 
 export async function getServiceCatalog(): Promise<ServiceCatalogItem[]> {
   const { data } = await supabase
     .from("services")
-    .select("id, name, type, duration_minutes")
+    .select("id, name, type, duration_minutes, available_until")
     .order("name");
   return (data ?? []).map((r) => ({
     id: r.id,
     name: r.name,
     type: r.type ?? "",
     durationMinutes: r.duration_minutes,
+    availableUntil: r.available_until ?? null,
   }));
 }
 
@@ -459,6 +462,8 @@ export type ServiceDetail = {
   costs: ServiceCost[];
   /** Hours used to price the transport add-on, if the service offers it. */
   transportHours: number | null;
+  /** Last year the service is offered; null = still offered. */
+  availableUntil: number | null;
   steps: ServiceStep[];
   tasks: ServiceTask[];
   restaurants: ServiceRestaurant[];
@@ -536,6 +541,7 @@ export async function getServiceDetail(id: string): Promise<ServiceDetail | null
     tiers: ((tiers ?? []) as PriceTierRow[]).map(mapTier),
     costs: ((costs ?? []) as ServiceCostRow[]).map(mapCost),
     transportHours: service.transport_hours ?? null,
+    availableUntil: service.available_until ?? null,
     steps: (steps ?? []).map((s) => ({ id: s.id, sortOrder: s.sort_order, title: s.title, description: s.description ?? "" })),
     tasks: (tasks ?? []).map((t) => ({ id: t.id, sortOrder: t.sort_order, name: t.name, description: t.description ?? "", role: t.role })),
     restaurants: ((links ?? []) as unknown as { sort_order: number; notes: string | null; restaurants: RestaurantRow | null }[])
