@@ -8,6 +8,7 @@ import {
   type PriceTierRow,
   type ServiceCost,
   type ServiceCostRow,
+  type TeamPayment,
   type TransportOption,
 } from "@/lib/pricing";
 
@@ -104,6 +105,25 @@ export async function replaceServiceCosts(serviceId: string, year: number, costs
     })),
   );
   if (error) throw new Error(`replaceServiceCosts: ${error.message}`);
+}
+
+/** Replaces every team payment of one service for one year. */
+export async function replaceServiceTeamPayments(serviceId: string, year: number, payments: Omit<TeamPayment, "id" | "year">[]): Promise<void> {
+  const { error: delError } = await supabase.from("service_team_payments").delete().eq("service_id", serviceId).eq("year", year);
+  if (delError) throw new Error(`replaceServiceTeamPayments (delete): ${delError.message}`);
+  if (!payments.length) return;
+  const { error } = await supabase.from("service_team_payments").insert(
+    payments.map((p, i) => ({
+      service_id: serviceId,
+      year,
+      role: p.role,
+      tier_min: p.tierMin,
+      tier_max: p.tierMax,
+      amount: p.amount,
+      sort_order: i + 1,
+    })),
+  );
+  if (error) throw new Error(`replaceServiceTeamPayments: ${error.message}`);
 }
 
 export async function updateTransportPrices(prices: { id: string; price: number | null }[]): Promise<void> {
