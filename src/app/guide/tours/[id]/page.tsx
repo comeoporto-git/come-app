@@ -34,6 +34,8 @@ import { EventRegistrations } from "@/components/EventRegistrations";
 import { SaleEmails } from "@/components/SaleEmails";
 import { getTransportOptions } from "@/lib/pricingData";
 import { getSaleEmails } from "@/lib/integration";
+import { getQuoteList } from "@/lib/eventQuotesData";
+import { SaleQuotes } from "@/components/quotes/SaleQuotes";
 
 function formatDate(iso: string | null, startTime: string | null): string {
   if (!iso) return "—";
@@ -226,6 +228,11 @@ async function TourPageContent({
   // Event registrations are Admin only.
   const showRegistrations = role === "Admin" && tour.serviceType === EVENT_SERVICE_TYPE;
   const registrations = showRegistrations ? await getRegistrationsForSale(id) : [];
+  // Quotes (orçamentos) for event services — Admin only, several per event.
+  const showQuotes = role === "Admin" && tour.serviceType === EVENT_SERVICE_TYPE;
+  const [saleQuotes, quoteTemplates] = showQuotes
+    ? await Promise.all([getQuoteList({ saleId: id }), getQuoteList({ templatesOnly: true })])
+    : [[], []];
   const tourDate = tour.date ? new Date(`${tour.date}T12:00:00`) : null;
 
   const totalSpent = transactions.reduce((s, t) => s + t.totalCost, 0); // negative values
@@ -411,6 +418,16 @@ async function TourPageContent({
 
             {/* Tasks */}
             <TourTaskList tourId={id} tasks={tasks} canManage={canEditTeam} />
+
+            {/* Quotes — event services only, Admin only */}
+            {showQuotes && (
+              <SaleQuotes
+                saleId={id}
+                serviceId={tour.service || null}
+                quotes={saleQuotes}
+                templates={quoteTemplates.map((t) => ({ id: t.id, name: t.name, serviceId: t.serviceId, pricePerPax: t.totals.pricePerPax }))}
+              />
+            )}
 
             {/* Registrations — event services only, Admin only */}
             {showRegistrations && (

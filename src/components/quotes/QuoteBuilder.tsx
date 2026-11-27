@@ -199,7 +199,12 @@ export function QuoteBuilder({
     <div className="space-y-4">
       {/* ── Top bar ─────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <Link href="/admin/orcamentos" className="text-sm text-white/70 hover:text-white transition-colors">← Orçamentos</Link>
+        <div className="flex items-center gap-4">
+          <Link href="/admin/orcamentos" className="text-sm text-white/70 hover:text-white transition-colors">← Orçamentos</Link>
+          {draft.saleId && (
+            <Link href={`/guide/tours/${draft.saleId}`} className="text-sm text-white/70 hover:text-white transition-colors">Ver serviço →</Link>
+          )}
+        </div>
         <div className="flex items-center gap-2 flex-wrap">
           {message && (
             <span className={`text-xs px-3 py-1.5 rounded-full ${message.kind === "ok" ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"}`}>{message.text}</span>
@@ -295,6 +300,7 @@ export function QuoteBuilder({
                     className={field}
                   >
                     <option value="">— Não ligada —</option>
+                    {draft.saleId && !sales.some((s) => s.id === draft.saleId) && <option value={draft.saleId}>Serviço ligado</option>}
                     {sales.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
                   </select>
                 </Field>

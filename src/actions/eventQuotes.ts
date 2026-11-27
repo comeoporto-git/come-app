@@ -10,6 +10,7 @@ import {
   deleteQuote,
   deleteSupplierItem,
   getQuote,
+  getSaleQuoteDefaults,
   saveQuote,
   upsertSupplierItem,
   type QuoteHeaderInput,
@@ -29,9 +30,10 @@ function fail(e: unknown): { error: string } {
   return { error: e instanceof Error ? e.message : String(e) };
 }
 
-function revalidateQuotes(id?: string) {
+function revalidateQuotes(id?: string, saleId?: string | null) {
   revalidatePath("/admin/orcamentos");
   if (id) revalidatePath(`/admin/orcamentos/${id}`);
+  if (saleId) revalidatePath(`/guide/tours/${saleId}`);
 }
 
 function cleanLines(lines: QuoteLine[]): QuoteLine[] {
@@ -59,11 +61,15 @@ export async function createQuoteAction(opts: {
   serviceId?: string | null;
   asTemplate?: boolean;
   name?: string;
+  /** Link the new quote to this booking and take its date, client, guests and place. */
+  saleId?: string | null;
 }): Promise<Result<{ id: string }>> {
   try {
     const session = await requireAdmin();
     const source = opts.fromId ? await getQuote(opts.fromId) : null;
-    const asTemplate = !!opts.asTemplate;
+    const asTemplate = !!opts.asTemplate && !opts.saleId;
+    const sale = opts.saleId ? await getSaleQuoteDefaults(opts.saleId) : null;
+    if (opts.saleId && !sale) return { error: "Serviço não encontrado" };
     const header: Partial<QuoteHeaderInput> & { name: string } = source
       ? {
           name: opts.name?.trim() || (asTemplate ? `${source.name} (cópia)` : source.isTemplate ? source.name : `${source.name} (cópia)`),
@@ -84,8 +90,20 @@ export async function createQuoteAction(opts: {
           isTemplate: asTemplate,
           serviceId: opts.serviceId ?? null,
         };
+    if (sale) {
+      header.isTemplate = false;
+      header.status = "Rascunho";
+      header.saleId = sale.saleId;
+      header.serviceId = sale.serviceId ?? header.serviceId ?? null;
+      header.clientId = sale.clientId;
+      header.eventDate = sale.eventDate;
+      if (sale.guests) header.guests = sale.guests;
+      header.location = sale.location ?? header.location ?? null;
+      if (!opts.name) header.name = source ? `${sale.name} · ${source.name.replace(/^Template · /, "")}` : sale.name;
+    }
     const id = await createQuote(header, source ? cleanLines(source.lines) : [], session.user.name ?? session.user.email ?? null);
     revalidateQuotes();
+    if (sale) revalidatePath(`/guide/tours/${sale.saleId}`);
     return { id };
   } catch (e) {
     return fail(e);
@@ -103,7 +121,7 @@ export async function saveQuoteAction(id: string, header: Partial<QuoteHeaderInp
     // Every course a line refers to is kept in the course list, in order.
     const courses = header.courses ? [...new Set([...header.courses.map((c) => c.trim()).filter(Boolean), ...clean.map((l) => l.course).filter((c): c is string => !!c)])] : undefined;
     await saveQuote(id, { ...header, name: header.name?.trim(), courses }, clean);
-    revalidateQuotes(id);
+    revalidateQuotes(id, header.saleId);
     return {};
   } catch (e) {
     return fail(e);
