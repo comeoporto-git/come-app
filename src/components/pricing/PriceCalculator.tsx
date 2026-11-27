@@ -261,9 +261,7 @@ function buildRows(service: CalculatorService, q: NonNullable<ReturnType<typeof 
   const rows: Row[] = [
     { label: L.pricePerPerson(q.tier ? tierLabel(q.tier) : "—"), excl: q.pricePerPax, incl: inc(q.pricePerPax) },
   ];
-  if (!hasChildren) {
-    rows.push({ label: `${service.name} · ${q.chargedPax} ${L.person(q.chargedPax)}`, excl: q.serviceTotal, incl: inc(q.serviceTotal) });
-  } else {
+  if (hasChildren) {
     const adults = q.adults + q.minimumTopUp;
     if (adults > 0) {
       const v = q.pricePerPax * adults;
@@ -279,9 +277,6 @@ function buildRows(service: CalculatorService, q: NonNullable<ReturnType<typeof 
   }
   if (q.transportVehicle) {
     rows.push({ label: `${L.transport} ${L.vehicle(q.transportVehicle)} (${q.transportHours}h)`, excl: q.transportTotal, incl: inc(q.transportTotal) });
-  }
-  if (q.guests > 0 && q.transportVehicle) {
-    rows.push({ label: L.totalPerPerson, excl: q.totalExclVat / q.guests, incl: q.totalInclVat / q.guests });
   }
   rows.push({ label: L.total, excl: q.totalExclVat, incl: q.totalInclVat, strong: true });
   return rows;
