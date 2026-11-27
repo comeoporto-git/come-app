@@ -62,6 +62,8 @@ export type QuoteLine = {
   unitCost: number;
   vatRate: number;
   notes: string | null;
+  /** Menu course that needs this material (Snack 1, Principal…); null = general line. */
+  course: string | null;
 };
 
 export type QuoteHeader = {
@@ -80,6 +82,8 @@ export type QuoteHeader = {
   pricePerPaxOverride: number | null;
   vatRate: number;
   notes: string | null;
+  /** Menu courses in serving order. */
+  courses: string[];
   createdAt: string;
   updatedAt: string;
 };
@@ -183,7 +187,24 @@ export function lineFromItem(item: SupplierItem, qtyMode: QtyMode = "per_pax", q
     unitCost: item.unitPrice ?? 0,
     vatRate: item.vatRate,
     notes: null,
+    course: null,
   };
+}
+
+/** Material for one course: one unit per guest of a catalogue item. */
+export function courseLineFromItem(item: SupplierItem, course: string): QuoteLine {
+  return { ...lineFromItem(item), category: "Material", qtyMode: "per_pax", quantity: 1, course };
+}
+
+export const COURSE_PRESETS = ["Snack", "Couvert", "Entrada", "Sopa", "Peixe", "Carne", "Principal", "Pré-sobremesa", "Sobremesa", "Café"];
+
+/** Next free course name: "Snack" → "Snack 2" when "Snack" or "Snack 1" exists. */
+export function nextCourseName(base: string, existing: string[]): string {
+  const taken = new Set(existing.map((c) => c.toLowerCase()));
+  if (!taken.has(base.toLowerCase()) && !taken.has(`${base} 1`.toLowerCase())) return base;
+  let n = 2;
+  while (taken.has(`${base} ${n}`.toLowerCase())) n += 1;
+  return `${base} ${n}`;
 }
 
 /** Things ordered as a total (tables, transport, heaters) rather than one per guest. */

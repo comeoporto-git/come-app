@@ -25,6 +25,7 @@ import {
 } from "@/lib/eventQuotes";
 import type { ClientOption, EventSaleOption, EventService } from "@/lib/eventQuotesData";
 import { CatalogPicker } from "./CatalogPicker";
+import { MenuBuilder } from "./MenuBuilder";
 
 type Fornecedor = { id: string; name: string };
 type Draft = Omit<Quote, "lines" | "createdAt" | "updatedAt">;
@@ -174,7 +175,7 @@ export function QuoteBuilder({
 
   const grouped = useMemo(() => {
     const cats = [...QUOTE_CATEGORIES, ...new Set(lines.map((l) => l.category).filter((c) => !QUOTE_CATEGORIES.includes(c as never)))];
-    return cats.map((c) => ({ category: c, lines: lines.filter((l) => l.category === c) }));
+    return cats.map((c) => ({ category: c, lines: lines.filter((l) => l.category === c && !l.course) }));
   }, [lines]);
 
   const supplierOrders = useMemo(() => {
@@ -183,7 +184,9 @@ export function QuoteBuilder({
       if (!l.fornecedorId) continue;
       const name = fornecedorName(l.fornecedorId) ?? "Fornecedor";
       const e = m.get(l.fornecedorId) ?? { name, rows: [] };
-      e.rows.push({ description: l.description, units: lineUnits(l, totals.guests), unitCost: l.unitCost });
+      const same = e.rows.find((r) => r.description === l.description && r.unitCost === l.unitCost);
+      if (same) same.units += lineUnits(l, totals.guests);
+      else e.rows.push({ description: l.description, units: lineUnits(l, totals.guests), unitCost: l.unitCost });
       m.set(l.fornecedorId, e);
     }
     return [...m.values()];
@@ -304,11 +307,24 @@ export function QuoteBuilder({
             )}
           </section>
 
+          {/* ── Menu: courses and the material each one needs ─────────── */}
+          <MenuBuilder
+            courses={draft.courses}
+            lines={lines}
+            items={items}
+            guests={totals.guests}
+            onCourses={(cs) => update("courses", cs)}
+            onAddLines={addLines}
+            onUpdateLine={updateLine}
+            onRemoveLine={removeLine}
+            onReplaceLines={(fn) => { setLines((ls) => fn(ls)); setDirty(true); }}
+          />
+
           {/* ── Lines by category ───────────────────────────────────── */}
           {lines.length === 0 && (
             <section className="bg-white rounded-2xl border border-dashed border-gray-200 p-6 text-center">
-              <p className="text-sm font-medium">Começa por adicionar custos</p>
-              <p className="text-xs text-gray-400 mt-1">Material dos fornecedores, equipa, comida, bebidas, espaço…</p>
+              <p className="text-sm font-medium">Outros custos</p>
+              <p className="text-xs text-gray-400 mt-1">Além do material do menu: equipa, comida, bebidas, espaço, mesas, transporte…</p>
               <div className="flex flex-wrap gap-2 justify-center mt-4">
                 <button type="button" onClick={() => setPickerFor("Material")} className="text-sm font-semibold bg-[#32373c] text-white rounded-xl px-4 py-2 hover:bg-[#1a2018]">
                   + Material do catálogo
@@ -416,7 +432,7 @@ export function QuoteBuilder({
                 <div className="px-4 pb-3 flex gap-3 text-xs">
                   <button
                     type="button"
-                    onClick={() => addLines([{ category, description: "Nova linha", supplierItemId: null, fornecedorId: null, qtyMode: "fixed", quantity: 1, unitCost: 0, vatRate: 0.23, notes: null }])}
+                    onClick={() => addLines([{ category, description: "Nova linha", supplierItemId: null, fornecedorId: null, qtyMode: "fixed", quantity: 1, unitCost: 0, vatRate: 0.23, notes: null, course: null }])}
                     className="text-gray-500 hover:text-[#32373c] font-medium"
                   >
                     + Linha
@@ -528,7 +544,7 @@ export function QuoteBuilder({
 }
 
 function quickToLine(q: (typeof QUICK_LINES)[number]): QuoteLine {
-  return { ...q, supplierItemId: null, fornecedorId: null, vatRate: 0.23, notes: null };
+  return { ...q, supplierItemId: null, fornecedorId: null, vatRate: 0.23, notes: null, course: null };
 }
 
 // ── Pieces ─────────────────────────────────────────────────────────────────
@@ -633,6 +649,7 @@ function Summary({
   async function copyForClient() {
     const rows: [string, string][] = [
       ["Evento", draft.name],
+      ...(draft.courses.length ? [["Menu", draft.courses.join(" · ")] as [string, string]] : []),
       ...(clientName ? [["Cliente", clientName] as [string, string]] : []),
       ...(draft.eventDate ? [["Data", new Date(`${draft.eventDate}T12:00:00`).toLocaleDateString("pt-PT")] as [string, string]] : []),
       ...(draft.location ? [["Local", draft.location] as [string, string]] : []),
