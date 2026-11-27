@@ -1,13 +1,17 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { ChildrenInputs } from "@/components/pricing/ChildrenInputs";
 import {
+  CHILD_RATES,
+  NO_CHILDREN,
   VAT_RATE,
   eur,
   quote,
   tierLabel,
   tiersForYear,
   yearsOf,
+  type Children,
   type PriceTier,
   type TransportOption,
 } from "@/lib/pricing";
@@ -33,6 +37,7 @@ export function PriceCalculator({ services, transport }: { services: CalculatorS
   const defaultYear = (ys: number[]) => (ys.includes(thisYear + 1) ? thisYear + 1 : ys[0] ?? thisYear);
   const [year, setYear] = useState<number>(defaultYear(years));
   const [guests, setGuests] = useState("4");
+  const [children, setChildren] = useState<Children>(NO_CHILDREN);
   const [vehicle, setVehicle] = useState("");
   const [copied, setCopied] = useState<"" | "ok" | "fail">("");
 
@@ -48,6 +53,7 @@ export function PriceCalculator({ services, transport }: { services: CalculatorS
         transportVehicle: hasTransport ? vehicle : null,
         transportHours: service.transportHours,
         transportOptions: transport,
+        children,
       })
     : null;
 
@@ -125,6 +131,7 @@ export function PriceCalculator({ services, transport }: { services: CalculatorS
             <input id="calc-guests" type="number" min={1} value={guests} onChange={(e) => setGuests(e.target.value)} className={fieldCls} />
           </div>
         </div>
+        <ChildrenInputs value={children} onChange={setChildren} totalGuests={guestsNum} inputClassName={fieldCls} />
         {hasTransport && (
           <div>
             <label htmlFor="calc-transport" className="block text-xs font-medium text-gray-500 mb-1">Transporte ({service?.transportHours}h)</label>
@@ -207,10 +214,26 @@ type Row = { label: string; excl: number; incl: number; strong?: boolean };
 
 function buildRows(service: CalculatorService, q: NonNullable<ReturnType<typeof quote>>): Row[] {
   const inc = (n: number) => n * (1 + VAT_RATE);
+  const hasChildren = q.children.children1018 + q.children.children39 + q.children.children02 > 0;
   const rows: Row[] = [
     { label: `Preço por pessoa (${q.tier ? tierLabel(q.tier) : "—"} pessoas)`, excl: q.pricePerPax, incl: inc(q.pricePerPax) },
-    { label: `${service.name} · ${q.chargedPax} ${q.chargedPax === 1 ? "pessoa" : "pessoas"}`, excl: q.serviceTotal, incl: inc(q.serviceTotal) },
   ];
+  if (!hasChildren) {
+    rows.push({ label: `${service.name} · ${q.chargedPax} ${q.chargedPax === 1 ? "pessoa" : "pessoas"}`, excl: q.serviceTotal, incl: inc(q.serviceTotal) });
+  } else {
+    const adults = q.adults + q.minimumTopUp;
+    if (adults > 0) {
+      const v = q.pricePerPax * adults;
+      rows.push({ label: `${adults} ${adults === 1 ? "adulto" : "adultos"}`, excl: v, incl: inc(v) });
+    }
+    for (const c of CHILD_RATES) {
+      const n = q.children[c.key];
+      if (!n) continue;
+      const v = q.pricePerPax * c.rate * n;
+      const share = c.rate === 0 ? "grátis" : `${Math.round(c.rate * 100)}%`;
+      rows.push({ label: `${n} × ${c.label.toLowerCase()} (${share})`, excl: v, incl: inc(v) });
+    }
+  }
   if (q.transportVehicle) {
     rows.push({ label: `Transporte ${q.transportVehicle} (${q.transportHours}h)`, excl: q.transportTotal, incl: inc(q.transportTotal) });
   }
@@ -232,7 +255,7 @@ function renderForEmail(service: CalculatorService, q: NonNullable<ReturnType<ty
   const people = `${q.guests} ${q.guests === 1 ? "pessoa" : "pessoas"}`;
   const html = [
     `<table style="border-collapse:collapse;">`,
-    `<tr><th colspan="3" style="${th}text-align:left;">${esc(service.name)} · ${people} · ${q.year ?? ""}</th></tr>`,
+    `<tr><th colspan="3" style="${th}text-align:left;">${esc(service.name)} · ${people}</th></tr>`,
     `<tr><th style="${th}text-align:left;"></th><th style="${th}text-align:right;">Sem IVA</th><th style="${th}text-align:right;">Com IVA (23%)</th></tr>`,
     ...rows.map((r) => {
       const w = r.strong ? "font-weight:bold;" : "";
@@ -241,7 +264,7 @@ function renderForEmail(service: CalculatorService, q: NonNullable<ReturnType<ty
     `</table>`,
   ].join("");
   const text = [
-    `${service.name} · ${people} · ${q.year ?? ""}`,
+    `${service.name} · ${people}`,
     `\tSem IVA\tCom IVA (23%)`,
     ...rows.map((r) => `${r.label}\t${eur(r.excl)}\t${eur(r.incl)}`),
   ].join("\n");

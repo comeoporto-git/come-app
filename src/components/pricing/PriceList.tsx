@@ -176,6 +176,7 @@ export function PriceList({ year, years, services, transport }: {
         )}
 
         <footer className="mt-8 pt-4 border-t border-gray-200 text-xs text-gray-500 space-y-1">
+          <p>Crianças dos 10 aos 18 anos pagam 75%, dos 3 aos 9 anos 50%, e até aos 2 anos não pagam. Contam para o tamanho do grupo.</p>
           <p>IVA à taxa de {Math.round(VAT_RATE * 100)}%. Grupos maiores ou serviços à medida sob consulta.</p>
         </footer>
       </div>

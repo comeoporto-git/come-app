@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import type { FinalisedSale, Transaction } from "@/lib/notion";
 import { ClientInvoiceModal } from "./ClientInvoiceModal";
+import { childrenSummary } from "@/lib/pricing";
 
 function SaleCard({
   sale,
@@ -80,6 +81,7 @@ function SaleBreakdown({ sale }: { sale: FinalisedSale }) {
   return (
     <span>
       {sale.chargedPax} × €{sale.pricePerPax.toFixed(2)}/pax ({sale.priceTierLabel} pax)
+      {childrenSummary(sale.children) && <> · crianças: {childrenSummary(sale.children)}</>}
       {sale.transportTotal > 0 && <> + transporte {sale.transportVehicle} €{sale.transportTotal.toFixed(2)}</>}
       {" "}+ IVA 23%
     </span>

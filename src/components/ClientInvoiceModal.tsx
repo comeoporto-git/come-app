@@ -4,6 +4,7 @@ import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { markSaleInvoicedAction } from "@/actions/sales";
 import type { FinalisedSale, Transaction } from "@/lib/notion";
+import { childrenSummary } from "@/lib/pricing";
 
 export function ClientInvoiceModal({
   sale,
@@ -110,6 +111,12 @@ export function ClientInvoiceModal({
               <div className="flex justify-between">
                 <span className="text-gray-500">Preço/pax ({sale.priceTierLabel} pax)</span>
                 <span className="font-semibold text-gray-900">€{sale.pricePerPax.toFixed(2)}</span>
+              </div>
+            )}
+            {childrenSummary(sale.children) && (
+              <div className="flex justify-between">
+                <span className="text-gray-500">Crianças</span>
+                <span className="font-semibold text-gray-900 text-right">{childrenSummary(sale.children)}</span>
               </div>
             )}
             {sale.chargedPax > sale.numGuests && (

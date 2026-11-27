@@ -22,6 +22,7 @@ import {
   type TeamPayment,
   type TeamPaymentRow,
   type TransportOption,
+  type Children,
 } from "@/lib/pricing";
 import {
   PARTNERS, PARTNER_SPLIT_DATE, PARTNER_PAYMENT_METHODS, partnerPaymentByMethod,
@@ -82,8 +83,10 @@ export type Tour = {
   startTime: string | null;
   endTime: string | null;
   expectedRevenue?: number;
-  /** Transport add-on vehicle (Carro / Van / Autocarro), if booked. */
+  /** Transport add-on vehicle (Carro / Van / Mini Bus), if booked. */
   transportVehicle: string | null;
+  /** How many of numGuests are children, by age band (they pay 75% / 50% / free). */
+  children: Children;
 };
 
 export type TeamSlotRole = "Guide" | "Chef" | "Driver" | "Logistics" | "Decorador";
@@ -104,6 +107,8 @@ export type FinalisedSale = Tour & {
   /** Transport add-on, excl. VAT. */
   transportTotal: number;
 };
+
+export type { Children };
 
 export type Transaction = {
   id: string;
@@ -208,6 +213,11 @@ function mapSaleRow(row: any): Tour {
     startTime: row.start_time ? String(row.start_time).slice(0, 5) : null,
     endTime:   row.end_time   ? String(row.end_time).slice(0, 5)   : null,
     transportVehicle: row.transport_vehicle ?? null,
+    children: {
+      children1018: row.children_10_18 ?? 0,
+      children39:   row.children_3_9   ?? 0,
+      children02:   row.children_0_2   ?? 0,
+    },
   };
 }
 
@@ -1263,6 +1273,8 @@ export async function createSale(data: {
   endTime?: string;
   /** Transport add-on vehicle; billed by the earning trigger. */
   transportVehicle?: string;
+  /** Children among numGuests; billed by the earning trigger. */
+  children?: Children;
 }): Promise<void> {
   const saleId = crypto.randomUUID();
   const { error: saleError } = await supabase.from("sales").insert({
@@ -1282,6 +1294,9 @@ export async function createSale(data: {
     start_time:       data.startTime    || null,
     end_time:         data.endTime      || null,
     transport_vehicle: data.transportVehicle || null,
+    children_10_18:   data.children?.children1018 ?? 0,
+    children_3_9:     data.children?.children39   ?? 0,
+    children_0_2:     data.children?.children02   ?? 0,
   });
   if (saleError) throw new Error(`createSale: ${saleError.message}`);
   // Default tasks are copied from the service's templates by the
@@ -1432,6 +1447,8 @@ export async function updateTourServiceInfo(
     endTime?: string | null;
     /** Transport add-on; the sales trigger adjusts the earning (IN-) for the change. */
     transportVehicle?: string | null;
+    /** Children among numGuests; the sales trigger adjusts the earning for the change. */
+    children?: Children;
   },
 ): Promise<void> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1451,6 +1468,11 @@ export async function updateTourServiceInfo(
   if (data.startTime !== undefined) updates.start_time  = data.startTime || null;
   if (data.endTime   !== undefined) updates.end_time    = data.endTime   || null;
   if (data.transportVehicle !== undefined) updates.transport_vehicle = data.transportVehicle || null;
+  if (data.children !== undefined) {
+    updates.children_10_18 = data.children.children1018;
+    updates.children_3_9   = data.children.children39;
+    updates.children_0_2   = data.children.children02;
+  }
 
   const { error } = await supabase.from("sales").update(updates).eq("id", tourId);
   if (error) throw new Error(`updateTourServiceInfo: ${error.message}`);
@@ -1516,6 +1538,7 @@ function salePricing(svc: SaleServicePricing, tour: Tour, transport: TransportOp
     transportVehicle: tour.transportVehicle,
     transportHours: svc.transport_hours ?? null,
     transportOptions: transport,
+    children: tour.children,
   });
   return {
     pricePerPax: q.pricePerPax,

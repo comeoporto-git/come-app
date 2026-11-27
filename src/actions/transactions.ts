@@ -75,6 +75,7 @@ export async function updateTourServiceInfoAction(
     startTime?: string | null;
     endTime?: string | null;
     transportVehicle?: string | null;
+    children?: { children1018: number; children39: number; children02: number };
   },
 ): Promise<{ error?: string }> {
   const session = await requireAuth();

@@ -285,6 +285,7 @@ async function TourPageContent({
                   services={servicesList}
                   clients={clientsList}
                   transportVehicle={tour.transportVehicle}
+                  children={tour.children}
                   transportVehicles={transportVehicles}
                 />
               ) : (
