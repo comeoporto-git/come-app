@@ -31,6 +31,10 @@ interface Props {
   phoneNumber: string;
   notes: string;
   meetingPoint: string;
+  dietaryRestrictions?: string;
+  mobilityRestrictions?: string;
+  /** Only passed in for Admin / Super Guide. */
+  emergencyContact?: string;
   notionId?: string;
   date?: string | null;
   startTime?: string | null;
@@ -58,6 +62,9 @@ export function ServiceInfoEditor({
   phoneNumber,
   notes,
   meetingPoint,
+  dietaryRestrictions = "",
+  mobilityRestrictions = "",
+  emergencyContact = "",
   notionId,
   date,
   startTime,
@@ -86,6 +93,9 @@ export function ServiceInfoEditor({
   const [draftPhone,     setDraftPhone]     = useState(phoneNumber);
   const [draftNotes,     setDraftNotes]     = useState(notes);
   const [draftMeeting,   setDraftMeeting]   = useState(meetingPoint);
+  const [draftDietary,   setDraftDietary]   = useState(dietaryRestrictions);
+  const [draftMobility,  setDraftMobility]  = useState(mobilityRestrictions);
+  const [draftEmergency, setDraftEmergency] = useState(emergencyContact);
   const [draftTransport, setDraftTransport] = useState(transportVehicle ?? "");
   const [draftChildren,  setDraftChildren]  = useState<Children>(children);
   const currentTransportHours = services.find((s) => s.id === serviceId)?.transportHours ?? null;
@@ -106,6 +116,9 @@ export function ServiceInfoEditor({
         phoneNumber: draftPhone,
         notes:       draftNotes,
         meetingPoint: draftMeeting,
+        dietaryRestrictions:  draftDietary,
+        mobilityRestrictions: draftMobility,
+        emergencyContact:     draftEmergency,
         status:      draftStatus,
         notionId:    draftNotionId || undefined,
         serviceId:   draftServiceId || undefined,
@@ -142,6 +155,9 @@ export function ServiceInfoEditor({
     setDraftPhone(phoneNumber);
     setDraftNotes(notes);
     setDraftMeeting(meetingPoint);
+    setDraftDietary(dietaryRestrictions);
+    setDraftMobility(mobilityRestrictions);
+    setDraftEmergency(emergencyContact);
     setDraftTransport(transportVehicle ?? "");
     setDraftChildren(children);
     setNewClient(false);
@@ -212,6 +228,18 @@ export function ServiceInfoEditor({
           <div>
             <p className="text-xs text-gray-500 mb-1">Ponto de Encontro</p>
             {meetingPoint ? <MapsLink location={meetingPoint} /> : <p className="text-sm text-gray-800 font-medium">—</p>}
+          </div>
+          <div>
+            <p className="text-xs text-gray-500 mb-1">Restrições Alimentares</p>
+            <p className="text-sm font-bold text-red-600 whitespace-pre-line">{dietaryRestrictions || "—"}</p>
+          </div>
+          <div>
+            <p className="text-xs text-gray-500 mb-1">Restrições de Mobilidade</p>
+            <p className="text-sm font-bold text-red-600 whitespace-pre-line">{mobilityRestrictions || "—"}</p>
+          </div>
+          <div>
+            <p className="text-xs text-gray-500 mb-1">Contacto de Emergência</p>
+            <p className="text-sm text-gray-800 font-medium whitespace-pre-line">{emergencyContact || "—"}</p>
           </div>
           <div>
             <p className="text-xs text-gray-500 mb-1">Notas</p>
@@ -320,6 +348,23 @@ export function ServiceInfoEditor({
           <div>
             <label className="text-xs text-gray-500 mb-1 block">Ponto de Encontro</label>
             <input type="text" value={draftMeeting} onChange={(e) => setDraftMeeting(e.target.value)} placeholder="Ex: Mercado do Bolhão" className="input" />
+          </div>
+
+          {/* Restrictions */}
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">Restrições Alimentares</label>
+            <textarea value={draftDietary} onChange={(e) => setDraftDietary(e.target.value)} rows={2} placeholder="Ex: 1 vegetariano, alergia a marisco…" className="input resize-none" />
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">Restrições de Mobilidade</label>
+            <textarea value={draftMobility} onChange={(e) => setDraftMobility(e.target.value)} rows={2} placeholder="Ex: cadeira de rodas, dificuldade em escadas…" className="input resize-none" />
+          </div>
+
+          {/* Emergency contact (Admin / Super Guide only) */}
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">Contacto de Emergência</label>
+            <input type="text" value={draftEmergency} onChange={(e) => setDraftEmergency(e.target.value)} placeholder="Nome e telefone" className="input" />
+            <p className="text-xs text-gray-400 mt-1">Visível apenas para Admin e Super Guide.</p>
           </div>
 
           {/* Notes */}

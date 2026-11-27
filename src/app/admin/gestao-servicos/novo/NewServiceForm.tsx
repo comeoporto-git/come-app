@@ -268,6 +268,33 @@ export default function NewServiceForm({ serviceTypes, clients, guides, chefs, t
             />
           </div>
           <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Restrições Alimentares</label>
+            <textarea
+              name="dietaryRestrictions"
+              rows={2}
+              placeholder="Ex: 1 vegetariano, alergia a marisco…"
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-[#32373c] bg-white placeholder:text-gray-400 focus:outline-none focus:border-[#667470] transition-colors resize-none"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Restrições de Mobilidade</label>
+            <textarea
+              name="mobilityRestrictions"
+              rows={2}
+              placeholder="Ex: cadeira de rodas, dificuldade em escadas…"
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-[#32373c] bg-white placeholder:text-gray-400 focus:outline-none focus:border-[#667470] transition-colors resize-none"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Contacto de Emergência</label>
+            <input
+              name="emergencyContact"
+              placeholder="Nome e telefone"
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-[#32373c] bg-white placeholder:text-gray-400 focus:outline-none focus:border-[#667470] transition-colors"
+            />
+            <p className="text-xs text-gray-400 mt-1">Visível apenas para Admin e Super Guide.</p>
+          </div>
+          <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">Notas</label>
             <textarea
               name="notes"

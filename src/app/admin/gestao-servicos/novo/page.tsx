@@ -57,6 +57,9 @@ export default async function NovoServicoPage() {
       notes:        (formData.get("notes")         as string)?.trim() || undefined,
       phoneNumber:  (formData.get("phoneNumber")   as string)?.trim() || undefined,
       names:        (formData.get("names")         as string)?.trim() || undefined,
+      dietaryRestrictions:  (formData.get("dietaryRestrictions")  as string)?.trim() || undefined,
+      mobilityRestrictions: (formData.get("mobilityRestrictions") as string)?.trim() || undefined,
+      emergencyContact:     (formData.get("emergencyContact")     as string)?.trim() || undefined,
       transportVehicle: (formData.get("transportVehicle") as string)?.trim() || undefined,
       children: {
         children1018: Math.max(0, parseInt(formData.get("children1018") as string) || 0),

@@ -11,6 +11,7 @@ import {
   getServiceSteps,
   getServiceRestaurants,
   getRegistrationsForSale,
+  getSaleEmergencyContact,
   deleteSale,
 } from "@/lib/notion";
 import type { Fornecedor, TeamSlotRole, Transaction } from "@/lib/notion";
@@ -166,7 +167,7 @@ async function TourPageContent({
   const canEditTeam = role === "Super Guide" || role === "Admin";
   const canSeeFinancials = role === "Super Guide" || role === "Admin";
 
-  const [tour, txResult, fornecedores, teamMembers, emails, servicesList, clientsList, tasks, transportOptions] = await Promise.all([
+  const [tour, txResult, fornecedores, teamMembers, emails, servicesList, clientsList, tasks, transportOptions, emergencyContact] = await Promise.all([
     getTourById(id),
     isTeamMember
       ? getMemberTransactionsForTour(id, memberId).then((t) => ({ expenses: t, earnings: [] as Transaction[] }))
@@ -178,6 +179,8 @@ async function TourPageContent({
     canEditTeam ? getClientsList()      : Promise.resolve([]),
     getTasksForSale(id, role),
     canEditTeam ? getTransportOptions() : Promise.resolve([]),
+    // Emergency contact: Admin and Super Guide only.
+    canEditTeam ? getSaleEmergencyContact(id) : Promise.resolve(""),
   ]);
   const transportVehicles = [...new Set(transportOptions.map((o) => o.vehicle))];
 
@@ -278,6 +281,9 @@ async function TourPageContent({
                   phoneNumber={tour.phoneNumber}
                   notes={tour.notes}
                   meetingPoint={tour.meetingPoint}
+                  dietaryRestrictions={tour.dietaryRestrictions}
+                  mobilityRestrictions={tour.mobilityRestrictions}
+                  emergencyContact={emergencyContact}
                   notionId={tour.saleId}
                   date={tour.date}
                   startTime={tour.startTime}
@@ -332,6 +338,14 @@ async function TourPageContent({
                     <div>
                       <p className="text-xs text-gray-500 mb-1">Ponto de Encontro</p>
                       {tour.meetingPoint ? <MapsLink location={tour.meetingPoint} /> : <p className="text-sm text-gray-800 font-medium">—</p>}
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1">Restrições Alimentares</p>
+                      <p className="text-sm font-bold text-red-600 whitespace-pre-line">{tour.dietaryRestrictions || "—"}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1">Restrições de Mobilidade</p>
+                      <p className="text-sm font-bold text-red-600 whitespace-pre-line">{tour.mobilityRestrictions || "—"}</p>
                     </div>
                     <div>
                       <p className="text-xs text-gray-500 mb-1">Notas</p>

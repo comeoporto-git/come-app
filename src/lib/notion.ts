@@ -63,6 +63,10 @@ export type Tour = {
   phoneNumber: string;
   notes: string;
   meetingPoint: string;
+  /** Guests' dietary restrictions (allergies, intolerances, vegetarian…). */
+  dietaryRestrictions: string;
+  /** Guests' mobility restrictions (wheelchair, can't walk far…). */
+  mobilityRestrictions: string;
   status: string;
   guideId: string | null;
   guideName: string;
@@ -189,6 +193,8 @@ function mapSaleRow(row: any): Tour {
     phoneNumber:   row.phone_number  ?? "",
     notes:         row.notes         ?? "",
     meetingPoint:  row.meeting_point ?? "",
+    dietaryRestrictions:  row.dietary_restrictions  ?? "",
+    mobilityRestrictions: row.mobility_restrictions ?? "",
     status:        row.status        ?? "",
     guideId:       row.guide_id      ?? null,
     guideName:     row.guide?.name   ?? "",
@@ -1269,6 +1275,10 @@ export async function createSale(data: {
   notes?: string;
   phoneNumber?: string;
   names?: string;
+  dietaryRestrictions?: string;
+  mobilityRestrictions?: string;
+  /** Only visible to Admin and Super Guide. */
+  emergencyContact?: string;
   startTime?: string;
   endTime?: string;
   /** Transport add-on vehicle; billed by the earning trigger. */
@@ -1291,6 +1301,9 @@ export async function createSale(data: {
     notes:            data.notes        || null,
     phone_number:     data.phoneNumber  || null,
     names:            data.names        || null,
+    dietary_restrictions:  data.dietaryRestrictions  || null,
+    mobility_restrictions: data.mobilityRestrictions || null,
+    emergency_contact:     data.emergencyContact     || null,
     start_time:       data.startTime    || null,
     end_time:         data.endTime      || null,
     transport_vehicle: data.transportVehicle || null,
@@ -1421,6 +1434,15 @@ export async function getTourById(id: string): Promise<Tour | null> {
   } catch { return null; }
 }
 
+/**
+ * Emergency contact of a service. Kept out of Tour (which is sent to guides'
+ * pages) so only Admin / Super Guide pages that ask for it ever receive it.
+ */
+export async function getSaleEmergencyContact(id: string): Promise<string> {
+  const { data } = await supabase.from("sales").select("emergency_contact").eq("id", id).maybeSingle();
+  return data?.emergency_contact ?? "";
+}
+
 export async function closeTour(tourId: string): Promise<void> {
   await supabase.from("sales").update({ expenses_closed: "Closed" }).eq("id", tourId);
 }
@@ -1437,6 +1459,10 @@ export async function updateTourServiceInfo(
     phoneNumber: string;
     notes: string;
     meetingPoint: string;
+    dietaryRestrictions?: string;
+    mobilityRestrictions?: string;
+    /** Only Admin and Super Guide may see or set it. */
+    emergencyContact?: string;
     status?: string;
     type?: string;
     notionId?: string;
@@ -1459,6 +1485,9 @@ export async function updateTourServiceInfo(
     notes:            data.notes        || null,
     meeting_point:    data.meetingPoint || null,
   };
+  if (data.dietaryRestrictions  !== undefined) updates.dietary_restrictions  = data.dietaryRestrictions  || null;
+  if (data.mobilityRestrictions !== undefined) updates.mobility_restrictions = data.mobilityRestrictions || null;
+  if (data.emergencyContact     !== undefined) updates.emergency_contact     = data.emergencyContact     || null;
   if (data.status    !== undefined) updates.status      = data.status    || null;
   if (data.type      !== undefined) updates.type        = data.type      || null;
   if (data.notionId  !== undefined) updates.notion_id   = data.notionId  || null;

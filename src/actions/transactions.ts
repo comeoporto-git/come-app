@@ -66,6 +66,9 @@ export async function updateTourServiceInfoAction(
     phoneNumber: string;
     notes: string;
     meetingPoint: string;
+    dietaryRestrictions?: string;
+    mobilityRestrictions?: string;
+    emergencyContact?: string;
     status?: string;
     type?: string;
     notionId?: string;
