@@ -228,7 +228,7 @@ function NewQuoteMenu({
       {open && (
         <>
           <button type="button" aria-label="Fechar" className="fixed inset-0 z-10 cursor-default" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 mt-2 w-72 bg-white rounded-2xl shadow-xl border border-gray-100 z-20 py-2 max-h-[70vh] overflow-y-auto">
+          <div className="absolute left-0 sm:left-auto sm:right-0 mt-2 w-72 max-w-[calc(100vw-2rem)] bg-white text-[#32373c] rounded-2xl shadow-xl border border-gray-100 z-20 py-2 max-h-[70vh] overflow-y-auto">
             <MenuItem title="Em branco" sub="Começar do zero" onClick={() => { setOpen(false); onCreate({}); }} />
             <MenuItem title="Novo template" sub="Modelo para eventos que se repetem" onClick={() => { setOpen(false); onCreate({ asTemplate: true }); }} />
             {templates.length > 0 && <p className="px-4 pt-3 pb-1 text-[11px] uppercase tracking-wide text-gray-400">A partir de um template</p>}

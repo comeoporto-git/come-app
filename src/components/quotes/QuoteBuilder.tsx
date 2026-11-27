@@ -504,7 +504,7 @@ export function QuoteBuilder({
       </div>
 
       {/* Mobile bottom bar */}
-      <div className="lg:hidden fixed bottom-0 inset-x-0 z-30 bg-[#32373c] text-white px-4 py-3 flex items-center justify-between gap-3 shadow-2xl">
+      <div className="lg:hidden fixed bottom-0 inset-x-0 z-30 bg-[#32373c] text-white pl-4 pr-20 py-3 flex items-center justify-between gap-3 shadow-2xl">
         <div className="tabular-nums min-w-0">
           <p className="text-base font-bold">{eur(totals.pricePerPax)}<span className="text-xs font-normal text-white/60"> /pax s/ IVA</span></p>
           <p className="text-xs text-white/60 truncate">Total {eur(totals.price)} · margem {pct(totals.margin)}</p>
@@ -892,7 +892,7 @@ function ActionsMenu({
       {open && (
         <>
           <button type="button" aria-label="Fechar" className="fixed inset-0 z-10 cursor-default" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-gray-100 z-20 py-2 text-sm">
+          <div className="absolute left-0 sm:left-auto sm:right-0 mt-2 w-64 max-w-[calc(100vw-2rem)] bg-white text-[#32373c] rounded-2xl shadow-xl border border-gray-100 z-20 py-2 text-sm">
             {isTemplate ? (
               <button type="button" onClick={act(onDuplicate)} className="w-full text-left px-4 py-2 hover:bg-gray-50">
                 <span className="font-medium">Usar template</span>

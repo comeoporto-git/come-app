@@ -47,7 +47,7 @@ export function SaleQuotes({
   }
 
   return (
-    <section className="bg-white rounded-2xl shadow-sm border border-gray-100">
+    <section className="bg-white rounded-2xl shadow-sm border border-gray-100 text-[#32373c]">
       <div className="px-4 py-3 border-b border-gray-50 flex items-center justify-between gap-2">
         <div>
           <h2 className="text-sm font-semibold text-gray-700">Orçamentos</h2>
@@ -69,13 +69,13 @@ export function SaleQuotes({
               <button type="button" aria-label="Fechar" className="fixed inset-0 z-10 cursor-default" onClick={() => setOpen(false)} />
               <div className="absolute right-0 mt-2 w-72 bg-white rounded-2xl shadow-xl border border-gray-100 z-20 py-2 max-h-[60vh] overflow-y-auto">
                 <button type="button" onClick={() => create()} className="w-full text-left px-4 py-2 hover:bg-gray-50">
-                  <p className="text-sm font-medium">Em branco</p>
+                  <p className="text-sm font-medium text-[#32373c]">Em branco</p>
                   <p className="text-xs text-gray-400">Com a data, cliente e nº de pessoas deste serviço</p>
                 </button>
                 {sorted.length > 0 && <p className="px-4 pt-3 pb-1 text-[11px] uppercase tracking-wide text-gray-400">A partir de um template</p>}
                 {sorted.map((t) => (
                   <button key={t.id} type="button" onClick={() => create(t.id)} className="w-full text-left px-4 py-2 hover:bg-gray-50">
-                    <p className="text-sm font-medium truncate">{t.name}</p>
+                    <p className="text-sm font-medium text-[#32373c] truncate">{t.name}</p>
                     <p className="text-xs text-gray-400 tabular-nums">
                       {t.serviceId === serviceId ? "Deste serviço · " : ""}{eur(t.pricePerPax)}/pax
                     </p>
@@ -100,19 +100,19 @@ export function SaleQuotes({
               <Link href={`/admin/orcamentos/${q.id}`} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-sm font-medium break-words">{q.name}</span>
+                    <span className="text-sm font-medium text-[#32373c] break-words">{q.name}</span>
                     <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${STATUS_STYLE[q.status]}`}>{q.status}</span>
                   </div>
-                  <p className="text-xs text-gray-400 truncate">
+                  <p className="text-xs text-gray-500 truncate">
                     {q.guests} pax{q.courses.length ? ` · ${q.courses.join(" · ")}` : ""}
                     {q.totals.missingPrices > 0 ? ` · ${q.totals.missingPrices} sem preço` : ""}
                   </p>
                 </div>
                 <div className="text-right shrink-0 tabular-nums">
-                  <p className="text-sm font-semibold">{eur(q.totals.pricePerPax)}<span className="text-xs text-gray-400 font-normal">/pax</span></p>
-                  <p className="text-xs text-gray-400">{eur(q.totals.price)} · {pct(q.totals.margin)}</p>
+                  <p className="text-sm font-semibold text-[#32373c]">{eur(q.totals.pricePerPax)}<span className="text-xs text-gray-500 font-normal">/pax</span></p>
+                  <p className="text-xs text-gray-500">{eur(q.totals.price)} · {pct(q.totals.margin)}</p>
                 </div>
-                <span className="text-gray-300" aria-hidden>›</span>
+                <span className="text-gray-400" aria-hidden>›</span>
               </Link>
             </li>
           ))}
