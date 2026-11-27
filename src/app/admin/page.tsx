@@ -135,7 +135,7 @@ export default async function AdminDashboard({
     getUnmatchedBankTransactions(),
     getFlaggedTransactions(),
     getGuideExpenses(),
-    getServicesWithMissingInfo(),
+    getServicesWithMissingInfo({ includeEmergencyContact: true }), // Admin-only page
     getPendingServices(),
     getServicesWithMissingStaff(),
     getAiScanFailedTransactions(),

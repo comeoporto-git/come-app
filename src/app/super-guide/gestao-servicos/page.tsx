@@ -1,7 +1,7 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { getServicesWithMissingInfo, getPendingServices, getServicesWithMissingStaff } from "@/lib/notion";
-import type { Tour, TourWithMissingStaff } from "@/lib/notion";
+import type { TourWithMissingStaff } from "@/lib/notion";
 import Image from "next/image";
 import Link from "next/link";
 import { signOut } from "@/lib/auth";
@@ -35,23 +35,13 @@ function statusColor(status: string): string {
   return "bg-gray-100 text-gray-500";
 }
 
-function getMissingFields(tour: Tour): string[] {
-  const missing: string[] = [];
-  if (!tour.clientName)  missing.push("Cliente");
-  if (!tour.numGuests)   missing.push("Nº Pax");
-  if (!tour.names)       missing.push("Nomes");
-  if (!tour.phoneNumber) missing.push("Contacto");
-  if (!tour.notes)       missing.push("Notas");
-  return missing;
-}
-
 export default async function SuperGuideGestaoServicosPage() {
   const session = await auth();
   if (!session) redirect("/login");
   if (session.user.role !== "Super Guide" && session.user.role !== "Admin") redirect("/");
 
   const [incompleteServices, pendingServices, missingStaffServices] = await Promise.all([
-    getServicesWithMissingInfo(),
+    getServicesWithMissingInfo({ includeEmergencyContact: session.user.role === "Admin" || session.user.role === "Super Guide" }),
     getPendingServices(),
     getServicesWithMissingStaff(),
   ]);
@@ -173,7 +163,7 @@ export default async function SuperGuideGestaoServicosPage() {
             ) : (
               <ul className="divide-y divide-gray-50">
                 {incompleteServices.map((t) => {
-                  const missing = getMissingFields(t);
+                  const missing = t.missingFields;
                   return (
                     <li key={t.id} className="px-5 py-3">
                       <div className="flex items-center gap-2 flex-wrap">
