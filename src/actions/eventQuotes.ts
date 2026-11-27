@@ -47,6 +47,7 @@ function cleanLines(lines: QuoteLine[]): QuoteLine[] {
       unitCost: Math.max(0, Number(l.unitCost) || 0),
       vatRate: Number.isFinite(Number(l.vatRate)) ? Number(l.vatRate) : 0.23,
       notes: l.notes?.trim() || null,
+      course: l.course?.trim() || null,
     }));
 }
 
@@ -76,6 +77,7 @@ export async function createQuoteAction(opts: {
           pricePerPaxOverride: source.pricePerPaxOverride,
           vatRate: source.vatRate,
           notes: source.notes,
+          courses: source.courses,
         }
       : {
           name: opts.name?.trim() || (asTemplate ? "Novo template" : "Novo orçamento"),
@@ -97,7 +99,10 @@ export async function saveQuoteAction(id: string, header: Partial<QuoteHeaderInp
     if (header.status !== undefined && !QUOTE_STATUSES.includes(header.status)) return { error: "Estado inválido" };
     if (header.guests !== undefined && (!Number.isInteger(header.guests) || header.guests < 0)) return { error: "Nº de pessoas inválido" };
     if (header.markupPct !== undefined && !(header.markupPct >= 0 && header.markupPct <= 1000)) return { error: "Margem inválida" };
-    await saveQuote(id, { ...header, name: header.name?.trim() }, cleanLines(lines));
+    const clean = cleanLines(lines);
+    // Every course a line refers to is kept in the course list, in order.
+    const courses = header.courses ? [...new Set([...header.courses.map((c) => c.trim()).filter(Boolean), ...clean.map((l) => l.course).filter((c): c is string => !!c)])] : undefined;
+    await saveQuote(id, { ...header, name: header.name?.trim(), courses }, clean);
     revalidateQuotes(id);
     return {};
   } catch (e) {

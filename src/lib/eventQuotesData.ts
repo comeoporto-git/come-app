@@ -12,9 +12,9 @@ import {
 // ── Row mapping ─────────────────────────────────────────────────────────────
 
 const QUOTE_COLUMNS =
-  "id, name, is_template, status, service_id, client_id, sale_id, template_id, event_date, guests, location, markup_pct, price_per_pax_override, vat_rate, notes, created_at, updated_at";
+  "id, name, is_template, status, service_id, client_id, sale_id, template_id, event_date, guests, location, markup_pct, price_per_pax_override, vat_rate, notes, courses, created_at, updated_at";
 const LINE_COLUMNS =
-  "id, quote_id, sort_order, category, description, supplier_item_id, fornecedor_id, qty_mode, quantity, unit_cost, vat_rate, notes";
+  "id, quote_id, sort_order, category, description, supplier_item_id, fornecedor_id, qty_mode, quantity, unit_cost, vat_rate, notes, course";
 
 type QuoteRow = {
   id: string;
@@ -32,6 +32,7 @@ type QuoteRow = {
   price_per_pax_override: number | string | null;
   vat_rate: number | string;
   notes: string | null;
+  courses: string[] | null;
   created_at: string;
   updated_at: string;
 };
@@ -49,6 +50,7 @@ type LineRow = {
   unit_cost: number | string;
   vat_rate: number | string;
   notes: string | null;
+  course: string | null;
 };
 
 const num = (v: number | string | null | undefined) => (v === null || v === undefined ? null : Number(v));
@@ -70,6 +72,7 @@ function mapQuote(r: QuoteRow): QuoteHeader {
     pricePerPaxOverride: num(r.price_per_pax_override),
     vatRate: Number(r.vat_rate),
     notes: r.notes,
+    courses: r.courses ?? [],
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -87,6 +90,7 @@ function mapLine(r: LineRow): QuoteLine {
     unitCost: Number(r.unit_cost),
     vatRate: Number(r.vat_rate),
     notes: r.notes,
+    course: r.course,
   };
 }
 
@@ -232,6 +236,7 @@ function headerRow(h: Partial<QuoteHeaderInput>) {
   if (h.pricePerPaxOverride !== undefined) row.price_per_pax_override = h.pricePerPaxOverride;
   if (h.vatRate !== undefined) row.vat_rate = h.vatRate;
   if (h.notes !== undefined) row.notes = h.notes;
+  if (h.courses !== undefined) row.courses = h.courses;
   return row;
 }
 
@@ -252,6 +257,7 @@ async function replaceLines(quoteId: string, lines: QuoteLine[]) {
       unit_cost: l.unitCost,
       vat_rate: l.vatRate,
       notes: l.notes,
+      course: l.course,
     })),
   );
   if (error) throw new Error(`replaceLines: ${error.message}`);
