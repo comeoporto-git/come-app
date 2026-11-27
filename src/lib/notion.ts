@@ -1315,18 +1315,42 @@ export async function deleteSale(id: string): Promise<void> {
 
 // ── Tours (Sales table) ───────────────────────────────────────────────────────
 
-export async function getServicesWithMissingInfo(): Promise<Tour[]> {
+export type IncompleteService = Tour & { missingFields: string[] };
+
+/**
+ * Labels for the sale fields that are still empty. The emergency contact is
+ * only visible to Admin and Super Guide, so it is checked only when the
+ * caller says the viewer may see it.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getSaleMissingFields(row: any, tour: Tour, includeEmergencyContact: boolean): string[] {
+  const isBlank = (v: unknown) => !v || !String(v).trim();
+  const missing: string[] = [];
+  if (!tour.clientName)  missing.push("Cliente");
+  if (!tour.numGuests)   missing.push("Nº Pax");
+  if (!tour.names)       missing.push("Nomes");
+  if (!tour.phoneNumber) missing.push("Contacto");
+  if (!tour.notes)       missing.push("Notas");
+  if (isBlank(row.dietary_restrictions))  missing.push("Alimentares");
+  if (isBlank(row.mobility_restrictions)) missing.push("Mobilidade");
+  if (includeEmergencyContact && isBlank(row.emergency_contact)) missing.push("Emergência");
+  return missing;
+}
+
+export async function getServicesWithMissingInfo(
+  { includeEmergencyContact = false }: { includeEmergencyContact?: boolean } = {},
+): Promise<IncompleteService[]> {
   const { data } = await supabase.from("sales")
     .select(SALE_SELECT)
     .gte("date", today0())
     .lt("date", in30Days())
     .order("date");
   return (data ?? [])
-    .map(mapSaleRow)
-    .filter((t) =>
-      t.status !== "Cancelled" &&
-      (!t.numGuests || !t.names || !t.phoneNumber || !t.clientName || !t.notes)
-    );
+    .map((row) => {
+      const tour = mapSaleRow(row);
+      return { ...tour, missingFields: getSaleMissingFields(row, tour, includeEmergencyContact) };
+    })
+    .filter((t) => t.status !== "Cancelled" && t.missingFields.length > 0);
 }
 
 export async function getPendingServices(): Promise<Tour[]> {
