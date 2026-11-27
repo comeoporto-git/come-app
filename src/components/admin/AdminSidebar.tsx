@@ -30,6 +30,7 @@ const nav: { group: string | null; items: NavItem[] }[] = [
       { label: "Produtos & Serviços", href: "/admin/produtos" },
       { label: "Tabela de Preços", href: "/admin/precos" },
       { label: "Calculadora", href: "/admin/calculadora" },
+      { label: "Orçamentos Eventos", href: "/admin/orcamentos" },
       { label: "Analytics", href: "/admin/analytics" },
     ],
   },
