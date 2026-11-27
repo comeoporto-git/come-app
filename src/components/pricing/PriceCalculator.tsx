@@ -1,13 +1,17 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { ChildrenInputs } from "@/components/pricing/ChildrenInputs";
 import {
+  CHILD_RATES,
+  NO_CHILDREN,
   VAT_RATE,
   eur,
   quote,
   tierLabel,
   tiersForYear,
   yearsOf,
+  type Children,
   type PriceTier,
   type TransportOption,
 } from "@/lib/pricing";
@@ -33,8 +37,9 @@ export function PriceCalculator({ services, transport }: { services: CalculatorS
   const defaultYear = (ys: number[]) => (ys.includes(thisYear + 1) ? thisYear + 1 : ys[0] ?? thisYear);
   const [year, setYear] = useState<number>(defaultYear(years));
   const [guests, setGuests] = useState("4");
+  const [children, setChildren] = useState<Children>(NO_CHILDREN);
   const [vehicle, setVehicle] = useState("");
-  const [copied, setCopied] = useState<"" | "ok" | "fail">("");
+  const [copied, setCopied] = useState<"" | `${Lang}-ok` | `${Lang}-fail`>("");
 
   const vehicles = [...new Set(transport.map((t) => t.vehicle))];
   const hasTransport = !!service?.transportHours;
@@ -48,6 +53,7 @@ export function PriceCalculator({ services, transport }: { services: CalculatorS
         transportVehicle: hasTransport ? vehicle : null,
         transportHours: service.transportHours,
         transportOptions: transport,
+        children,
       })
     : null;
 
@@ -71,11 +77,11 @@ export function PriceCalculator({ services, transport }: { services: CalculatorS
     if (!s?.transportHours) setVehicle("");
   }
 
-  const rows = q && service ? buildRows(service, q) : null;
+  const rows = q && service ? buildRows(service, q, "pt") : null;
 
-  async function copy() {
+  async function copy(lang: Lang) {
     if (!rows || !service || !q) return;
-    const { html, text } = renderForEmail(service, q, rows);
+    const { html, text } = renderForEmail(service, q, buildRows(service, q, lang), lang);
     try {
       if (typeof ClipboardItem !== "undefined" && navigator.clipboard?.write) {
         await navigator.clipboard.write([
@@ -87,9 +93,9 @@ export function PriceCalculator({ services, transport }: { services: CalculatorS
       } else {
         await navigator.clipboard.writeText(text);
       }
-      setCopied("ok");
+      setCopied(`${lang}-ok`);
     } catch {
-      setCopied("fail");
+      setCopied(`${lang}-fail`);
     }
     setTimeout(() => setCopied(""), 2500);
   }
@@ -125,6 +131,7 @@ export function PriceCalculator({ services, transport }: { services: CalculatorS
             <input id="calc-guests" type="number" min={1} value={guests} onChange={(e) => setGuests(e.target.value)} className={fieldCls} />
           </div>
         </div>
+        <ChildrenInputs value={children} onChange={setChildren} totalGuests={guestsNum} inputClassName={fieldCls} />
         {hasTransport && (
           <div>
             <label htmlFor="calc-transport" className="block text-xs font-medium text-gray-500 mb-1">Transporte ({service?.transportHours}h)</label>
@@ -159,14 +166,24 @@ export function PriceCalculator({ services, transport }: { services: CalculatorS
               {guestsNum} {guestsNum === 1 ? "pessoa" : "pessoas"} · preços {year}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={copy}
-            disabled={!rows || guestsNum === 0}
-            className="bg-[#32373c] text-white text-xs font-semibold px-4 py-2 rounded-xl disabled:opacity-40 hover:bg-[#1a2018] transition-colors"
-          >
-            {copied === "ok" ? "Copiado ✓" : copied === "fail" ? "Não foi possível copiar" : "Copiar tabela"}
-          </button>
+          <div className="flex gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={() => copy("pt")}
+              disabled={!rows || guestsNum === 0}
+              className="bg-[#32373c] text-white text-xs font-semibold px-4 py-2 rounded-xl disabled:opacity-40 hover:bg-[#1a2018] transition-colors"
+            >
+              {copied === "pt-ok" ? "Copiado ✓" : copied === "pt-fail" ? "Não foi possível copiar" : "Copiar tabela"}
+            </button>
+            <button
+              type="button"
+              onClick={() => copy("en")}
+              disabled={!rows || guestsNum === 0}
+              className="border border-[#32373c] text-[#32373c] text-xs font-semibold px-4 py-2 rounded-xl disabled:opacity-40 hover:bg-gray-50 transition-colors"
+            >
+              {copied === "en-ok" ? "Copied ✓" : copied === "en-fail" ? "Could not copy" : "Copy table (EN)"}
+            </button>
+          </div>
         </div>
         {rows && guestsNum > 0 ? (
           <div className="overflow-x-auto px-5 py-4">
@@ -204,20 +221,69 @@ export function PriceCalculator({ services, transport }: { services: CalculatorS
 }
 
 type Row = { label: string; excl: number; incl: number; strong?: boolean };
+type Lang = "pt" | "en";
 
-function buildRows(service: CalculatorService, q: NonNullable<ReturnType<typeof quote>>): Row[] {
+const TEXT = {
+  pt: {
+    person: (n: number) => (n === 1 ? "pessoa" : "pessoas"),
+    adult: (n: number) => (n === 1 ? "adulto" : "adultos"),
+    pricePerPerson: (tier: string) => `Preço por pessoa (${tier} pessoas)`,
+    child: { children1018: "criança 10-18 anos", children39: "criança 3-9 anos", children02: "bebé 0-2 anos" },
+    free: "grátis",
+    transport: "Transporte",
+    vehicle: (v: string) => v,
+    totalPerPerson: "Total por pessoa",
+    total: "Total",
+    exclVat: "Sem IVA",
+    inclVat: "Com IVA (23%)",
+    money: eur,
+  },
+  en: {
+    person: (n: number) => (n === 1 ? "person" : "people"),
+    adult: (n: number) => (n === 1 ? "adult" : "adults"),
+    pricePerPerson: (tier: string) => `Price per person (${tier} people)`,
+    child: { children1018: "child aged 10-18", children39: "child aged 3-9", children02: "infant aged 0-2" },
+    free: "free",
+    transport: "Transport",
+    vehicle: (v: string) => (v === "Carro" ? "Car" : v.replace("até 16 pax", "up to 16 passengers")),
+    totalPerPerson: "Total per person",
+    total: "Total",
+    exclVat: "Excl. VAT",
+    inclVat: "Incl. VAT (23%)",
+    money: (n: number) => new Intl.NumberFormat("en-GB", { style: "currency", currency: "EUR" }).format(n),
+  },
+} as const;
+
+function buildRows(service: CalculatorService, q: NonNullable<ReturnType<typeof quote>>, lang: Lang): Row[] {
+  const L = TEXT[lang];
   const inc = (n: number) => n * (1 + VAT_RATE);
+  const hasChildren = q.children.children1018 + q.children.children39 + q.children.children02 > 0;
   const rows: Row[] = [
-    { label: `Preço por pessoa (${q.tier ? tierLabel(q.tier) : "—"} pessoas)`, excl: q.pricePerPax, incl: inc(q.pricePerPax) },
-    { label: `${service.name} · ${q.chargedPax} ${q.chargedPax === 1 ? "pessoa" : "pessoas"}`, excl: q.serviceTotal, incl: inc(q.serviceTotal) },
+    { label: L.pricePerPerson(q.tier ? tierLabel(q.tier) : "—"), excl: q.pricePerPax, incl: inc(q.pricePerPax) },
   ];
+  if (!hasChildren) {
+    rows.push({ label: `${service.name} · ${q.chargedPax} ${L.person(q.chargedPax)}`, excl: q.serviceTotal, incl: inc(q.serviceTotal) });
+  } else {
+    const adults = q.adults + q.minimumTopUp;
+    if (adults > 0) {
+      const v = q.pricePerPax * adults;
+      rows.push({ label: `${adults} ${L.adult(adults)}`, excl: v, incl: inc(v) });
+    }
+    for (const c of CHILD_RATES) {
+      const n = q.children[c.key];
+      if (!n) continue;
+      const v = q.pricePerPax * c.rate * n;
+      const share = c.rate === 0 ? L.free : `${Math.round(c.rate * 100)}%`;
+      rows.push({ label: `${n} × ${L.child[c.key]} (${share})`, excl: v, incl: inc(v) });
+    }
+  }
   if (q.transportVehicle) {
-    rows.push({ label: `Transporte ${q.transportVehicle} (${q.transportHours}h)`, excl: q.transportTotal, incl: inc(q.transportTotal) });
+    rows.push({ label: `${L.transport} ${L.vehicle(q.transportVehicle)} (${q.transportHours}h)`, excl: q.transportTotal, incl: inc(q.transportTotal) });
   }
   if (q.guests > 0 && q.transportVehicle) {
-    rows.push({ label: "Total por pessoa", excl: q.totalExclVat / q.guests, incl: q.totalInclVat / q.guests });
+    rows.push({ label: L.totalPerPerson, excl: q.totalExclVat / q.guests, incl: q.totalInclVat / q.guests });
   }
-  rows.push({ label: "Total", excl: q.totalExclVat, incl: q.totalInclVat, strong: true });
+  rows.push({ label: L.total, excl: q.totalExclVat, incl: q.totalInclVat, strong: true });
   return rows;
 }
 
@@ -226,24 +292,25 @@ function esc(s: string) {
 }
 
 /** Email-ready table (inline styles survive pasting into Gmail/Outlook) plus a plain-text fallback. */
-function renderForEmail(service: CalculatorService, q: NonNullable<ReturnType<typeof quote>>, rows: Row[]) {
+function renderForEmail(service: CalculatorService, q: NonNullable<ReturnType<typeof quote>>, rows: Row[], lang: Lang) {
+  const L = TEXT[lang];
   const td = "padding:6px 12px;border:1px solid #d9dedc;font-family:Arial,sans-serif;font-size:14px;color:#32373c;";
   const th = `${td}background:#f2f4f3;font-weight:bold;`;
-  const people = `${q.guests} ${q.guests === 1 ? "pessoa" : "pessoas"}`;
+  const people = `${q.guests} ${L.person(q.guests)}`;
   const html = [
     `<table style="border-collapse:collapse;">`,
-    `<tr><th colspan="3" style="${th}text-align:left;">${esc(service.name)} · ${people} · ${q.year ?? ""}</th></tr>`,
-    `<tr><th style="${th}text-align:left;"></th><th style="${th}text-align:right;">Sem IVA</th><th style="${th}text-align:right;">Com IVA (23%)</th></tr>`,
+    `<tr><th colspan="3" style="${th}text-align:left;">${esc(service.name)} · ${people}</th></tr>`,
+    `<tr><th style="${th}text-align:left;"></th><th style="${th}text-align:right;">${L.exclVat}</th><th style="${th}text-align:right;">${L.inclVat}</th></tr>`,
     ...rows.map((r) => {
       const w = r.strong ? "font-weight:bold;" : "";
-      return `<tr><td style="${td}${w}">${esc(r.label)}</td><td style="${td}${w}text-align:right;">${esc(eur(r.excl))}</td><td style="${td}${w}text-align:right;">${esc(eur(r.incl))}</td></tr>`;
+      return `<tr><td style="${td}${w}">${esc(r.label)}</td><td style="${td}${w}text-align:right;">${esc(L.money(r.excl))}</td><td style="${td}${w}text-align:right;">${esc(L.money(r.incl))}</td></tr>`;
     }),
     `</table>`,
   ].join("");
   const text = [
-    `${service.name} · ${people} · ${q.year ?? ""}`,
-    `\tSem IVA\tCom IVA (23%)`,
-    ...rows.map((r) => `${r.label}\t${eur(r.excl)}\t${eur(r.incl)}`),
+    `${service.name} · ${people}`,
+    `\t${L.exclVat}\t${L.inclVat}`,
+    ...rows.map((r) => `${r.label}\t${L.money(r.excl)}\t${L.money(r.incl)}`),
   ].join("\n");
   return { html, text };
 }

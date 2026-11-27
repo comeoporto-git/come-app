@@ -46,10 +46,34 @@ export type TransportOption = {
   sortOrder: number;
 };
 
+/** Children are part of the group size; they pay a share of the tier's price.
+ *  Mirrors sale_pricing() in supabase/migrations/child_prices.sql. */
+export const CHILD_RATES = [
+  { key: "children1018", label: "Criança 10-18 anos", short: "10-18", rate: 0.75 },
+  { key: "children39", label: "Criança 3-9 anos", short: "3-9", rate: 0.5 },
+  { key: "children02", label: "Bebé 0-2 anos", short: "0-2", rate: 0 },
+] as const;
+
+export type Children = { children1018: number; children39: number; children02: number };
+export const NO_CHILDREN: Children = { children1018: 0, children39: 0, children02: 0 };
+
+/** e.g. "1 × 10-18 anos, 2 × 3-9 anos" — empty when there are no children. */
+export function childrenSummary(c: Children): string {
+  return CHILD_RATES.filter((r) => c[r.key] > 0)
+    .map((r) => `${c[r.key]} × ${r.short} anos`)
+    .join(", ");
+}
+
 export type Quote = {
   year: number | null;
   tier: PriceTier | null;
   guests: number;
+  /** Adults = guests minus children. */
+  adults: number;
+  /** Children counted (never more than the group). */
+  children: Children;
+  /** Extra full-price people charged to reach the tier's minimum. */
+  minimumTopUp: number;
   chargedPax: number;
   pricePerPax: number;
   serviceTotal: number;
@@ -186,6 +210,7 @@ export function quote(args: {
   transportVehicle?: string | null;
   transportHours?: number | null;
   transportOptions?: TransportOption[];
+  children?: Partial<Children>;
 }): Quote {
   const targetYear = args.year ?? (args.date ? new Date(args.date).getFullYear() : new Date().getFullYear());
   const year = args.year != null && yearsOf(args.tiers).includes(args.year) ? args.year : pickYear(args.tiers, targetYear);
@@ -193,7 +218,15 @@ export function quote(args: {
   const guests = Math.max(0, Math.floor(args.guests || 0));
   const chargedPax = guests > 0 ? Math.max(guests, tier?.minChargedPax ?? 0) : 0;
   const pricePerPax = tier?.pricePerPax ?? 0;
-  const serviceTotal = round2(pricePerPax * chargedPax);
+  // Children can't outnumber the group; the oldest band is counted first.
+  const n = (v: number | undefined) => Math.max(0, Math.floor(v || 0));
+  const c1018 = Math.min(n(args.children?.children1018), guests);
+  const c39 = Math.min(n(args.children?.children39), guests - c1018);
+  const c02 = Math.min(n(args.children?.children02), guests - c1018 - c39);
+  const adults = guests - c1018 - c39 - c02;
+  const minimumTopUp = guests > 0 ? Math.max((tier?.minChargedPax ?? 0) - guests, 0) : 0;
+  const units = adults + c1018 * CHILD_RATES[0].rate + c39 * CHILD_RATES[1].rate + c02 * CHILD_RATES[2].rate + minimumTopUp;
+  const serviceTotal = guests > 0 ? round2(pricePerPax * units) : 0;
   const vehicle = args.transportVehicle || null;
   const hours = vehicle ? args.transportHours ?? null : null;
   const transportTotal = round2(transportPrice(args.transportOptions ?? [], vehicle, hours));
@@ -203,6 +236,9 @@ export function quote(args: {
     year,
     tier,
     guests,
+    adults,
+    children: { children1018: c1018, children39: c39, children02: c02 },
+    minimumTopUp,
     chargedPax,
     pricePerPax,
     serviceTotal,

@@ -58,6 +58,11 @@ export default async function NovoServicoPage() {
       phoneNumber:  (formData.get("phoneNumber")   as string)?.trim() || undefined,
       names:        (formData.get("names")         as string)?.trim() || undefined,
       transportVehicle: (formData.get("transportVehicle") as string)?.trim() || undefined,
+      children: {
+        children1018: Math.max(0, parseInt(formData.get("children1018") as string) || 0),
+        children39:   Math.max(0, parseInt(formData.get("children39")   as string) || 0),
+        children02:   Math.max(0, parseInt(formData.get("children02")   as string) || 0),
+      },
     });
 
     redirect("/admin/servicos");

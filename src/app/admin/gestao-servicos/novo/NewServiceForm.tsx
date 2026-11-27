@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { ChildrenInputs } from "@/components/pricing/ChildrenInputs";
+import { NO_CHILDREN, type Children } from "@/lib/pricing";
 
 type ServiceType = { id: string; name: string; transportHours: number | null; availableUntil: number | null };
 type Client      = { id: string; name: string };
@@ -19,6 +21,8 @@ export default function NewServiceForm({ serviceTypes, clients, guides, chefs, t
   const [loading, setLoading]         = useState(false);
   const [serviceId, setServiceId]     = useState("");
   const [date, setDate]               = useState("");
+  const [guests, setGuests]           = useState("");
+  const [children, setChildren]       = useState<Children>(NO_CHILDREN);
   const selectedService = serviceTypes.find((s) => s.id === serviceId);
   const transportHours = selectedService?.transportHours ?? null;
   const bookingYear = date ? Number(date.slice(0, 4)) : null;
@@ -218,9 +222,17 @@ export default function NewServiceForm({ serviceTypes, clients, guides, chefs, t
               type="number"
               min="1"
               placeholder="0"
+              value={guests}
+              onChange={(e) => setGuests(e.target.value)}
               className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-[#32373c] bg-white placeholder:text-gray-400 focus:outline-none focus:border-[#667470] transition-colors"
             />
           </div>
+          <ChildrenInputs
+            value={children}
+            onChange={setChildren}
+            totalGuests={guests ? Number(guests) : null}
+            inputClassName="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-[#32373c] bg-white placeholder:text-gray-400 focus:outline-none focus:border-[#667470] transition-colors"
+          />
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">Nomes</label>
             <input

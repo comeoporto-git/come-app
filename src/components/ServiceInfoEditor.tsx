@@ -4,6 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { updateTourServiceInfoAction } from "@/actions/transactions";
 import { MapsLink } from "@/components/MapsLink";
+import { ChildrenInputs } from "@/components/pricing/ChildrenInputs";
+import { NO_CHILDREN, childrenSummary, type Children } from "@/lib/pricing";
 
 const STATUS_OPTIONS = ["Pending", "Confirmed", "Finalised", "Invoiced", "Paid", "Cancelled"];
 const STATUS_COLORS: Record<string, string> = {
@@ -39,6 +41,8 @@ interface Props {
   transportVehicle?: string | null;
   /** Vehicles that can be booked as transport. */
   transportVehicles?: string[];
+  /** Children among numGuests, by age band. */
+  children?: Children;
 }
 
 export function ServiceInfoEditor({
@@ -62,6 +66,7 @@ export function ServiceInfoEditor({
   clients = [],
   transportVehicle = null,
   transportVehicles = [],
+  children = NO_CHILDREN,
 }: Props) {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving]   = useState(false);
@@ -82,6 +87,7 @@ export function ServiceInfoEditor({
   const [draftNotes,     setDraftNotes]     = useState(notes);
   const [draftMeeting,   setDraftMeeting]   = useState(meetingPoint);
   const [draftTransport, setDraftTransport] = useState(transportVehicle ?? "");
+  const [draftChildren,  setDraftChildren]  = useState<Children>(children);
   const currentTransportHours = services.find((s) => s.id === serviceId)?.transportHours ?? null;
   const draftTransportHours   = services.find((s) => s.id === draftServiceId)?.transportHours ?? null;
 
@@ -108,6 +114,7 @@ export function ServiceInfoEditor({
         startTime:   draftStart || null,
         endTime:     draftEnd   || null,
         transportVehicle: draftTransportHours ? (draftTransport || null) : null,
+        children:    draftChildren,
       });
       if (result.error) {
         setError(result.error);
@@ -136,6 +143,7 @@ export function ServiceInfoEditor({
     setDraftNotes(notes);
     setDraftMeeting(meetingPoint);
     setDraftTransport(transportVehicle ?? "");
+    setDraftChildren(children);
     setNewClient(false);
     setEditing(false);
   }
@@ -185,6 +193,7 @@ export function ServiceInfoEditor({
             )}
           </div>
           <ReadField label="Nº de Pax" value={numGuests ? String(numGuests) : "—"} />
+          {childrenSummary(children) && <ReadField label="Crianças" value={childrenSummary(children)} />}
           {(transportVehicle || currentTransportHours) && (
             <ReadField
               label="Transporte"
@@ -292,6 +301,8 @@ export function ServiceInfoEditor({
             <label className="text-xs text-gray-500 mb-1 block">Nº de Pax</label>
             <input type="number" min={0} value={draftGuests} onChange={(e) => setDraftGuests(e.target.value)} placeholder="0" className="input" />
           </div>
+          <ChildrenInputs value={draftChildren} onChange={setDraftChildren} totalGuests={draftGuests ? Number(draftGuests) : null} inputClassName="input" />
+          <p className="text-xs text-gray-400 -mt-1">Ao mudar as crianças, a faturação (IN-) é atualizada, exceto se o serviço já estiver faturado ou pago.</p>
 
           {/* Names */}
           <div>
