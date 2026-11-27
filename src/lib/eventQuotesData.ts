@@ -184,11 +184,14 @@ export async function deleteSupplierItem(id: string): Promise<void> {
 
 // ── Quotes ──────────────────────────────────────────────────────────────────
 
-export async function getQuoteList(): Promise<QuoteListItem[]> {
-  const { data, error } = await supabase
+export async function getQuoteList(filter: { saleId?: string; templatesOnly?: boolean } = {}): Promise<QuoteListItem[]> {
+  let q = supabase
     .from("event_quotes")
     .select(`${QUOTE_COLUMNS}, services(name), clients(name), event_quote_lines(${LINE_COLUMNS})`)
     .order("updated_at", { ascending: false });
+  if (filter.saleId) q = q.eq("sale_id", filter.saleId);
+  if (filter.templatesOnly) q = q.eq("is_template", true);
+  const { data, error } = await q;
   if (error) throw new Error(`getQuoteList: ${error.message}`);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return ((data ?? []) as any[]).map((r) => {
@@ -315,6 +318,30 @@ export async function createEventService(name: string, description: string | nul
     .single();
   if (error) throw new Error(`createEventService: ${error.message}`);
   return data.id as string;
+}
+
+/** What a quote for a booked event starts from: the sale's service, client, date, group and place. */
+export async function getSaleQuoteDefaults(saleId: string) {
+  const { data, error } = await supabase
+    .from("sales")
+    .select("id, date, names, number_of_guests, meeting_point, service_id, client_id, services(name), clients(name)")
+    .eq("id", saleId)
+    .maybeSingle();
+  if (error) throw new Error(`getSaleQuoteDefaults: ${error.message}`);
+  if (!data) return null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const s = data as any;
+  const who = String(s.clients?.name || s.names || "").trim();
+  const svc = String(s.services?.name ?? "").trim();
+  return {
+    saleId: s.id as string,
+    serviceId: (s.service_id as string | null) ?? null,
+    clientId: (s.client_id as string | null) ?? null,
+    eventDate: (s.date ? String(s.date).slice(0, 10) : null) as string | null,
+    guests: (s.number_of_guests as number | null) ?? null,
+    location: (s.meeting_point as string | null) || null,
+    name: [svc, who].filter(Boolean).join(" · ") || "Orçamento",
+  };
 }
 
 export type ClientOption = { id: string; name: string };
