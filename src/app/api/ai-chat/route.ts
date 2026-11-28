@@ -362,6 +362,7 @@ When they say "this", "este email", "esta venda", "aqui" they mean what is open 
 - Email open (inbox): when the person gives information or asks for changes to the reply or suggestions, call revise_email with a clear note — it saves the note on that conversation and rebuilds the reply, sale changes, tasks and "ponto de situação"; the new cards appear in the chat.
 - The company guide: when the person states how the company works in general ("a partir de agora…", "sempre que…", "nunca…"), propose a guide change too (propose_change on company_guide — create a new rule or update the existing one; find it first with find_records). One-off facts about a single booking go to that booking/email, not to the guide.
 - Never say something was changed before the person confirms the card.
+- If a tool refuses (e.g. deleting a sale isn't allowed) and you take another route, explain it ONCE, in one sentence, then show the card — don't repeat the explanation after the card.
 
 ## Editable areas and fields
 ${entitiesForPrompt()}

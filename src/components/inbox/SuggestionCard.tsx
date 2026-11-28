@@ -2,6 +2,8 @@
 
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { entityDef, urlFor } from "@/lib/comeAi/entities";
 import { acceptSuggestionAction, rejectSuggestionAction } from "@/actions/inbox";
 import { sanitizeHtml } from "@/lib/sanitizeHtml";
 import type { InboxSuggestion } from "./InboxClient";
@@ -159,7 +161,7 @@ function UpdateSaleView({ p, editing, set }: { p: AnyPayload; editing: boolean; 
   const remove = (i: number) => set("changes", changes.filter((_, j) => j !== i));
   return (
     <div className="space-y-1.5">
-      <p className="text-[12px] text-gray-500">{String(p.sale_label ?? "")}</p>
+      <p className="text-[12px] text-gray-500"><Val text={String(p.sale_label ?? "")} url={p.sale_id ? `/guide/tours/${String(p.sale_id)}` : null} /></p>
       <table className="w-full text-[13px]">
         <thead>
           <tr className="text-left text-[11px] text-gray-400">
@@ -292,7 +294,23 @@ function GuideView({ p, editing, set }: { p: AnyPayload; editing: boolean; set: 
 
 // ── Card ──────────────────────────────────────────────────────────────────────
 
-type RecChange = { field: string; label: string; old: unknown; new: unknown; old_label?: string | null; new_label?: string | null };
+type RecChange = {
+  field: string; label: string; old: unknown; new: unknown;
+  old_label?: string | null; new_label?: string | null; old_url?: string | null; new_url?: string | null;
+};
+
+/** A value that opens its page when it's a linked record (service, client, guide…). */
+function Val({ text, url }: { text: string; url: string | null | undefined }) {
+  if (!url || text === "—") return <>{text}</>;
+  return <Link href={url} className="underline decoration-dotted underline-offset-2 hover:text-[#111514]">{text} ↗</Link>;
+}
+
+/** Page of a linked value, also for proposals made before links were stored. */
+function fkUrl(entity: unknown, field: string, value: unknown, stored: string | null | undefined): string | null {
+  if (stored) return stored;
+  const f = entityDef(String(entity))?.fields.find((x) => x.key === field);
+  return f?.type === "fk" && f.fk && typeof value === "string" && value ? urlFor(f.fk, value) : null;
+}
 
 const show = (v: unknown, label?: string | null) =>
   label ? label
@@ -302,16 +320,19 @@ const show = (v: unknown, label?: string | null) =>
   : String(v);
 
 /** Before → after of a change anywhere in the app (COME AI). */
-function RecordChangeView({ p, editing, set }: { p: AnyPayload; editing: boolean; set: (k: string, v: unknown) => void }) {
+function RecordChangeView({ p, editing, set, createdId }: { p: AnyPayload; editing: boolean; set: (k: string, v: unknown) => void; createdId?: string | null }) {
   const changes = (p.changes as RecChange[]) ?? [];
   const op = String(p.op);
+  const merged = Object.fromEntries(changes.map((c) => [c.field, c.new]));
+  const recordUrl = op === "delete" ? null
+    : (p.record_url as string | null | undefined) ?? urlFor(String(p.entity), (p.record_id as string | null) ?? createdId ?? null, merged);
   const update = (i: number, v: unknown) => set("changes", changes.map((c, j) => (j === i ? { ...c, new: v, new_label: null } : c)));
   const remove = (i: number) => set("changes", changes.filter((_, j) => j !== i));
   return (
     <div className="space-y-1.5">
       <p className="text-[12px] text-gray-500">
         {op === "create" ? "Novo registo em " : op === "delete" ? "Apagar de " : ""}<span className="font-semibold">{String(p.entity_label ?? "")}</span>
-        {p.record_label ? ` · ${String(p.record_label)}` : ""}
+        {p.record_label ? <> · <Val text={String(p.record_label)} url={recordUrl} /></> : recordUrl ? <> · <Val text="abrir" url={recordUrl} /></> : null}
       </p>
       {op === "delete" ? (
         <p className="text-[13px] text-red-600 bg-red-50 rounded-lg px-3 py-2">Este registo vai ser apagado.</p>
@@ -329,7 +350,7 @@ function RecordChangeView({ p, editing, set }: { p: AnyPayload; editing: boolean
             {changes.map((c, i) => (
               <tr key={c.field} className="border-t border-gray-100 align-top">
                 <td className="py-1.5 pr-2 text-gray-500 whitespace-nowrap">{c.label}</td>
-                {op !== "create" && <td className="py-1.5 pr-2 text-gray-400 line-through decoration-gray-300 break-words whitespace-pre-line">{show(c.old, c.old_label)}</td>}
+                {op !== "create" && <td className="py-1.5 pr-2 text-gray-400 line-through decoration-gray-300 break-words whitespace-pre-line"><Val text={show(c.old, c.old_label)} url={fkUrl(p.entity, c.field, c.old, c.old_url)} /></td>}
                 <td className="py-1.5 font-medium break-words whitespace-pre-line bg-emerald-50/50">
                   {editing ? (
                     String(c.new ?? "").length > 60 ? (
@@ -338,7 +359,7 @@ function RecordChangeView({ p, editing, set }: { p: AnyPayload; editing: boolean
                       <input className={input} value={String(c.new ?? "")} onChange={(e) => update(i, e.target.value)} />
                     )
                   ) : (
-                    show(c.new, c.new_label)
+                    <Val text={show(c.new, c.new_label)} url={fkUrl(p.entity, c.field, c.new, c.new_url)} />
                   )}
                 </td>
                 {editing && (
@@ -353,6 +374,21 @@ function RecordChangeView({ p, editing, set }: { p: AnyPayload; editing: boolean
       )}
     </div>
   );
+}
+
+/** Where the result of an accepted proposal lives (the new sale, the expense…). */
+function resultUrl(s: InboxSuggestion): string | null {
+  const r = (s as unknown as { result?: Record<string, unknown> | null }).result ?? null;
+  const p = ((s.final_payload ?? s.payload) ?? {}) as Record<string, unknown>;
+  if (s.kind === "create_sale" && typeof r?.sale_id === "string") return `/guide/tours/${r.sale_id}`;
+  if (s.kind === "update_sale" && typeof p.sale_id === "string") return `/guide/tours/${p.sale_id}`;
+  if (s.kind === "add_expense") return typeof p.sale_id === "string" && p.sale_id ? `/guide/tours/${p.sale_id}` : "/admin/transacoes";
+  if (s.kind === "guide_entry") return "/admin/guia";
+  if (s.kind === "record_change" && p.op !== "delete") {
+    const changes = (p.changes as { field: string; new: unknown }[]) ?? [];
+    return urlFor(String(p.entity), (p.record_id as string | null) ?? (typeof r?.id === "string" ? r.id : null), Object.fromEntries(changes.map((c) => [c.field, c.new])));
+  }
+  return null;
 }
 
 export function SuggestionCard({ s, saleOptions }: { s: InboxSuggestion; saleOptions: { id: string; label: string }[] }) {
@@ -407,6 +443,9 @@ export function SuggestionCard({ s, saleOptions }: { s: InboxSuggestion; saleOpt
         {s.source === "chat" && <span className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">COME AI</span>}
         <p className="text-[13px] font-semibold flex-1 min-w-0 truncate">{s.title}</p>
         {!actionable && <span className="text-[11px] text-gray-400">{STATUS_LABEL[s.status] ?? s.status}</span>}
+        {!actionable && (s.status === "accepted" || s.status === "modified") && resultUrl(s) && (
+          <Link href={resultUrl(s)!} className="text-[11px] font-semibold text-blue-600 hover:underline">Abrir ↗</Link>
+        )}
       </div>
       {s.rationale && <p className="px-4 pb-2 text-[12px] text-gray-500">{s.rationale}</p>}
       <div className="px-4 pb-3">
@@ -415,7 +454,7 @@ export function SuggestionCard({ s, saleOptions }: { s: InboxSuggestion; saleOpt
         {s.kind === "update_sale" && <UpdateSaleView p={shown} editing={editing} set={set} />}
         {s.kind === "add_expense" && <ExpenseView p={shown} editing={editing} set={set} saleOptions={saleOptions} />}
         {s.kind === "guide_entry" && <GuideView p={shown} editing={editing} set={set} />}
-        {s.kind === "record_change" && <RecordChangeView p={shown} editing={editing} set={set} />}
+        {s.kind === "record_change" && <RecordChangeView p={shown} editing={editing} set={set} createdId={((s as unknown as { result?: { id?: string } | null }).result?.id) ?? null} />}
       </div>
 
       {s.feedback && !actionable && <p className="px-4 pb-3 text-[12px] text-gray-500">Comentário: {s.feedback}</p>}
@@ -465,7 +504,12 @@ export function SuggestionCard({ s, saleOptions }: { s: InboxSuggestion; saleOpt
           </div>
         </div>
       )}
-      {done && <p className="border-t border-gray-50 px-4 py-2.5 text-[12px] text-emerald-700">{done}</p>}
+      {done && (
+        <p className="border-t border-gray-50 px-4 py-2.5 text-[12px] text-emerald-700">
+          {done}
+          {resultUrl(s) && <> <Link href={resultUrl(s)!} className="font-semibold text-blue-600 hover:underline">Abrir ↗</Link></>}
+        </p>
+      )}
     </div>
   );
 }

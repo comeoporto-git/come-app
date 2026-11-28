@@ -315,3 +315,68 @@ export type EntityKey = keyof typeof ENTITIES;
 export function entityDef(key: string): EntityDef | null {
   return (ENTITIES as Record<string, EntityDef>)[key] ?? null;
 }
+
+/**
+ * The page of the app where a record lives, so cards can link to it.
+ * `row` gives parent ids (e.g. a price tier → its service page).
+ */
+export function urlFor(entity: string, id: string | null | undefined, row: Record<string, unknown> = {}): string | null {
+  const v = (k: string) => (typeof row[k] === "string" && row[k] ? String(row[k]) : null);
+  switch (entity) {
+    case "sales":
+    case "sales_computed":
+      return id ? `/guide/tours/${id}` : null;
+    case "services":
+      return id ? `/admin/produtos/${id}` : "/admin/produtos";
+    case "service_prices":
+    case "service_price_tiers":
+    case "service_costs":
+    case "service_team_payments":
+    case "service_steps":
+    case "service_tasks":
+      return v("service_id") ? `/admin/produtos/${v("service_id")}` : "/admin/gestao-servicos";
+    case "clients":
+    case "sales_pipeline":
+      return id ? `/admin/crm/accounts/${id}` : "/admin/crm";
+    case "crm_contacts":
+    case "crm_weekly_actions":
+      return v("account_id") ? `/admin/crm/accounts/${v("account_id")}` : "/admin/crm";
+    case "sales_activities":
+      return v("sales_pipeline_id") ? `/admin/crm/accounts/${v("sales_pipeline_id")}` : "/admin/crm";
+    case "fornecedores":
+      return id ? `/admin/fornecedores/${id}` : "/admin/fornecedores";
+    case "supplier_items":
+      return v("fornecedor_id") ? `/admin/fornecedores/${v("fornecedor_id")}` : "/admin/orcamentos";
+    case "event_quotes":
+      return id ? `/admin/orcamentos/${id}` : "/admin/orcamentos";
+    case "event_quote_lines":
+      return v("quote_id") ? `/admin/orcamentos/${v("quote_id")}` : "/admin/orcamentos";
+    case "sale_team_members":
+    case "sale_registrations":
+      return v("sale_id") ? `/guide/tours/${v("sale_id")}` : "/admin/servicos";
+    case "tasks":
+      return v("sale_id") ? `/guide/tours/${v("sale_id")}` : "/admin/tarefas";
+    case "transactions":
+      return v("sale_id") ? `/guide/tours/${v("sale_id")}` : "/admin/transacoes";
+    case "team":
+      return "/admin/equipa";
+    case "company_guide":
+      return "/admin/guia";
+    case "business_rules":
+      return "/admin/configuracoes";
+    case "restaurants":
+    case "restaurant_hours":
+      return "/admin/produtos";
+    case "transport_options":
+      return "/admin/precos";
+    case "social_posts":
+      return id ? `/admin/social/posts/${id}` : "/admin/social";
+    case "social_photos":
+    case "social_media_planner":
+      return "/admin/social";
+    case "bank_transactions":
+      return "/admin/reconciliation";
+    default:
+      return null;
+  }
+}

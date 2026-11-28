@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/notion";
-import { ENTITIES, entityDef, type EntityDef, type FieldDef } from "./entities";
+import { ENTITIES, entityDef, urlFor, type EntityDef, type FieldDef } from "./entities";
 
 /**
  * Generic read / change of any record COME AI may touch (see entities.ts).
@@ -15,6 +15,9 @@ export type RecordChange = {
   /** Human-readable values (e.g. a person's name for a team id). */
   old_label?: string | null;
   new_label?: string | null;
+  /** Page of the linked record (for links like a service or a client). */
+  old_url?: string | null;
+  new_url?: string | null;
 };
 
 export type RecordChangePayload = {
@@ -23,6 +26,8 @@ export type RecordChangePayload = {
   op: "create" | "update" | "delete";
   record_id: string | null;
   record_label: string;
+  /** Page where this record lives in the app. */
+  record_url?: string | null;
   changes: RecordChange[];
 };
 
@@ -163,12 +168,16 @@ export async function buildRecordChange(entity: string, op: "create" | "update" 
         field: key, label: f.label, old: ov, new: nv,
         old_label: f.type === "fk" ? await fkLabel(f, ov) : null,
         new_label: f.type === "fk" ? await fkLabel(f, nv) : null,
+        old_url: f.type === "fk" && typeof ov === "string" ? urlFor(f.fk!, ov) : null,
+        new_url: f.type === "fk" && typeof nv === "string" ? urlFor(f.fk!, nv) : null,
       });
     }
     if (!changes.length) throw new Error("Nada a mudar: os valores já são esses.");
   }
+  const merged = { ...(current ?? {}), ...Object.fromEntries(changes.map((c) => [c.field, c.new])) };
   return {
     entity, entity_label: def.label, op, record_id: id,
+    record_url: op === "delete" ? null : urlFor(entity, id, merged),
     record_label: current ? labelOf(def, current) : labelOf(def, Object.fromEntries(changes.map((c) => [c.field, c.new_label ?? c.new]))),
     changes,
   };
