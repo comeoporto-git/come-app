@@ -206,6 +206,7 @@ const EXPENSE_FIELDS: { k: string; label: string; type?: string }[] = [
   { k: "total", label: "Total", type: "number" },
   { k: "payment_method", label: "Método de pagamento" },
   { k: "status", label: "Estado" },
+  { k: "socio_pessoal", label: "Despesa de sócio" },
 ];
 
 function ExpenseView({ p, editing, set, saleOptions }: { p: AnyPayload; editing: boolean; set: (k: string, v: unknown) => void; saleOptions: { id: string; label: string }[] }) {
@@ -222,6 +223,11 @@ function ExpenseView({ p, editing, set, saleOptions }: { p: AnyPayload; editing:
               {f.k === "status" ? (
                 <select className={input} value={String(p.status ?? "")} onChange={(e) => set("status", e.target.value)}>
                   {["Pending Payment", "Paid"].map((s) => <option key={s}>{s}</option>)}
+                </select>
+              ) : f.k === "socio_pessoal" ? (
+                <select className={input} value={String(p.socio_pessoal ?? "")} onChange={(e) => set("socio_pessoal", e.target.value || null)}>
+                  <option value="">Não (despesa da empresa)</option>
+                  {["António", "Manel", "Bernardo"].map((s) => <option key={s} value={s}>{s}</option>)}
                 </select>
               ) : f.k === "payment_method" ? (
                 <select className={input} value={String(p.payment_method ?? "")} onChange={(e) => set("payment_method", e.target.value)}>

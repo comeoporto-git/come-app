@@ -268,6 +268,7 @@ async function execAddExpense(p: AddExpensePayload, createdBy: string | null) {
       fatura_url: p.file_url,
       ...(tx.id_fatura ? {} : { id_fatura: p.invoice_id || null }),
       ...(p.tax_free ? { valor_sem_iva: p.tax_free, iva_6: p.iva6, iva_13: p.iva13, iva_23: p.iva23 } : {}),
+      ...(p.socio_pessoal ? { socio_pessoal: p.socio_pessoal } : {}),
     }).eq("id", tx.id);
     if (error) throw new Error(error.message);
     revalidatePath("/admin/transacoes");
@@ -293,6 +294,7 @@ async function execAddExpense(p: AddExpensePayload, createdBy: string | null) {
     bankReference: "",
     invoiceImageUrl: p.file_url,
     contaPagamento: p.conta_pagamento || "COME",
+    socioPessoal: p.socio_pessoal || null,
   }, createdBy);
   revalidatePath("/admin/transacoes");
   revalidatePath("/admin/transferencias");

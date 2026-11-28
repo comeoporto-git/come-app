@@ -42,10 +42,13 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
   let q = supabase
     .from("inbox_threads")
     .select("*, sale:sales(id, date, notion_id, status, number_of_guests, services(name), clients(name))")
-    .order("last_message_at", { ascending: false })
+    // Rows registered but not read yet (no subject) wait for the next reading.
+    .not("subject", "is", null)
+    .order("last_message_at", { ascending: false, nullsFirst: false })
     .limit(100);
   // Pending = needs something from us, or still unread in Gmail.
-  if (filter === "pendentes") q = q.or("status.in.(attention,needs_reply,awaiting_approval),and(unread.eq.true,status.neq.deleted)");
+  // Treated ones (done) never show here, even if still unread in Gmail.
+  if (filter === "pendentes") q = q.or("status.in.(attention,needs_reply,awaiting_approval),and(unread.eq.true,status.in.(replied,no_reply))");
   if (filter === "tratados") q = q.in("status", ["replied", "done", "no_reply"]);
   if (filter === "todos") q = q.neq("status", "deleted");
   const [{ data: threads }, { data: pending }, { data: chatSuggestions }, { data: sales }] = await Promise.all([

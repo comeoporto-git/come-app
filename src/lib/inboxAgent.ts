@@ -84,6 +84,8 @@ export type AddExpensePayload = {
   /** Learned from earlier expenses of the same supplier. */
   who_paid?: string;
   conta_pagamento?: string;
+  /** Partner's personal expense paid by the company (transactions.socio_pessoal). */
+  socio_pessoal?: string | null;
   /** An existing expense (e.g. created from the bank) this invoice belongs to: attach instead of creating. */
   attach_to_transaction_id?: string | null;
   history_note?: string;
@@ -92,7 +94,47 @@ export type AddExpensePayload = {
 type SupplierTx = {
   id: string; notion_id: string | null; valor: number | null; data: string | null; status: string | null;
   pago_por: string | null; metodo_pagamento: string | null; conta_pagamento: string | null; fatura_url: string | null; id_fatura: string | null;
+  socio_pessoal: string | null; fornecedor_id: string | null;
 };
+const TX_COLUMNS = "id, notion_id, valor, data, status, pago_por, metodo_pagamento, conta_pagamento, fatura_url, id_fatura, socio_pessoal, fornecedor_id";
+
+/** Defaults learned from earlier expenses (newest first). */
+function learnDefaults(rows: SupplierTx[]) {
+  const recent = rows.slice(0, 6);
+  // A partner expense only when most recent ones were.
+  const socios = recent.map((r) => r.socio_pessoal).filter(Boolean);
+  return {
+    count: rows.length,
+    name: mostCommon(recent.map((r) => r.notion_id)),
+    paymentMethod: mostCommon(recent.map((r) => r.metodo_pagamento)),
+    account: mostCommon(recent.map((r) => r.conta_pagamento)),
+    whoPaid: mostCommon(recent.map((r) => r.pago_por)),
+    status: mostCommon(recent.map((r) => r.status)),
+    socio: socios.length * 2 >= recent.length ? mostCommon(socios) : null,
+    last: rows[0] ?? null,
+  };
+}
+
+/**
+ * Recurring expense with the same amount (e.g. a monthly insurance debit),
+ * when the supplier isn't recognised by name.
+ */
+async function recurringByAmount(total: number) {
+  if (!(total > 0)) return null;
+  const since = new Date(Date.now() - 200 * 86400_000).toISOString().slice(0, 10);
+  const { data } = await supabase
+    .from("transactions")
+    .select(TX_COLUMNS)
+    .gte("data", since)
+    .lte("valor", -(total - 0.05))
+    .gte("valor", -(total + 0.05))
+    .order("data", { ascending: false })
+    .limit(12);
+  const rows = (data ?? []) as SupplierTx[];
+  const forn = mostCommon(rows.map((r) => r.fornecedor_id));
+  const same = rows.filter((r) => r.fornecedor_id === forn);
+  return same.length >= 2 ? { fornecedorId: forn, rows: same } : null;
+}
 
 /** Most frequent non-empty value. */
 function mostCommon(values: (string | null)[]): string | null {
@@ -109,28 +151,25 @@ function mostCommon(values: (string | null)[]): string | null {
 async function supplierHistory(fornecedorId: string, total: number, date: string | null, invoiceId: string) {
   const { data } = await supabase
     .from("transactions")
-    .select("id, notion_id, valor, data, status, pago_por, metodo_pagamento, conta_pagamento, fatura_url, id_fatura")
+    .select(TX_COLUMNS)
     .eq("fornecedor_id", fornecedorId)
     .order("data", { ascending: false, nullsFirst: false })
     .limit(12);
   const rows = (data ?? []) as SupplierTx[];
-  const recent = rows.slice(0, 6);
   const near = (d: string | null) => !date || !d ? true : Math.abs(new Date(d).getTime() - new Date(date).getTime()) <= 12 * 86400_000;
   const match = rows.find((r) =>
     (invoiceId && r.id_fatura && r.id_fatura.trim() === invoiceId.trim()) ||
     (total > 0 && Math.abs(Math.abs(Number(r.valor ?? 0)) - total) < 0.06 && near(r.data)),
   ) ?? null;
-  return {
-    count: rows.length,
-    name: mostCommon(recent.map((r) => r.notion_id)),
-    paymentMethod: mostCommon(recent.map((r) => r.metodo_pagamento)),
-    account: mostCommon(recent.map((r) => r.conta_pagamento)),
-    whoPaid: mostCommon(recent.map((r) => r.pago_por)),
-    status: mostCommon(recent.map((r) => r.status)),
-    match,
-    last: rows[0] ?? null,
-  };
+  return { ...learnDefaults(rows), match };
 }
+
+/** Words that say nothing about which supplier it is (never used to match). */
+const GENERIC_NAME_WORDS = new Set([
+  "lda", "limited", "limitada", "inc", "company", "companhia", "seguros", "seguro", "portugal", "porto", "lisboa",
+  "mail", "email", "billing", "invoice", "invoices", "statements", "stripe", "faturas", "fatura", "clientes", "cliente",
+  "servicos", "services", "grupo", "group", "comercial", "unipessoal", "sociedade", "noreply", "reply",
+]);
 
 /** Supplier for an invoice: exact name, then a word of the name, then the sender's domain. */
 function findFornecedor(fornecedores: { id: string; name: string }[], supplier: string | null, senderEmail: string) {
@@ -139,11 +178,11 @@ function findFornecedor(fornecedores: { id: string; name: string }[], supplier: 
   if (s) {
     const exact = fornecedores.find((f) => norm(f.name) === s);
     if (exact) return exact;
-    const words = s.split(/[^a-z0-9]+/).filter((w) => w.length >= 4 && !["lda", "limited", "seguros", "inc", "company"].includes(w));
+    const words = s.split(/[^a-z0-9]+/).filter((w) => w.length >= 4 && !GENERIC_NAME_WORDS.has(w));
     const byWord = fornecedores.find((f) => words.some((w) => norm(f.name).includes(w)));
     if (byWord) return byWord;
   }
-  const domainWords = (senderEmail.split("@")[1] ?? "").split(".").filter((w) => w.length >= 4 && !["mail", "email", "billing", "invoice", "statements", "stripe"].includes(w));
+  const domainWords = (senderEmail.split("@")[1] ?? "").split(".").filter((w) => w.length >= 4 && !GENERIC_NAME_WORDS.has(w));
   return fornecedores.find((f) => domainWords.some((w) => norm(f.name).includes(w))) ?? null;
 }
 
@@ -683,7 +722,17 @@ async function invoiceSuggestions(opts: {
     }
 
     // Do it the way this supplier's invoices were done before.
-    const hist = forn ? await supplierHistory(forn.id, total, invDate, data.invoiceId ?? "") : null;
+    let hist: (Awaited<ReturnType<typeof supplierHistory>> & { byAmount?: boolean }) | null =
+      forn ? await supplierHistory(forn.id, total, invDate, data.invoiceId ?? "") : null;
+    let histForn = forn;
+    if (!hist || !hist.count) {
+      // Not known by name: a recurring charge of the same amount tells how it's registered.
+      const rec = await recurringByAmount(total);
+      if (rec?.fornecedorId) {
+        histForn = fornecedores.find((f) => f.id === rec.fornecedorId) ?? null;
+        if (histForn) hist = { ...(await supplierHistory(histForn.id, total, invDate, data.invoiceId ?? "")), byAmount: true };
+      }
+    }
     let attachTo: string | null = null;
     if (hist?.match) {
       if (hist.match.fatura_url) duplicateOf ??= hist.match.id;  // already registered with its invoice
@@ -691,12 +740,12 @@ async function invoiceSuggestions(opts: {
     }
     if (duplicateOf && !attachTo) continue; // nothing to do: this invoice is already in the app
 
-    const historyNote = hist && hist.count
-      ? `Como nas ${hist.count} despesas anteriores de ${forn!.name}: ${[hist.paymentMethod, hist.status === "Paid" ? "marcada como paga" : hist.status, hist.account ? `conta ${hist.account}` : null].filter(Boolean).join(", ")}.${hist.last ? ` Última: ${hist.last.data ?? "?"}, ${Math.abs(Number(hist.last.valor ?? 0)).toFixed(2)} €.` : ""}`
+    const historyNote = hist && hist.count && histForn
+      ? `${hist.byAmount ? `Mesmo valor que as despesas recorrentes de ${histForn.name}` : `Como nas ${hist.count} despesas anteriores de ${histForn.name}`}: ${[hist.paymentMethod, hist.status === "Paid" ? "marcada como paga" : hist.status, hist.account ? `conta ${hist.account}` : null, hist.socio ? `despesa de sócio (${hist.socio})` : null].filter(Boolean).join(", ")}.${hist.last ? ` Última: ${hist.last.data ?? "?"}, ${Math.abs(Number(hist.last.valor ?? 0)).toFixed(2)} €.` : ""}`
       : forn ? `Primeira despesa de ${forn.name} com fatura.` : "Fornecedor novo — confirme o nome.";
 
     const payload: AddExpensePayload = {
-      supplier: hist?.name ?? forn?.name ?? data.supplier ?? "",
+      supplier: hist?.byAmount ? (forn?.name ?? data.supplier ?? hist.name ?? "") : (hist?.name ?? forn?.name ?? data.supplier ?? ""),
       fornecedor_id: forn?.id ?? null,
       date: invDate,
       invoice_id: data.invoiceId ?? "",
@@ -713,6 +762,7 @@ async function invoiceSuggestions(opts: {
       duplicate_of: duplicateOf,
       who_paid: hist?.whoPaid ?? "Company",
       conta_pagamento: hist?.account ?? "COME",
+      socio_pessoal: hist?.socio ?? null,
       attach_to_transaction_id: attachTo,
       history_note: historyNote,
     };
@@ -723,7 +773,8 @@ async function invoiceSuggestions(opts: {
       title: attachTo
         ? `Anexar fatura à despesa existente: ${payload.supplier} — ${payload.total.toFixed(2)} €`
         : `Adicionar despesa: ${payload.supplier || a.filename} — ${payload.total.toFixed(2)} €`,
-      rationale: [attachTo ? "A despesa já existe (do banco/cartão) sem fatura — a fatura é anexada a essa despesa." : null, historyNote].filter(Boolean).join(" "),
+      // The history note is shown in the card itself (payload.history_note).
+      rationale: attachTo ? "A despesa já existe (do banco/cartão) sem fatura — a fatura é anexada a essa despesa." : `Fatura anexada (${a.filename}).`,
       payload,
       for_message_id: a.messageId,
     });
