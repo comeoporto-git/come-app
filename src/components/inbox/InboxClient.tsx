@@ -142,7 +142,7 @@ export function InboxClient(props: {
         : kind === "requeue" ? await requeueThreadAction(t.id)
         : await trashThreadAction(t.id);
       setMsg(r.error ? `Erro: ${r.error}`
-        : kind === "done" ? "Marcado como tratado."
+        : kind === "done" ? "Marcado como tratado e lido."
         : kind === "requeue" ? "De volta à fila — vai ser analisado outra vez."
         : "Movido para o lixo do Gmail.");
       if (r.error) setHidden((h) => { const n = new Set(h); n.delete(t.id); return n; });
@@ -260,17 +260,19 @@ export function InboxClient(props: {
             <p className="p-6 text-sm text-gray-400">Nada por aqui. Carrega em &quot;Ler novos emails&quot;.</p>
           ) : (
             <>
-            <p className="px-4 pt-2 pb-1 text-[11px] text-gray-400">Arrasta para a direita: {props.filter === "tratados" ? "voltar à fila" : "tratado"} · para a esquerda: eliminar</p>
+            <p className="px-4 pt-2 pb-1 text-[11px] text-gray-400">Arrasta uma conversa para a esquerda para ver as opções: {props.filter === "tratados" ? "voltar à fila" : "tratado"} ou eliminar</p>
             <ul className="divide-y divide-gray-50 max-h-[75vh] overflow-y-auto">
               {props.threads.filter((t) => !hidden.has(t.id)).map((t) => {
                 const st = STATUS[t.status] ?? { label: t.status, cls: "bg-gray-100 text-gray-500" };
                 return (
                   <li key={t.id}>
                     <SwipeRow
-                      right={isTreated(t.status)
-                        ? { label: "↺ Voltar à fila", className: "bg-blue-600", run: () => swipe(t, "requeue") }
-                        : { label: "✓ Tratado", className: "bg-emerald-600", run: () => swipe(t, "done") }}
-                      left={{ label: "Eliminar 🗑", className: "bg-red-600", run: () => swipe(t, "trash") }}
+                      actions={[
+                        isTreated(t.status)
+                          ? { label: "↺ Voltar à fila", className: "bg-blue-600", run: () => swipe(t, "requeue") }
+                          : { label: "✓ Tratado", className: "bg-emerald-600", run: () => swipe(t, "done") },
+                        { label: "🗑 Eliminar", className: "bg-red-600", run: () => swipe(t, "trash") },
+                      ]}
                     >
                     <Link href={qs(t.id)} className={`block px-4 py-3 hover:bg-gray-50 ${sel?.id === t.id ? "bg-[#667470]/5" : ""}`}>
                       <div className="flex items-baseline gap-2">

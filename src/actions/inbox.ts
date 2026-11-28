@@ -84,8 +84,12 @@ export async function reanalyzeThreadAction(threadRowId: string): Promise<Result
 
 export async function setThreadStatusAction(threadRowId: string, status: "done" | "needs_reply" | "no_reply"): Promise<Result> {
   try {
-    await requireAdmin();
-    await supabase.from("inbox_threads").update({ status, updated_at: new Date().toISOString() }).eq("id", threadRowId);
+    const session = await requireAdmin();
+    const { data: row } = await supabase.from("inbox_threads").update({ status, updated_at: new Date().toISOString() }).eq("id", threadRowId).select("gmail_thread_id").maybeSingle();
+    // "Tratado" = read, nothing to do: also read in Gmail.
+    if (status === "done" && row?.gmail_thread_id) {
+      try { await markThreadRead(await gmailToken(session.user.id), row.gmail_thread_id); } catch (e) { console.error("[inbox] mark read failed:", e); }
+    }
     if (status !== "needs_reply") {
       await supabase.from("inbox_suggestions").update({ status: "superseded" }).eq("thread_id", threadRowId).eq("status", "pending");
     }
