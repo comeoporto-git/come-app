@@ -1158,7 +1158,8 @@ export async function syncInbox(opts: { userId: string; maxAnalyses?: number; th
         .from("inbox_threads")
         .select("gmail_thread_id, analyzed_message_id, last_message_id, error_attempts, situation")
         .in("status", ["needs_reply", "awaiting_approval", "replied"])
-        .gte("last_message_at", new Date(Date.now() - 30 * 86400_000).toISOString())
+        // Rows registered without opening the thread have no date yet.
+        .or(`last_message_at.gte.${new Date(Date.now() - 30 * 86400_000).toISOString()},last_message_at.is.null`)
         .order("last_message_at", { ascending: false })
         .limit(100);
       const backlog = (waiting ?? [])
