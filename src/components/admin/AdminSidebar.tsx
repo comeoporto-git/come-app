@@ -113,13 +113,15 @@ export function AdminSidebar({ userName, userEmail, userImage, fornecedores = []
     <div className="flex flex-col h-full bg-[#111514]">
       {/* Logo */}
       <div className="px-4 py-[14px] border-b border-white/10 flex items-center gap-2.5">
-        <Image
-          src="https://comeoporto.com/wp-content/uploads/2023/08/cropped-COME-Porto-Food-Tours-Logo-Black-.png"
-          alt="COME"
-          width={72}
-          height={28}
-          className="object-contain invert opacity-75"
-        />
+        <Link href="/" onClick={() => setMobileOpen(false)} aria-label="Ir para o Dashboard">
+          <Image
+            src="https://comeoporto.com/wp-content/uploads/2023/08/cropped-COME-Porto-Food-Tours-Logo-Black-.png"
+            alt="COME"
+            width={72}
+            height={28}
+            className="object-contain invert opacity-75 hover:opacity-100 transition-opacity"
+          />
+        </Link>
         <span className="text-[10px] font-semibold text-white/30 uppercase tracking-widest">
           Admin
         </span>
@@ -243,13 +245,15 @@ export function AdminSidebar({ userName, userEmail, userImage, fornecedores = []
             />
           </svg>
         </button>
-        <Image
-          src="https://comeoporto.com/wp-content/uploads/2023/08/cropped-COME-Porto-Food-Tours-Logo-Black-.png"
-          alt="COME"
-          width={56}
-          height={22}
-          className="object-contain invert opacity-75"
-        />
+        <Link href="/" aria-label="Ir para o Dashboard">
+          <Image
+            src="https://comeoporto.com/wp-content/uploads/2023/08/cropped-COME-Porto-Food-Tours-Logo-Black-.png"
+            alt="COME"
+            width={56}
+            height={22}
+            className="object-contain invert opacity-75"
+          />
+        </Link>
       </div>
 
       {/* Mobile drawer overlay */}
