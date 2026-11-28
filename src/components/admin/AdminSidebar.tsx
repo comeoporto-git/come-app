@@ -73,7 +73,7 @@ const nav: { group: string | null; items: NavItem[] }[] = [
       { label: "Copy", href: "/admin/social/posts" },
       { label: "Calendário", href: "/admin/social/calendar" },
       { label: "Analytics", href: "/admin/social/analytics" },
-      { label: "Marca", href: "/admin/social/brand-brief" },
+      { label: "Marca (no Guia)", href: "/admin/guia#marca-e-redes-sociais" },
     ],
   },
   {

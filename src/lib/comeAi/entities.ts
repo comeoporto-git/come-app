@@ -126,7 +126,7 @@ export const ENTITIES = {
     order: { column: "section", ascending: true },
     canCreate: true, canDelete: false,
     fields: [
-      en("section", "Secção", ["Respostas", "Preços", "Disponibilidade", "Serviços", "Clientes", "Despesas", "Processos"]),
+      en("section", "Secção", ["Respostas", "Preços", "Disponibilidade", "Serviços", "Clientes", "Despesas", "Processos", "Marca e redes sociais"]),
       t("title", "Título"), ta("content", "Regra"), { key: "active", label: "Ativa", type: "bool" },
     ],
   },

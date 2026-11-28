@@ -1,57 +1,25 @@
+import { guidePrompt } from "@/lib/companyGuide";
+import { AGENT_MODEL } from "@/lib/claude";
 import Anthropic from "@anthropic-ai/sdk";
 import { supabase } from "@/lib/notion";
 import { SOCIAL_CATEGORIES, isValidCategory, type SocialCategorySlug } from "@/lib/social-categories";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-const MODEL = "claude-sonnet-4-6";
-
-const BRAND_BRIEF_ID = "00000000-0000-0000-0000-000000000001";
+// The same AI as everywhere else in the app (COME AI).
+const MODEL = AGENT_MODEL;
 
 // Anthropic images are sent as base64 — skip scoring anything that would
 // blow past a sane request size rather than fail the whole sync.
 const MAX_IMAGE_BYTES = 4.5 * 1024 * 1024;
 
-type BrandBriefRow = {
-  tone: string | null;
-  offerings: string | null;
-  website_summary: string | null;
-  audience: string | null;
-  guidelines: string | null;
-};
-
-type BusinessRuleRow = { key: string; value: string; description: string | null };
-
-/** Formats the singleton brand brief + relevant business_rules as a context block for AI prompts. */
+/**
+ * Brand context for captions and photo scoring. Comes from the one company
+ * guide ("Marca e redes sociais" section + business rules) — the old Social
+ * brand brief was imported into it.
+ */
 export async function getBrandBrief(): Promise<string> {
-  const [briefResult, rulesResult] = await Promise.all([
-    supabase
-      .from("social_brand_brief")
-      .select("tone, offerings, website_summary, audience, guidelines")
-      .eq("id", BRAND_BRIEF_ID)
-      .maybeSingle(),
-    supabase.from("business_rules").select("key, value, description"),
-  ]);
-  const brief = briefResult.data as BrandBriefRow | null;
-  const rules = rulesResult.data as BusinessRuleRow[] | null;
-
-  const parts: string[] = [];
-  // Guidelines first and most prominent — this is where concrete formatting
-  // rules (structure, language, hashtags, CTA) tend to live, and it needs to
-  // read as instructions, not just background color.
-  if (brief?.guidelines) parts.push(`Diretrizes (regras concretas a seguir):\n${brief.guidelines}`);
-  if (brief?.tone) parts.push(`Tom de voz: ${brief.tone}`);
-  if (brief?.offerings) parts.push(`O que vendemos: ${brief.offerings}`);
-  if (brief?.audience) parts.push(`Audiência: ${brief.audience}`);
-  if (brief?.website_summary) parts.push(`Sobre o negócio: ${brief.website_summary}`);
-
-  if (rules && rules.length > 0) {
-    const rulesText = rules
-      .map((r) => `- ${r.key}: ${r.value}${r.description ? ` (${r.description})` : ""}`)
-      .join("\n");
-    parts.push(`Regras do negócio:\n${rulesText}`);
-  }
-
-  return parts.length > 0 ? parts.join("\n\n") : "Sem informação de marca definida ainda.";
+  const text = await guidePrompt({ sections: ["Marca e redes sociais"] });
+  return text.includes("**") ? text : "Sem informação de marca definida ainda.";
 }
 
 export type PhotoScore = { score: number; reason: string; tags: string[]; category: SocialCategorySlug | null };

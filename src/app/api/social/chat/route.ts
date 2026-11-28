@@ -1,3 +1,5 @@
+import { guidePrompt } from "@/lib/companyGuide";
+import { AGENT_MODEL } from "@/lib/claude";
 import { NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
 import Anthropic from "@anthropic-ai/sdk";
@@ -70,7 +72,8 @@ export async function POST(req: NextRequest) {
     snapshot = { today: new Date().toISOString().split("T")[0] } as never;
   }
 
-  const systemPrompt = `You are a senior social media manager (10+ years running Instagram for hospitality/tourism brands) helping the owner of COME o Porto — a food-tours and cooking-classes business in Porto, Portugal — get their content operation up and running from scratch.
+  const guide = await guidePrompt({ sections: ["Marca e redes sociais", "Serviços", "Clientes"] }).catch(() => "");
+  const systemPrompt = `You are COME AI acting as a senior social media manager (10+ years running Instagram for hospitality/tourism brands) helping the owner of COME o Porto — a food-tours and cooking-classes business in Porto, Portugal — get their content operation up and running from scratch.
 
 The app already handles the mechanics: syncing photos from Google Drive, AI photo scoring, AI-drafted bilingual captions, a scheduling calendar, and Instagram analytics. Your job is the strategic layer on top of that — the thinking a senior human social media manager would bring, not the plumbing.
 
@@ -82,6 +85,9 @@ How to be useful:
 - When asked to "help get things up and running" or for a plan, propose a concrete first-2-weeks posting cadence across categories, tell them what to shoot/gather next for categories with low backlog, and point at specific next actions in the app (e.g. "aprova mais fotos de Vinhos em Fotos", "agenda a publicação de amanhã no Calendário").
 - You cannot take actions yourself (no publishing, no editing posts, no scheduling) — you only advise. Always point to exactly where in the app to go to do the thing you're suggesting.
 - Respond in the same language the user writes in (Portuguese if they write Portuguese, English if English).
+- Follow the company guide below (the single source of the brand voice and business rules). If what the user asks contradicts it, say so.
+
+${guide}
 
 Current state (today: ${snapshot.today}):
 ${JSON.stringify(snapshot, null, 2)}`;
@@ -91,7 +97,7 @@ ${JSON.stringify(snapshot, null, 2)}`;
     async start(controller) {
       try {
         const response = await anthropic.messages.stream({
-          model: "claude-sonnet-4-6",
+          model: AGENT_MODEL,
           max_tokens: 1024,
           system: systemPrompt,
           messages,

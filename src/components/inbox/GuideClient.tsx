@@ -5,6 +5,8 @@ import { useState, useTransition } from "react";
 import { saveGuideEntryAction, deleteGuideEntryAction } from "@/actions/inbox";
 import type { GuideEntry } from "@/lib/companyGuide";
 
+const slug = (x: string) => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+
 const input = "w-full text-[13px] border border-black/15 rounded-lg px-2.5 py-1.5 outline-none focus:ring-2 focus:ring-[#111514]/15";
 
 type Draft = { id?: string; section: string; title: string; content: string; active: boolean };
@@ -62,7 +64,7 @@ export function GuideClient({ entries, sections }: { entries: GuideEntry[]; sect
       </div>
 
       {bySection.map(({ s, items }) => (
-        <section key={s} className="bg-white rounded-2xl p-4">
+        <section key={s} id={slug(s)} className="bg-white rounded-2xl p-4 scroll-mt-20">
           <h2 className="text-[14px] font-bold mb-2">{s}</h2>
           <ul className="divide-y divide-gray-100">
             {items.map((e) => (

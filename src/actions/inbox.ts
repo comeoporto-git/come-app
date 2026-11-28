@@ -7,7 +7,14 @@ import { auth } from "@/lib/auth";
 import { supabase, createTransaction, findOrCreateFornecedor } from "@/lib/notion";
 import { getGoogleToken, GMAIL_SCOPE } from "@/lib/google-token";
 import { sendReply, markThreadRead, trashThread } from "@/lib/gmail";
-import { learnFromDecision, GUIDE_SECTIONS } from "@/lib/companyGuide";
+import { learnFromDecision, GUIDE_SECTIONS, detectGuideConflicts, resolveGuideConflict } from "@/lib/companyGuide";
+
+/** After any change to the guide, look for contradictions in the background. */
+function checkGuideLater() {
+  after(async () => {
+    try { await detectGuideConflicts(); } catch (e) { console.error("[guide] conflict check failed:", e); }
+  });
+}
 import { applyRecordChange, type RecordChangePayload } from "@/lib/comeAi/records";
 import {
   syncInbox, toAddonThreadId, linkThreadToSale, SALE_FIELDS,
@@ -310,6 +317,7 @@ async function execGuideEntry(p: GuideEntryPayload, suggestionId: string) {
     .insert({ section, title: p.title, content: p.content, source: "learned", source_suggestion_id: suggestionId })
     .select("id").single();
   if (error) throw new Error(error.message);
+  checkGuideLater();
   return { guide_id: data.id };
 }
 
@@ -358,6 +366,7 @@ export async function acceptSuggestionAction(
       case "guide_entry": result = await execGuideEntry(payload, s.id); break;
       case "record_change": {
         result = await applyRecordChange(payload as RecordChangePayload);
+        if ((payload as RecordChangePayload).entity === "company_guide" || (payload as RecordChangePayload).entity === "business_rules") checkGuideLater();
         // The change can be on any page of the app.
         revalidatePath("/", "layout");
         break;
@@ -442,6 +451,7 @@ export async function saveGuideEntryAction(entry: { id?: string; section: string
       ? await supabase.from("company_guide").update(row).eq("id", entry.id)
       : await supabase.from("company_guide").insert({ ...row, source: "manual" });
     if (error) return { error: error.message };
+    checkGuideLater();
     revalidateInbox();
     return {};
   } catch (e) {
@@ -493,3 +503,29 @@ export type InboxSuggestionRow = {
   payload: unknown; status: string; final_payload: unknown; feedback: string | null; error: string | null; source: string;
   created_at: string;
 };
+
+
+// ── Guide conflicts ───────────────────────────────────────────────────────────
+
+/** Looks for contradictions in the whole guide now (button on the Guia page). */
+export async function detectGuideConflictsAction(): Promise<Result<{ found: number }>> {
+  try {
+    await requireAdmin();
+    const found = await detectGuideConflicts();
+    revalidatePath("/admin/guia");
+    return { found };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+export async function resolveGuideConflictAction(id: string, decision: { kind: "proposal" | "keep" | "dismiss"; keepId?: string; content?: string }): Promise<Result> {
+  try {
+    const session = await requireAdmin();
+    await resolveGuideConflict(id, decision, session.user.email ?? "");
+    revalidatePath("/admin/guia");
+    return {};
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
+}
