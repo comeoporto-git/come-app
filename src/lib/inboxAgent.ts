@@ -336,9 +336,9 @@ export function agencyRefs(text: string): string[] {
   return [...refs];
 }
 
-async function candidateSales(apiThreadId: string, senderEmails: string[], refs: string[] = []) {
-  const addon = toAddonThreadId(apiThreadId);
-  const refFilter = refs.map((raw) => {
+/** PostgREST filter matching sales.notion_id against agency references. */
+function refFilterFor(refs: string[]): string {
+  return refs.map((raw) => {
     const r = raw.replace(/[%,()]/g, "");
     // TLO numbers are short digits: match them exactly or next to "TLO", never inside other codes.
     if (/^P?\d{3,5}$/.test(r)) {
@@ -347,6 +347,27 @@ async function candidateSales(apiThreadId: string, senderEmails: string[], refs:
     }
     return `notion_id.ilike.%${r}%`;
   }).join(",");
+}
+
+/**
+ * Automatic step for every incoming email: if the conversation isn't linked
+ * to a sale yet and it carries an agency reference that matches exactly one
+ * existing sale, link them (conversation row + the sale's Emails section).
+ */
+export async function autoLinkBySaleRef(threadRowId: string, apiThreadId: string, text: string): Promise<string | null> {
+  const refs = agencyRefs(text);
+  if (!refs.length) return null;
+  const { data } = await supabase.from("sales").select("id").or(refFilterFor(refs)).neq("status", "Cancelled").limit(3);
+  if (!data || data.length !== 1) return null; // none, or ambiguous: leave it to the person
+  const saleId = data[0].id as string;
+  await supabase.from("inbox_threads").update({ sale_id: saleId }).eq("id", threadRowId).is("sale_id", null);
+  await linkThreadToSale(saleId, apiThreadId);
+  return saleId;
+}
+
+async function candidateSales(apiThreadId: string, senderEmails: string[], refs: string[] = []) {
+  const addon = toAddonThreadId(apiThreadId);
+  const refFilter = refFilterFor(refs);
   const [{ data: byThread }, { data: clients }, { data: byRef }] = await Promise.all([
     supabase.from("sales").select(SALE_COLUMNS).or(`thread_ids.ilike.%${addon}%,thread_ids.ilike.%${apiThreadId}%`),
     senderEmails.length
@@ -1129,7 +1150,7 @@ export async function analyzeThread(opts: {
 
 export type SyncResult = { checked: number; analyzed: number; suggestions: number; tasks: number; archived: number; followups: number; errors: string[]; remaining: number };
 
-async function upsertThreadRow(thread: GmailThread, myEmail: string): Promise<{ id: string; analyzed_message_id: string | null; status: string }> {
+async function upsertThreadRow(thread: GmailThread, myEmail: string): Promise<{ id: string; analyzed_message_id: string | null; status: string; sale_id: string | null }> {
   const first = thread.messages[0];
   const last = thread.messages[thread.messages.length - 1];
   const lastExternal = [...thread.messages].reverse().find((m) => m.fromEmail !== myEmail) ?? first;
@@ -1150,10 +1171,10 @@ async function upsertThreadRow(thread: GmailThread, myEmail: string): Promise<{ 
   const { data, error } = await supabase
     .from("inbox_threads")
     .upsert(base, { onConflict: "gmail_thread_id" })
-    .select("id, analyzed_message_id, status")
+    .select("id, analyzed_message_id, status, sale_id")
     .single();
   if (error) throw new Error(`upsertThreadRow: ${error.message}`);
-  return data as { id: string; analyzed_message_id: string | null; status: string };
+  return data as { id: string; analyzed_message_id: string | null; status: string; sale_id: string | null };
 }
 
 // ── Automatic notifications ──────────────────────────────────────────────────
@@ -1298,6 +1319,14 @@ export async function syncInbox(opts: { userId: string; maxAnalyses?: number; th
       if (!thread.messages.length) continue;
       const saved = await upsertThreadRow(thread, myEmail);
       const last = thread.messages[thread.messages.length - 1];
+      // Not linked to a sale yet? Find it by the agency reference in the email.
+      if (!saved.sale_id) {
+        try {
+          await autoLinkBySaleRef(saved.id, thread.id, thread.messages.map((m) => `${m.subject}\n${m.body.slice(0, 3000)}`).join("\n"));
+        } catch (e) {
+          console.error("[inbox] auto-link by reference failed:", e);
+        }
+      }
       const ourLast = last.fromEmail === myEmail || last.labelIds.includes("SENT");
       if (ourLast) {
         // We answered (in Gmail or from the app): the pending reply is no longer needed.
