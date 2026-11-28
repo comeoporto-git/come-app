@@ -86,6 +86,8 @@ export async function getAvailability(opts: {
   /** Google token with calendar.readonly; without it the calendar is skipped. */
   calendarToken?: string | null;
   calendarId?: string;
+  /** The booking being checked (found by its id / agency reference): it doesn't count against itself. */
+  excludeSaleIds?: string[];
 }): Promise<{ days: DayAvailability[]; calendarChecked: boolean; calendarError?: string }> {
   const dates = [...new Set(opts.dates.filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)))].sort();
   if (!dates.length) return { days: [], calendarChecked: false };
@@ -125,7 +127,7 @@ export async function getAvailability(opts: {
 
   const days = dates.map((date): DayAvailability => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const daySales = ((sales ?? []) as any[]).filter((s) => String(s.date).slice(0, 10) === date);
+    const daySales = ((sales ?? []) as any[]).filter((s) => String(s.date).slice(0, 10) === date && !opts.excludeSaleIds?.includes(s.id));
     const bookedGuideIds = new Set<string>();
     for (const s of daySales) {
       if (s.guide_id) bookedGuideIds.add(s.guide_id);

@@ -324,14 +324,41 @@ async function servicesForPrompt() {
 }
 
 /** Sales linked to the thread, the sender's sales, and the upcoming calendar. */
-async function candidateSales(apiThreadId: string, senderEmails: string[]) {
+/**
+ * Agency booking references in a conversation (MFSP…, TFY PR…/OC…, TLO nº):
+ * the reliable way to find the sale an email is about.
+ */
+export function agencyRefs(text: string): string[] {
+  const refs = new Set<string>();
+  for (const m of text.matchAll(/\bMFSP\s?-?(\d{5,})\b/gi)) refs.add(`MFSP${m[1]}`);
+  for (const m of text.matchAll(/\b((?:PR|OC)\d{4,}[A-Z]{0,3})\b/g)) refs.add(m[1]);
+  for (const m of text.matchAll(/\bTLO\b[^\n]{0,60}?[-–]\s*(P?\d{3,5})\b/gi)) refs.add(m[1].toUpperCase());
+  return [...refs];
+}
+
+async function candidateSales(apiThreadId: string, senderEmails: string[], refs: string[] = []) {
   const addon = toAddonThreadId(apiThreadId);
-  const [{ data: byThread }, { data: clients }] = await Promise.all([
+  const refFilter = refs.map((raw) => {
+    const r = raw.replace(/[%,()]/g, "");
+    // TLO numbers are short digits: match them exactly or next to "TLO", never inside other codes.
+    if (/^P?\d{3,5}$/.test(r)) {
+      const n = r.replace(/^P/, "");
+      return `notion_id.eq.${n},notion_id.eq.P${n},notion_id.ilike.%TLO%${n}%`;
+    }
+    return `notion_id.ilike.%${r}%`;
+  }).join(",");
+  const [{ data: byThread }, { data: clients }, { data: byRef }] = await Promise.all([
     supabase.from("sales").select(SALE_COLUMNS).or(`thread_ids.ilike.%${addon}%,thread_ids.ilike.%${apiThreadId}%`),
     senderEmails.length
       ? supabase.from("clients").select("id, name, email").in("email", senderEmails)
       : Promise.resolve({ data: [] as { id: string; name: string; email: string }[] }),
+    refFilter
+      ? supabase.from("sales").select(SALE_COLUMNS).or(refFilter).neq("status", "Cancelled")
+      : Promise.resolve({ data: [] as SaleRow[] }),
   ]);
+  // Same agency reference = same booking, even if the email isn't linked yet.
+  const linked = [...(byThread ?? []) as SaleRow[]];
+  for (const s of (byRef ?? []) as SaleRow[]) if (!linked.some((l) => l.id === s.id)) linked.push(s);
   const clientIds = (clients ?? []).map((c) => c.id);
   const { data: byClient } = clientIds.length
     ? await supabase.from("sales").select(SALE_COLUMNS).in("client_id", clientIds).gte("date", addDays(today(), -14)).order("date")
@@ -345,7 +372,7 @@ async function candidateSales(apiThreadId: string, senderEmails: string[]) {
     .order("date")
     .limit(120);
   return {
-    linked: (byThread ?? []) as SaleRow[],
+    linked,
     clientSales: (byClient ?? []) as SaleRow[],
     clients: (clients ?? []) as { id: string; name: string; email: string }[],
     upcoming: (upcoming ?? []) as SaleRow[],
@@ -842,7 +869,7 @@ export async function analyzeThread(opts: {
   const [guide, services, cands] = await Promise.all([
     guidePrompt(),
     servicesForPrompt(),
-    candidateSales(thread.id, senders),
+    candidateSales(thread.id, senders, agencyRefs(thread.messages.map((m) => `${m.subject}\n${m.body.slice(0, 3000)}`).join("\n"))),
   ]);
   const extracted = await extract({ thread, myEmail, guide, services, cands });
   const lastFromUs = last.fromEmail === myEmail || last.labelIds.includes("SENT");
@@ -964,7 +991,11 @@ export async function analyzeThread(opts: {
     const serviceForAvail = requests[0]?.service_id ?? sale?.service_id ?? null;
     const dates = [...new Set(requests.flatMap((r) => [r.date, ...r.alternative_dates]).filter((d): d is string => !!d))].slice(0, 8);
     const availability = dates.length
-      ? await getAvailability({ dates, serviceId: serviceForAvail, calendarToken: opts.calendarToken, calendarId: opts.calendarId })
+      ? await getAvailability({
+          dates, serviceId: serviceForAvail, calendarToken: opts.calendarToken, calendarId: opts.calendarId,
+          // The booking this email is about doesn't make its own date "unavailable".
+          excludeSaleIds: [...new Set([sale?.id, ...cands.linked.map((s) => s.id)].filter((x): x is string => !!x))],
+        })
       : { days: [], calendarChecked: false };
     const prices = await priceLines(
       requests
