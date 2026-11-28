@@ -1,3 +1,4 @@
+import { headers } from "next/headers";
 import { supabase } from "@/lib/notion";
 import { syncInbox, type SyncResult } from "@/lib/inboxAgent";
 import { getInboxOwnerUserId } from "@/lib/google-token";
@@ -33,4 +34,16 @@ export async function runInboxSync(opts: { userId?: string; maxAnalyses: number 
   } finally {
     await supabase.from("inbox_settings").update({ sync_started_at: null }).eq("id", 1);
   }
+}
+
+/**
+ * Remembers the app's public address (from the request) so the database job
+ * can call /api/cron/inbox-sync every 2 minutes. Ignores local addresses.
+ */
+export async function rememberAppUrl(): Promise<void> {
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host");
+  if (!host || host.startsWith("localhost") || host.startsWith("127.")) return;
+  const url = `${h.get("x-forwarded-proto") ?? "https"}://${host}`;
+  await supabase.from("inbox_settings").update({ app_url: url }).eq("id", 1);
 }

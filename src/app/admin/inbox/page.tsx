@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { supabase } from "@/lib/notion";
 import { getGoogleToken, GMAIL_SCOPE, CALENDAR_SCOPE, INBOX_SCOPES } from "@/lib/google-token";
 import { getThread, type GmailMessage } from "@/lib/gmail";
+import { rememberAppUrl } from "@/lib/inboxSyncRunner";
 import { InboxClient, type InboxThread, type InboxSuggestion, type SaleOption, type ThreadMessage, type AgentTaskView } from "@/components/inbox/InboxClient";
 
 export const dynamic = "force-dynamic";
@@ -26,6 +27,8 @@ type Filter = (typeof FILTERS)[number];
 export default async function InboxPage({ searchParams }: { searchParams: Promise<{ t?: string; f?: string }> }) {
   const session = await auth();
   if (!session || session.user.role !== "Admin") redirect("/");
+  // Opening the page is enough for the 2-minute background reading to start.
+  await rememberAppUrl().catch(() => {});
   const { t, f } = await searchParams;
   const filter: Filter = (FILTERS as readonly string[]).includes(f ?? "") ? (f as Filter) : "pendentes";
 

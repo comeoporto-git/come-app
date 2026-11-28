@@ -1036,8 +1036,10 @@ export async function syncInbox(opts: { userId: string; maxAnalyses?: number; th
     result.checked++;
     try {
       const { data: row } = await supabase.from("inbox_threads").select("id, analyzed_message_id, last_message_id, status, error_message_id, error_attempts, situation").eq("gmail_thread_id", id).maybeSingle();
+      let lastMessageId: string | null = null;
       if (!opts.threadIds) {
         const meta = await getThreadMeta(tok.token, id);
+        lastMessageId = meta.lastMessageId;
         // From the history: only inbox conversations, not promotions/social.
         if (!fullScan && (!meta.labelIds.includes("INBOX") || meta.labelIds.some((l) => l === "CATEGORY_PROMOTIONS" || l === "CATEGORY_SOCIAL"))) continue;
         if (row) {
@@ -1045,6 +1047,13 @@ export async function syncInbox(opts: { userId: string; maxAnalyses?: number; th
           // Same message failed 3 times: wait for a new message or a manual "Reanalisar".
           if (row.error_message_id === meta.lastMessageId && (row.error_attempts ?? 0) >= 3) continue;
         }
+      }
+      // Over this run's limit: remember the conversation (so the next run picks
+      // it up) without opening it — keeps well under Gmail's per-minute limit.
+      if (result.analyzed >= max) {
+        if (!row) await supabase.from("inbox_threads").upsert({ gmail_thread_id: id, status: "needs_reply", last_message_id: lastMessageId }, { onConflict: "gmail_thread_id", ignoreDuplicates: true });
+        result.remaining++;
+        continue;
       }
       const thread = await getThread(tok.token, id);
       if (!thread.messages.length) continue;
@@ -1063,7 +1072,6 @@ export async function syncInbox(opts: { userId: string; maxAnalyses?: number; th
         result.archived += rule.important ? 0 : 1;
         continue;
       }
-      if (result.analyzed >= max) { result.remaining++; continue; }
       const r = await analyzeThread({ token: tok.token, calendarToken: cal, calendarId, myEmail, thread, threadRowId: saved.id, notifications });
       if (r.status === "done") result.archived++;
       result.analyzed++;
