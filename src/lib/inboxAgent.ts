@@ -338,6 +338,16 @@ export function agencyRefs(text: string): string[] {
   return [...refs];
 }
 
+/** "Gene & Kelley Shrock" → "Gene Shrock"; "Dick and Ruth Weisberg" → "Dick Weisberg". */
+function firstGuest(names: string | null): string {
+  const all = (names ?? "").trim();
+  if (!all) return "";
+  const first = (all.split(/[,;&\n]| e | and /i)[0] ?? "").trim();
+  if (first.includes(" ")) return first;
+  const surname = all.split(/\s+/).pop() ?? "";
+  return surname && surname !== first ? `${first} ${surname}` : first;
+}
+
 /** PostgREST filter matching sales.notion_id against agency references. */
 function refFilterFor(refs: string[]): string {
   return refs.map((raw) => {
@@ -648,7 +658,7 @@ Regras:
 - Escreve na língua do cliente (${opts.language}). Segue o tom e as regras do guia e das regras de negócio abaixo.
 - Usa a assinatura e o estilo das nossas mensagens anteriores nesta conversa, se existirem.
 - body_html: só o corpo em HTML simples (<p>, <br>, <ul>, <li>, <strong>). Sem <html>/<body>, sem citar a mensagem anterior.
-- Preços: NUNCA escrevas valores tu próprio. Se há linhas de preço abaixo, coloca o marcador {{TABELA_PRECOS}} exatamente uma vez, num parágrafo próprio, onde a tabela com o preço proposto deve aparecer. Se não há preços calculados para o serviço pedido (serviço à medida/sem tabela), diz que enviamos uma proposta personalizada em breve, ou pede o que falta para orçamentar (nº de pessoas, data).
+- Preços: NUNCA escrevas valores tu próprio. Se há linhas de preço abaixo, coloca SEMPRE o marcador {{TABELA_PRECOS}} exatamente uma vez, num parágrafo próprio antes do fecho, onde a tabela com o preço proposto deve aparecer. Restrições alimentares, alergias ou pedidos de menu não alteram o preço: não prometas "proposta personalizada" por causa disso — apresenta o preço da tabela. Se não há preços calculados para o serviço pedido (serviço à medida/sem tabela), diz que enviamos uma proposta personalizada em breve, ou pede o que falta para orçamentar (nº de pessoas, data).
 - Disponibilidade: usa apenas a verificação abaixo. Se uma data não está disponível, propõe as alternativas disponíveis. Se o Bernardo está fora mas há outros guias livres, a data ESTÁ disponível (não mencionar o Bernardo ao cliente).${opts.calendarChecked ? "" : " (Atenção: o calendário Google não foi verificado — não confirmes datas de forma definitiva.)"}
 - Informação em falta: se a reserva está confirmada ou a ser confirmada, pede de forma simpática e agrupada a informação em falta listada abaixo. Em missing_info_requested lista o que pediste.
 - Responde às perguntas em aberto do cliente com a informação dos serviços e do guia; se não souberes, diz que confirmamos em breve (não inventes).
@@ -703,7 +713,9 @@ export function withPriceTable(html: string, prices: PricedLine[], language: str
   if (html.includes("{{TABELA_PRECOS}}")) {
     return html.replace(/<p>\s*\{\{TABELA_PRECOS\}\}\s*<\/p>/, table).replace(/\{\{TABELA_PRECOS\}\}/, table).replace(/\{\{TABELA_PRECOS\}\}/g, "");
   }
-  return `${html}\n${table}`;
+  // No placeholder: put the table before the closing ("Kind regards", "Obrigado"…), not under the signature.
+  const closing = /<p>\s*(kind regards|best regards|warm regards|regards|obrigad[oa]|cumprimentos|com os melhores cumprimentos|atenciosamente|saludos|un saludo)\b/i.exec(html);
+  return closing ? `${html.slice(0, closing.index)}${table}\n${html.slice(closing.index)}` : `${html}\n${table}`;
 }
 
 function replyEnvelope(thread: GmailThread, myEmail: string): Pick<ReplyPayload, "to" | "cc" | "subject" | "in_reply_to" | "references"> {
@@ -1010,15 +1022,23 @@ export async function analyzeThread(opts: {
   // 2. New sale(s) for a new booking request.
   let newBooking: CreateSalePayload | null = null;
   if (!sale && ex.new_booking) {
-    const client = cands.clients[0] ?? null;
+    // Bookings made on the website (Calendly) belong to the client "Website";
+    // the person who booked goes in "Nomes" and gives the sale its ID.
+    const fromWebsite = thread.messages.some((m) => /calendly\.com$/i.test(m.fromEmail.split("@")[1] ?? "") || /calendly/i.test(m.from));
+    const websiteClient = fromWebsite
+      ? ((await supabase.from("clients").select("id, name, email").ilike("name", "website").limit(1)).data?.[0] ?? null)
+      : null;
+    const client = websiteClient ?? cands.clients[0] ?? null;
     const toCreate = requests.filter((r) => r.service_id && r.date).slice(0, 8);
     // The booking's ID is the agency reference; one request with several
     // services becomes REF_1, REF_2, REF_3…
     const baseRef = agencyRefs(thread.messages.map((m) => `${m.subject}\n${m.body.slice(0, 3000)}`).join("\n"))[0] ?? "";
     for (const [i, r] of toCreate.entries()) {
       const svc = services.find((s) => s.id === r.service_id)!;
-      const fallbackName = [svc.name, client?.name ?? ex.client.name ?? ""].filter(Boolean).join(" - ");
-      const base = baseRef || fallbackName;
+      // Without an agency code the ID is the guest's name, as on the website: "Lynn_Hamilton".
+      const person = (websiteClient ? ex.client.name : null) || firstGuest(ex.booking_info.names) || ex.client.name || (websiteClient ? "" : client?.name) || "";
+      const fallbackName = person.normalize("NFC").trim().replace(/\s+/g, "_").replace(/[^\p{L}\p{N}_.-]/gu, "");
+      const base = baseRef || fallbackName || `${svc.name.replace(/\s+/g, "_")}_${r.date}`;
       const saleCode = toCreate.length > 1 ? `${base}_${i + 1}` : base;
       const payload: CreateSalePayload = {
         service_id: svc.id,
@@ -1032,9 +1052,9 @@ export async function analyzeThread(opts: {
         transport_vehicle: r.transport_vehicle,
         client_id: client?.id ?? null,
         client_name: client?.name ?? ex.client.name ?? senders[0] ?? "",
-        client_email: client?.email ?? ex.client.email ?? senders[0] ?? "",
+        client_email: websiteClient ? (ex.client.email ?? "") : (client?.email ?? ex.client.email ?? senders[0] ?? ""),
         phone_number: ex.booking_info.phone_number ?? ex.client.phone ?? "",
-        names: ex.booking_info.names ?? "",
+        names: ex.booking_info.names ?? (websiteClient ? ex.client.name ?? "" : ""),
         dietary_restrictions: ex.booking_info.dietary_restrictions ?? "",
         mobility_restrictions: ex.booking_info.mobility_restrictions ?? "",
         emergency_contact: ex.booking_info.emergency_contact ?? "",

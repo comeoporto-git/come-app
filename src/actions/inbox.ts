@@ -204,6 +204,7 @@ async function findOrCreateClient(name: string, email: string): Promise<string |
 
 async function execCreateSale(p: CreateSalePayload, threadRowId: string | null) {
   if (!p.service_id || !p.date) throw new Error("Falta serviço ou data");
+  if (!p.sale_code?.trim()) throw new Error("Falta o ID da venda (código da agência ou Nome_Apelido)");
   const clientId = p.client_id || (await findOrCreateClient(p.client_name, p.client_email));
   const { data: svc } = await supabase.from("services").select("name, type").eq("id", p.service_id).maybeSingle();
   const id = crypto.randomUUID();
@@ -214,7 +215,7 @@ async function execCreateSale(p: CreateSalePayload, threadRowId: string | null) 
     date: p.date,
     status: p.status || "Pending",
     type: svc?.type ?? null,
-    notion_id: p.sale_code?.trim() || [svc?.name, p.client_name].filter(Boolean).join(" - ") || null,
+    notion_id: p.sale_code.trim(),
     number_of_guests: p.guests || null,
     children_10_18: p.children_10_18 || 0,
     children_3_9: p.children_3_9 || 0,
