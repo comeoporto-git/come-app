@@ -27,7 +27,7 @@ function duration(min: number | null) {
 // (matched by a word in the name). Anything not listed goes last, by name.
 const TYPE_ORDER = ["tour", "cooking class", "chef + sommelier em casa"];
 const SERVICE_ORDER: Record<string, string[]> = {
-  "cooking class": ["chefs house", "capucine", "barro"],
+  "cooking class": ["chef's house", "chefs house", "barro"],
 };
 
 function rank(list: string[], match: (item: string) => boolean) {
