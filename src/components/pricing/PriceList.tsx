@@ -23,6 +23,31 @@ function duration(min: number | null) {
   return m ? `${h}h${String(m).padStart(2, "0")}` : `${h}h`;
 }
 
+// Order of the sections in the price list, and of services inside a section
+// (matched by a word in the name). Anything not listed goes last, by name.
+const TYPE_ORDER = ["tour", "cooking class", "chef + sommelier em casa"];
+const SERVICE_ORDER: Record<string, string[]> = {
+  "cooking class": ["chefs house", "capucine", "barro"],
+};
+
+function rank(list: string[], match: (item: string) => boolean) {
+  const i = list.findIndex(match);
+  return i === -1 ? list.length : i;
+}
+
+function byListOrder(a: PriceListService, b: PriceListService) {
+  const ta = a.type.trim().toLowerCase();
+  const tb = b.type.trim().toLowerCase();
+  const byType = rank(TYPE_ORDER, (t) => t === ta) - rank(TYPE_ORDER, (t) => t === tb);
+  if (byType) return byType;
+  if (ta !== tb) return ta.localeCompare(tb);
+  const order = SERVICE_ORDER[ta] ?? [];
+  const na = a.name.toLowerCase();
+  const nb = b.name.toLowerCase();
+  const byName = rank(order, (w) => na.includes(w)) - rank(order, (w) => nb.includes(w));
+  return byName || a.name.localeCompare(b.name);
+}
+
 // Prints only the price list: the app's sidebar, chat and buttons are hidden,
 // and the browser's "Save as PDF" produces the shareable file.
 const PRINT_CSS = `
@@ -42,7 +67,7 @@ export function PriceList({ year, years, services, transport }: {
   transport: TransportOption[];
 }) {
   const groups = new Map<string, PriceListService[]>();
-  for (const s of services) groups.set(s.type || "Outros", [...(groups.get(s.type || "Outros") ?? []), s]);
+  for (const s of [...services].sort(byListOrder)) groups.set(s.type || "Outros", [...(groups.get(s.type || "Outros") ?? []), s]);
 
   const vehicles = [...new Set(transport.map((t) => t.vehicle))];
   const hours = [...new Set(transport.map((t) => t.hours))].sort((a, b) => a - b);
