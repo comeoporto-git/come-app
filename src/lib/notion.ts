@@ -2653,36 +2653,54 @@ export async function getDashboardMonthlyStats(): Promise<DashboardMonthlyStats>
   const lyMonthStart = `${yr - 1}-${String(mo).padStart(2, "0")}-01`;
   const lyNextMonthStart = `${mo === 12 ? yr : yr - 1}-${String(nextMo).padStart(2, "0")}-01`;
 
-  const [salesThis, salesLast, txThis, txLast, salesLY, txLY] = await Promise.all([
-    supabase.from("sales").select("number_of_guests")
+  // Revenue is attributed to the month of the *service* (sales.date), not the
+  // date the invoice transaction was recorded — otherwise payments for last
+  // month's services inflate this month's figure and don't match the service count.
+  const SALES_WITH_TX =
+    "number_of_guests, transactions!transactions_sale_id_fkey(valor, notion_id)";
+
+  const [salesThis, salesLast, salesLY] = await Promise.all([
+    supabase.from("sales").select(SALES_WITH_TX)
       .gte("date", thisMonthStart).lt("date", nextMonthStart)
       .neq("status", "Cancelled"),
-    supabase.from("sales").select("id")
+    supabase.from("sales").select(SALES_WITH_TX)
       .gte("date", lastMonthStart).lt("date", thisMonthStart)
       .neq("status", "Cancelled"),
-    supabase.from("transactions").select("valor, sales!transactions_sale_id_fkey(status)")
-      .gte("data", thisMonthStart).lt("data", nextMonthStart).like("notion_id", "IN -%").gt("valor", 0),
-    supabase.from("transactions").select("valor, sales!transactions_sale_id_fkey(status)")
-      .gte("data", lastMonthStart).lt("data", thisMonthStart).like("notion_id", "IN -%").gt("valor", 0),
-    supabase.from("sales").select("number_of_guests")
+    supabase.from("sales").select(SALES_WITH_TX)
       .gte("date", lyMonthStart).lt("date", lyNextMonthStart)
       .neq("status", "Cancelled"),
-    supabase.from("transactions").select("valor, sales!transactions_sale_id_fkey(status)")
-      .gte("data", lyMonthStart).lt("data", lyNextMonthStart).like("notion_id", "IN -%").gt("valor", 0),
   ]);
 
-  const notCancelled = (r: { valor: any; sales: any }) =>
-    !r.sales || (r.sales as { status: any }).status !== "Cancelled";
+  type SaleRow = {
+    number_of_guests: number | null;
+    transactions: { valor: number | string | null; notion_id: string | null }[] | null;
+  };
+
+  const revenueOf = (rows: SaleRow[] | null) =>
+    (rows ?? []).reduce(
+      (sum, sale) =>
+        sum +
+        (sale.transactions ?? [])
+          .filter((t) => (t.notion_id ?? "").startsWith("IN -") && Number(t.valor) > 0)
+          .reduce((s, t) => s + Number(t.valor), 0),
+      0,
+    );
+  const paxOf = (rows: SaleRow[] | null) =>
+    (rows ?? []).reduce((s, r) => s + (r.number_of_guests ?? 0), 0);
+
+  const thisRows = salesThis.data as SaleRow[] | null;
+  const lastRows = salesLast.data as SaleRow[] | null;
+  const lyRows = salesLY.data as SaleRow[] | null;
 
   return {
-    serviceCount: salesThis.data?.length ?? 0,
-    totalPax: (salesThis.data ?? []).reduce((s, r) => s + (r.number_of_guests ?? 0), 0),
-    revenue: (txThis.data ?? []).filter(notCancelled).reduce((s, r) => s + (r.valor ?? 0), 0),
-    lastMonthRevenue: (txLast.data ?? []).filter(notCancelled).reduce((s, r) => s + (r.valor ?? 0), 0),
-    lastMonthServiceCount: salesLast.data?.length ?? 0,
-    lastYearRevenue: (txLY.data ?? []).filter(notCancelled).reduce((s, r) => s + (r.valor ?? 0), 0),
-    lastYearServiceCount: salesLY.data?.length ?? 0,
-    lastYearPax: (salesLY.data ?? []).reduce((s, r) => s + (r.number_of_guests ?? 0), 0),
+    serviceCount: thisRows?.length ?? 0,
+    totalPax: paxOf(thisRows),
+    revenue: revenueOf(thisRows),
+    lastMonthRevenue: revenueOf(lastRows),
+    lastMonthServiceCount: lastRows?.length ?? 0,
+    lastYearRevenue: revenueOf(lyRows),
+    lastYearServiceCount: lyRows?.length ?? 0,
+    lastYearPax: paxOf(lyRows),
   };
 }
 
