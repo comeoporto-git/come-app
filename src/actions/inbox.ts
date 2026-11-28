@@ -394,12 +394,14 @@ export async function deleteGuideEntryAction(id: string): Promise<Result> {
   }
 }
 
-export async function saveInboxSettingsAction(s: { gmail_query: string; calendar_id: string }): Promise<Result> {
+export async function saveInboxSettingsAction(s: { gmail_query: string; calendar_id: string; auto_archive_notifications: boolean; notifications_label: string }): Promise<Result> {
   try {
     await requireAdmin();
     const { error } = await supabase.from("inbox_settings").update({
       gmail_query: s.gmail_query.trim() || "in:inbox newer_than:30d",
       calendar_id: s.calendar_id.trim() || "primary",
+      auto_archive_notifications: s.auto_archive_notifications,
+      notifications_label: s.notifications_label.trim() || "Notificações",
     }).eq("id", 1);
     if (error) return { error: error.message };
     revalidateInbox();

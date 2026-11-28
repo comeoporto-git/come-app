@@ -7,6 +7,7 @@ import { priceLines, priceTableHtml, priceLinesText, type PricedLine } from "@/l
 import { analyzeInvoice } from "@/actions/invoice";
 import {
   getMyEmail, listThreadIds, getThreadMeta, getThread, getAttachment, toApiThreadId, parseAddress,
+  ensureLabel, archiveThread, highlightThread,
   type GmailThread, type GmailMessage,
 } from "@/lib/gmail";
 import { getGoogleToken, GMAIL_SCOPE, CALENDAR_SCOPE } from "@/lib/google-token";
@@ -281,6 +282,8 @@ type Extraction = {
   invoice_attachments: string[];
   open_questions: string[];
   tasks: AgentTask[];
+  is_notification: boolean;
+  important: boolean;
 };
 
 export type AgentTask = { key: string; name: string; description: string; due_date: string; owner: string; done: boolean };
@@ -322,6 +325,8 @@ const EXTRACTION_SCHEMA = obj({
   }),
   invoice_attachments: arr(str),
   open_questions: arr(str),
+  is_notification: bool,
+  important: bool,
   tasks: arr(obj({
     key: str,
     name: str,
@@ -363,6 +368,8 @@ Regras:
 - needs_reply: true se a última mensagem é de alguém externo e espera resposta nossa. Também true (resposta curta) para reconfirmações ("Chequeo", "Reconfirmation", "FINAL DETAILS"), comprovativos de pagamento que pedem para confirmar, e informações enviadas por agências (contactos, alergias). false para newsletters, questionários, notificações automáticas, respostas automáticas, spam comercial, recibos/faturas de fornecedores sem pergunta, ou se a última mensagem é nossa.
 - client e booking_info: "" quando a informação não está escrita.
 - tasks: tarefas internas que esta conversa cria para a equipa — tudo o que alguém da COME tem de FAZER além de responder ao email (a resposta já é tratada à parte). Exemplos: "Enviar fatura MFSP148054", "Pagar taxa RNAAT", "Enviar nome e contacto do guia à TLO", "Reservar transporte para 6 pax", "Registar despesa Vercel", "Preparar proposta para a Ovation (52 pax)", "Confirmar com o Barro a cooking class de 30/09". Não cries tarefas para "responder ao email". key: identificador curto e estável em minúsculas (ex.: "enviar-fatura", "nome-guia", "pagar-rnaat") — usa a MESMA key em análises seguintes da mesma conversa para a mesma tarefa. name: imperativo curto em português, com o cliente/código. description: 1-2 frases com o contexto. due_date: yyyy-mm-dd se houver prazo (ex.: prazo do email, ou 2 semanas antes da tour para o nome do guia, 7 dias após o serviço para faturas), senão "". owner: Bernardo (operação, guias, tours, chefs, fornecedores do serviço), António (faturação, pagamentos, despesas, contabilidade, administração, parcerias) ou Manel (reservas e comunicação com agências e clientes). done: true se a conversa mostra que a tarefa já foi feita (ex.: fatura enviada, pagamento confirmado). Se não houver tarefas, lista vazia.
+- is_notification: true se é um email automático sem uma pessoa à espera de resposta — notificações de sistemas (Vercel, GitHub, Supabase, deploys, merges, pushes), newsletters, marketing, questionários, apps de viagem, redes sociais, respostas automáticas. false para clientes, agências, fornecedores, parceiros, contabilista, bancos e organismos que pedem algo, e para faturas/recibos.
+- important: só para notificações — true se exige atenção da equipa (falha de deploy/build, erro, alerta de segurança, pagamento falhado, conta suspensa, limite atingido, prazo legal); false para avisos de rotina (deploy concluído, merge, push, newsletter).
 - summary: 1-2 frases em português.
 
 ${opts.guide}`,
@@ -663,6 +670,7 @@ export async function analyzeThread(opts: {
   myEmail: string;
   thread: GmailThread;
   threadRowId: string;
+  notifications?: { autoArchive: boolean; labelName: string };
 }): Promise<AnalyzeResult> {
   const { thread, myEmail } = opts;
   const last = thread.messages[thread.messages.length - 1];
@@ -674,6 +682,13 @@ export async function analyzeThread(opts: {
     candidateSales(thread.id, senders),
   ]);
   const ex = await extract({ thread, myEmail, guide, services, cands });
+
+  // Automatic notifications: archive the routine ones, highlight the important.
+  if (opts.notifications?.autoArchive && ex.is_notification && !ex.invoice_attachments.length && !cands.linked.length) {
+    const tasks = ex.important ? await syncAgentTasks(opts.threadRowId, null, ex.tasks) : 0;
+    const status = await handleNotification({ token: opts.token, thread, threadRowId: opts.threadRowId, important: ex.important, summary: ex.summary, labelName: opts.notifications.labelName });
+    return { suggestions: 0, status, tasks };
+  }
 
   // Validate ids coming back from the model.
   const allSales = [...cands.linked, ...cands.clientSales];
@@ -853,7 +868,7 @@ export async function analyzeThread(opts: {
 
 // ── Sync ──────────────────────────────────────────────────────────────────────
 
-export type SyncResult = { checked: number; analyzed: number; suggestions: number; tasks: number; followups: number; errors: string[]; remaining: number };
+export type SyncResult = { checked: number; analyzed: number; suggestions: number; tasks: number; archived: number; followups: number; errors: string[]; remaining: number };
 
 async function upsertThreadRow(thread: GmailThread, myEmail: string): Promise<{ id: string; analyzed_message_id: string | null; status: string }> {
   const first = thread.messages[0];
@@ -881,6 +896,45 @@ async function upsertThreadRow(thread: GmailThread, myEmail: string): Promise<{ 
   return data as { id: string; analyzed_message_id: string | null; status: string };
 }
 
+// ── Automatic notifications ──────────────────────────────────────────────────
+
+/** Senders that only ever send system notifications — handled without AI. */
+const NOTIFICATION_SENDERS = /(@|\.)(vercel\.com|github\.com|githubusercontent\.com)$/i;
+/** Words that make a notification worth a look. */
+const IMPORTANT_WORDS = /\b(fail(ed|ure)?|error|erro|falh(ou|a)|crash|security|segurança|vulnerab\w*|alert|incident|outage|down|suspend\w*|billing|payment|pagamento|overdue|quota|limit|exceeded|expir\w*|action required)\b/i;
+
+export function ruleNotification(thread: GmailThread): { important: boolean } | null {
+  const last = thread.messages[thread.messages.length - 1];
+  if (!thread.messages.every((m) => NOTIFICATION_SENDERS.test(m.fromEmail))) return null;
+  return { important: IMPORTANT_WORDS.test(`${last.subject} ${last.snippet}`) };
+}
+
+/**
+ * Routine notifications are read and moved to the notifications label; the
+ * important ones stay in the inbox, starred, and are flagged in the app.
+ */
+async function handleNotification(opts: { token: string; thread: GmailThread; threadRowId: string; important: boolean; summary: string; labelName: string }): Promise<string> {
+  if (opts.important) {
+    await highlightThread(opts.token, opts.thread.id);
+  } else {
+    const labelId = await ensureLabel(opts.token, opts.labelName);
+    await archiveThread(opts.token, opts.thread.id, labelId);
+  }
+  const status = opts.important ? "attention" : "done";
+  const last = opts.thread.messages[opts.thread.messages.length - 1];
+  await supabase.from("inbox_suggestions").update({ status: "superseded" }).eq("thread_id", opts.threadRowId).eq("status", "pending");
+  await supabase.from("inbox_threads").update({
+    category: "notification",
+    summary: opts.summary,
+    status,
+    analyzed_message_id: last.id,
+    analyzed_at: new Date().toISOString(),
+    error: null, error_message_id: null, error_attempts: 0,
+    updated_at: new Date().toISOString(),
+  }).eq("id", opts.threadRowId);
+  return status;
+}
+
 /** One readable line for an error (API errors arrive as long JSON). */
 function shortError(e: unknown): string {
   const raw = e instanceof Error ? e.message : String(e);
@@ -890,13 +944,17 @@ function shortError(e: unknown): string {
 
 /** Pull recent inbox threads, analyse new messages, propose follow-ups for missing info. */
 export async function syncInbox(opts: { userId: string; maxAnalyses?: number; threadIds?: string[] }): Promise<SyncResult> {
-  const result: SyncResult = { checked: 0, analyzed: 0, suggestions: 0, tasks: 0, followups: 0, errors: [], remaining: 0 };
+  const result: SyncResult = { checked: 0, analyzed: 0, suggestions: 0, tasks: 0, archived: 0, followups: 0, errors: [], remaining: 0 };
   const tok = await getGoogleToken(opts.userId, [GMAIL_SCOPE]);
   if (tok.status !== "ok") throw new Error(tok.status === "no_scope" ? "Falta autorizar o Gmail." : "Sem ligação ao Google.");
   const cal = tok.scopes.includes(CALENDAR_SCOPE) ? tok.token : null;
   const { data: settings } = await supabase.from("inbox_settings").select("*").eq("id", 1).maybeSingle();
   const query = (settings?.gmail_query as string) || "in:inbox newer_than:30d";
   const calendarId = (settings?.calendar_id as string) || "primary";
+  const notifications = {
+    autoArchive: settings?.auto_archive_notifications !== false,
+    labelName: (settings?.notifications_label as string) || "Notificações",
+  };
   const myEmail = await getMyEmail(tok.token);
   const max = opts.maxAnalyses ?? 5;
 
@@ -922,8 +980,16 @@ export async function syncInbox(opts: { userId: string; maxAnalyses?: number; th
         await supabase.from("inbox_threads").update({ status: pending ? "awaiting_approval" : "replied", analyzed_message_id: last.id }).eq("id", saved.id);
         continue;
       }
+      // Known system senders (Vercel, GitHub): no AI needed.
+      const rule = notifications.autoArchive ? ruleNotification(thread) : null;
+      if (rule) {
+        await handleNotification({ token: tok.token, thread, threadRowId: saved.id, important: rule.important, summary: last.subject, labelName: notifications.labelName });
+        result.archived += rule.important ? 0 : 1;
+        continue;
+      }
       if (result.analyzed >= max) { result.remaining++; continue; }
-      const r = await analyzeThread({ token: tok.token, calendarToken: cal, calendarId, myEmail, thread, threadRowId: saved.id });
+      const r = await analyzeThread({ token: tok.token, calendarToken: cal, calendarId, myEmail, thread, threadRowId: saved.id, notifications });
+      if (r.status === "done") result.archived++;
       result.analyzed++;
       result.suggestions += r.suggestions;
       result.tasks += r.tasks;

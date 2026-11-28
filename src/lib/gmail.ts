@@ -284,6 +284,34 @@ export async function markThreadRead(token: string, threadId: string): Promise<v
   });
 }
 
+/** Id of a user label, created if it doesn't exist yet. */
+export async function ensureLabel(token: string, name: string): Promise<string> {
+  const { labels } = await gmail<{ labels?: { id: string; name: string }[] }>(token, "/labels");
+  const found = labels?.find((l) => l.name.toLowerCase() === name.toLowerCase());
+  if (found) return found.id;
+  const created = await gmail<{ id: string }>(token, "/labels", {
+    method: "POST",
+    body: JSON.stringify({ name, labelListVisibility: "labelShow", messageListVisibility: "show" }),
+  });
+  return created.id;
+}
+
+/** Marks a thread read and moves it out of the inbox into a label. */
+export async function archiveThread(token: string, threadId: string, labelId: string): Promise<void> {
+  await gmail(token, `/threads/${threadId}/modify`, {
+    method: "POST",
+    body: JSON.stringify({ addLabelIds: [labelId], removeLabelIds: ["INBOX", "UNREAD"] }),
+  });
+}
+
+/** Stars a thread and marks it important, keeping it in the inbox. */
+export async function highlightThread(token: string, threadId: string): Promise<void> {
+  await gmail(token, `/threads/${threadId}/modify`, {
+    method: "POST",
+    body: JSON.stringify({ addLabelIds: ["STARRED", "IMPORTANT"] }),
+  });
+}
+
 export function gmailThreadUrl(threadId: string): string {
   return `https://mail.google.com/mail/u/0/#all/${threadId}`;
 }

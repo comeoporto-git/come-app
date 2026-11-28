@@ -59,6 +59,7 @@ const CATEGORY: Record<string, string> = {
 const STATUS: Record<string, { label: string; cls: string }> = {
   needs_reply: { label: "Por responder", cls: "bg-amber-100 text-amber-700" },
   awaiting_approval: { label: "Sugestões prontas", cls: "bg-blue-100 text-blue-700" },
+  attention: { label: "⚠ Notificação importante", cls: "bg-red-100 text-red-700" },
   replied: { label: "Respondido", cls: "bg-emerald-100 text-emerald-700" },
   done: { label: "Tratado", cls: "bg-gray-100 text-gray-500" },
   no_reply: { label: "Sem resposta necessária", cls: "bg-gray-100 text-gray-500" },
@@ -113,7 +114,7 @@ export function InboxClient(props: {
   saleOptions: SaleOption[];
   lastSyncedAt: string | null;
   lastSyncError: string | null;
-  settings: { gmailQuery: string; calendarId: string };
+  settings: { gmailQuery: string; calendarId: string; autoArchive: boolean; notificationsLabel: string };
   calendarConnected: boolean;
 }) {
   const router = useRouter();
@@ -122,6 +123,8 @@ export function InboxClient(props: {
   const [showSettings, setShowSettings] = useState(false);
   const [query, setQuery] = useState(props.settings.gmailQuery);
   const [calendarId, setCalendarId] = useState(props.settings.calendarId);
+  const [autoArchive, setAutoArchive] = useState(props.settings.autoArchive);
+  const [notifLabel, setNotifLabel] = useState(props.settings.notificationsLabel);
   const [showHistory, setShowHistory] = useState(false);
   const sel = props.selected;
 
@@ -145,7 +148,7 @@ export function InboxClient(props: {
       else if (!r.result) setMsg("Os emails já estão a ser lidos em segundo plano — a página atualiza sozinha.");
       else {
         const x = r.result;
-        setMsg(`${x.checked} conversas verificadas · ${x.analyzed} analisadas · ${x.suggestions} sugestões · ${x.tasks} tarefas${x.followups ? ` · ${x.followups} pedidos de info em falta` : ""}${x.errors.length ? ` · ${x.errors.length} com erro` : ""}${x.remaining ? ` — faltam ${x.remaining}, continuam a ser lidas automaticamente` : ""}`);
+        setMsg(`${x.checked} conversas verificadas · ${x.analyzed} analisadas · ${x.suggestions} sugestões · ${x.tasks} tarefas${x.archived ? ` · ${x.archived} notificações arquivadas` : ""}${x.followups ? ` · ${x.followups} pedidos de info em falta` : ""}${x.errors.length ? ` · ${x.errors.length} com erro` : ""}${x.remaining ? ` — faltam ${x.remaining}, continuam a ser lidas automaticamente` : ""}`);
       }
       router.refresh();
     });
@@ -202,9 +205,15 @@ export function InboxClient(props: {
             Calendário (id)
             <input className="text-[13px] border border-black/15 rounded-lg px-2.5 py-1.5" value={calendarId} onChange={(e) => setCalendarId(e.target.value)} />
           </label>
+          <label className="flex items-center gap-2 text-[12px] text-gray-600 sm:col-span-2">
+            <input type="checkbox" checked={autoArchive} onChange={(e) => setAutoArchive(e.target.checked)} />
+            Arquivar notificações automáticas (Vercel, GitHub, newsletters…) na etiqueta
+            <input className="text-[13px] border border-black/15 rounded-lg px-2 py-1 w-36" value={notifLabel} onChange={(e) => setNotifLabel(e.target.value)} />
+            — as importantes ficam na caixa com estrela.
+          </label>
           <button
             disabled={pending}
-            onClick={() => run(() => saveInboxSettingsAction({ gmail_query: query, calendar_id: calendarId }), "Definições guardadas")}
+            onClick={() => run(() => saveInboxSettingsAction({ gmail_query: query, calendar_id: calendarId, auto_archive_notifications: autoArchive, notifications_label: notifLabel }), "Definições guardadas")}
             className="text-[13px] font-semibold text-white bg-[#111514] px-4 py-1.5 rounded-xl"
           >
             Guardar

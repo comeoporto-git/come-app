@@ -41,7 +41,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
     .select("*, sale:sales(id, date, notion_id, status, number_of_guests, services(name), clients(name))")
     .order("last_message_at", { ascending: false })
     .limit(100);
-  if (filter === "pendentes") q = q.in("status", ["needs_reply", "awaiting_approval"]);
+  if (filter === "pendentes") q = q.in("status", ["attention", "needs_reply", "awaiting_approval"]);
   if (filter === "tratados") q = q.in("status", ["replied", "done", "no_reply"]);
   const [{ data: threads }, { data: pending }, { data: chatSuggestions }, { data: sales }] = await Promise.all([
     q,
@@ -176,7 +176,12 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
             saleOptions={saleOptions}
             lastSyncedAt={(settings?.last_synced_at as string | null) ?? null}
             lastSyncError={(settings?.last_sync_error as string | null) ?? null}
-            settings={{ gmailQuery: (settings?.gmail_query as string) ?? "", calendarId: (settings?.calendar_id as string) ?? "primary" }}
+            settings={{
+              gmailQuery: (settings?.gmail_query as string) ?? "",
+              calendarId: (settings?.calendar_id as string) ?? "primary",
+              autoArchive: settings?.auto_archive_notifications !== false,
+              notificationsLabel: (settings?.notifications_label as string) ?? "Notificações",
+            }}
             calendarConnected={calendarConnected}
           />
         )}
