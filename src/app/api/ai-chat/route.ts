@@ -79,7 +79,7 @@ async function getBusinessSnapshot() {
   const in90Days       = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
 
   // Join earning transactions per sale so revenue comes from actual earnings, not pricing estimates
-  const SALE_SELECT = `id, date, status, number_of_guests, expenses_closed, start_time, end_time,
+  const SALE_SELECT = `id, notion_id, date, status, number_of_guests, expenses_closed, start_time, end_time,
     services(name, type, equipa),
     clients(name),
     guide:guide_id(name),
@@ -187,6 +187,8 @@ async function getBusinessSnapshot() {
       .filter((t) => t.type === "Earning")
       .reduce((sum, t) => sum + Math.abs(t.valor ?? 0), 0);
     return {
+      id: s.id,
+      ref: s.notion_id ?? null,
       service: s.services?.name ?? "",
       client: s.clients?.name ?? "",
       date: s.date,
@@ -362,6 +364,7 @@ When they say "this", "este email", "esta venda", "aqui" they mean what is open 
 - Email open (inbox): when the person gives information or asks for changes to the reply or suggestions, call revise_email with a clear note — it saves the note on that conversation and rebuilds the reply, sale changes, tasks and "ponto de situação"; the new cards appear in the chat.
 - The company guide: when the person states how the company works in general ("a partir de agora…", "sempre que…", "nunca…"), propose a guide change too (propose_change on company_guide — create a new rule or update the existing one; find it first with find_records). One-off facts about a single booking go to that booking/email, not to the guide.
 - Never say something was changed before the person confirms the card.
+- Links: whenever you mention a record in your text, make its name/ID a markdown link to its page so the person can open it: sale → [PR26177ARP](/guide/tours/<sale id>), service → [nome](/admin/produtos/<id>), client or CRM account → [nome](/admin/crm/accounts/<id>), supplier → [nome](/admin/fornecedores/<id>), event quote → [nome](/admin/orcamentos/<id>), social post → (/admin/social/posts/<id>), team → (/admin/equipa), guide → (/admin/guia). Use the real ids from the data or the tools (sales in the snapshot have "id" and "ref"); never invent an id — if you don't have it, don't link. In tables, link the ID cell.
 - If a tool refuses (e.g. deleting a sale isn't allowed) and you take another route, explain it ONCE, in one sentence, then show the card — don't repeat the explanation after the card.
 
 ## Editable areas and fields

@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback, Fragment } from "react";
 import { usePathname } from "next/navigation";
+import Link from "next/link";
 import { useDictation, speak, speakableText, stopSpeaking, canSpeak } from "@/components/voice";
 
 /** The email or sale open on this page, which gets its own ongoing conversation. */
@@ -177,13 +178,23 @@ function renderMarkdown(text: string, isStreaming: boolean) {
   return elements;
 }
 
+// Links the AI writes: only pages of this app (/…) or https.
+const LINK_RE = /^\[([^\]]+)\]\(((?:\/|https:\/\/)[^\s)]+)\)$/;
+
 function inlineFormat(text: string): React.ReactNode {
-  const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g);
+  const parts = text.split(/(\[[^\]]+\]\((?:\/|https:\/\/)[^\s)]+\)|\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g);
   return parts.map((part, i) => {
+    const link = LINK_RE.exec(part);
+    if (link) {
+      const [, label, href] = link;
+      return href.startsWith("/")
+        ? <Link key={i} href={href} className="font-semibold underline decoration-dotted underline-offset-2 hover:text-[#111514]">{inlineFormat(label)}</Link>
+        : <a key={i} href={href} target="_blank" rel="noopener noreferrer" className="underline">{label}</a>;
+    }
     if (part.startsWith("**") && part.endsWith("**"))
-      return <strong key={i}>{part.slice(2, -2)}</strong>;
+      return <strong key={i}>{inlineFormat(part.slice(2, -2))}</strong>;
     if (part.startsWith("*") && part.endsWith("*"))
-      return <em key={i}>{part.slice(1, -1)}</em>;
+      return <em key={i}>{inlineFormat(part.slice(1, -1))}</em>;
     if (part.startsWith("`") && part.endsWith("`"))
       return <code key={i} className="bg-black/8 px-1 rounded text-[12px] font-mono">{part.slice(1, -1)}</code>;
     return <Fragment key={i}>{part}</Fragment>;
