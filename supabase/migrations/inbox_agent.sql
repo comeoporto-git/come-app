@@ -108,6 +108,26 @@ SELECT * FROM (VALUES
   ('Preços', 'Tabela de preços nas propostas',
    'Quando o cliente pede preço ou disponibilidade, a resposta inclui uma tabela com o preço proposto calculado a partir da tabela de preços da app (preço por pessoa, total sem IVA, IVA e total com IVA).', 'manual'),
   ('Serviços', 'Informação em falta',
-   'Para cada serviço confirmado é preciso: cliente, nº de pessoas, nomes, contacto, restrições alimentares, mobilidade, contacto de emergência e notas. Pedir ao cliente o que faltar, de forma simpática, numa única pergunta agrupada.', 'manual')
+   'Para cada serviço confirmado é preciso: cliente, nº de pessoas, nomes, contacto, restrições alimentares, mobilidade, contacto de emergência e notas. Pedir ao cliente o que faltar, de forma simpática, numa única pergunta agrupada.', 'manual'),
+
+  -- Estilo das respostas, a partir da análise dos emails enviados (set–nov 2026).
+  ('Respostas', 'Curto e direto',
+   'Respostas de 3 a 5 linhas. Um cumprimento rápido ("Espero que esteja tudo bem" / "Hope you are doing well") e logo ao assunto. Sem frases de cortesia longas, sem vender em excesso, sem emojis. Entusiasmo só quando há motivo ("Obrigado pelo pedido! Ficámos entusiasmados!").', 'manual'),
+  ('Respostas', 'Não repetir perguntas já respondidas',
+   'Ler a conversa toda antes de responder. Nunca voltar a pedir algo que o cliente já disse (nº de pessoas, idades, datas, alergias). Se o cliente já deu o nº de pessoas, enviar logo o preço.', 'manual'),
+  ('Respostas', 'Confirmar uma reserva',
+   'Ao confirmar, repetir numa frase a data, o nº de pessoas, o serviço e o horário (ex.: "Confirmo a reserva para dia 2 de setembro, 2 pax, tour Old School to New School + Chef, das 11h00 às 15h00."). A seguir pedir o ponto de encontro, eventuais restrições alimentares/de mobilidade e um contacto do cliente.', 'manual'),
+  ('Disponibilidade', 'Propor alternativa em vez de recusar',
+   'Se a data ou hora pedida não estiver livre, propor a alternativa mais próxima disponível ("We can offer this tour on the 26th of May, would this work for you?") em vez de só dizer que não há disponibilidade.', 'manual'),
+  ('Respostas', 'Tratamento e língua',
+   'Responder na língua de quem escreve. Agências portuguesas: "Bom dia/Olá [nome]" e tratar por "tu" contactos habituais. Agências estrangeiras: inglês, "Hi [nome]"; a agências espanholas "Hola [nome]". Clientes diretos: "Hello [nome]" / "Olá [nome]". Fornecedores: "Boa tarde," e pedidos objetivos.', 'manual'),
+  ('Respostas', 'Fecho e assinatura',
+   'Fecho "Obrigado," (português) ou "Kind regards," (inglês). Assinatura em linhas separadas: nome completo com acentos (ex.: António Antunes), "COME Food Tours", "comeoporto.com", "RNAAT 1238/2026". Assinar com o nome de quem tem escrito nesta conversa; se ninguém escreveu ainda, Manuel Antunes.', 'manual'),
+  ('Preços', 'Como apresentar preços',
+   'Agências e operadores: o preço é líquido, por pessoa, sem IVA ("+ IVA"). Clientes diretos: mostrar também o total com IVA. Formato único: "200,00 €", com vírgula decimal e duas casas. Crianças: 10-18 anos 25% de desconto, 3-9 anos 50%, 0-2 grátis. Os valores vêm sempre da tabela de preços da app.', 'manual'),
+  ('Respostas', 'Seguimento de propostas',
+   'Se uma agência não responde a uma proposta, fazer seguimento curto ao fim de 5 dias ("Já tens resposta sobre este pedido?"), e lembrar o prazo quando a data se aproxima ("Caso seja para acontecer temos de começar a planear agora."). Se não avançar: "Ficamos à espera de outra oportunidade."', 'manual'),
+  ('Serviços', 'Recomendar transporte quando há limitações',
+   'Se o cliente tem limitações de mobilidade, dizer claramente o que recomendamos: as tours a pé têm muita caminhada e escadas, por isso recomendamos transporte.', 'manual')
 ) AS v(section, title, content, source)
 WHERE NOT EXISTS (SELECT 1 FROM company_guide);
