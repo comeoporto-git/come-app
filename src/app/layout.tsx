@@ -1,15 +1,18 @@
 import type { Metadata, Viewport } from "next";
-import { Montserrat } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import { SessionProvider } from "next-auth/react";
 import { auth } from "@/lib/auth";
 import Script from "next/script";
 import { InstallPrompt } from "@/components/InstallPrompt";
 
-const montserrat = Montserrat({
+// Montserrat served from the app (variable font, latin) — the build doesn't
+// depend on downloading it from Google Fonts. License: fonts/OFL-Montserrat.txt
+const montserrat = localFont({
+  src: "./fonts/montserrat-latin-wght.woff2",
   variable: "--font-montserrat",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
+  weight: "100 900",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
