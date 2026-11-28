@@ -25,6 +25,10 @@ function isCancelled(t: Tour) {
 function isTourFuture(t: Tour) {
   return !!t.date && new Date(t.date) >= TODAY;
 }
+/** Earnings = client invoices ("IN - …") or anything typed as Earning. */
+function isEarningTx(t: Transaction) {
+  return t.supplier.startsWith("IN -") || t.txType === "Earning";
+}
 function isBernardoGuide(name: string) {
   return name.toLowerCase().includes("bernardo");
 }
@@ -461,7 +465,7 @@ function ServicePaxBreakdownRow({ service, totalTours, paxBuckets }: {
 
 export function AnalyticsDashboard({
   tours: allTours,
-  transactions: allTransactions,
+  transactions: rawTransactions,
   teamMap,
   clientNameMap,
   fornecedores,
@@ -483,6 +487,21 @@ export function AnalyticsDashboard({
     };
   });
   const [category, setCategory] = useState<Category>("resumo");
+
+  // Attribute every transaction linked to a service to the *service date*, not
+  // the date it was recorded — invoices/payments are often registered weeks
+  // after the service (e.g. a batch on the 2nd of the next month), which shifted
+  // revenue and costs into the wrong month/year. Unlinked transactions (or ones
+  // whose service has no date) keep their own date.
+  const allTransactions = useMemo(() => {
+    const tourDateById = new Map(
+      allTours.filter((t) => t.id && t.date).map((t) => [t.id!, t.date!.slice(0, 10)])
+    );
+    return rawTransactions.map((t) => {
+      const serviceDate = t.tourId ? tourDateById.get(t.tourId) : undefined;
+      return serviceDate ? { ...t, date: serviceDate } : t;
+    });
+  }, [allTours, rawTransactions]);
   const [ivaMode, setIvaMode] = useState<"com" | "sem">("com");
 
   // ── By year (always full history) ──────────────────────────────────────────
@@ -509,7 +528,7 @@ export function AnalyticsDashboard({
       allTours.filter((t) => t.id).map((t) => [t.id!, t.status || "Sem estado"])
     );
     for (const t of allTransactions) {
-      if (!t.date || !t.supplier.startsWith("IN -")) continue;
+      if (!t.date || !isEarningTx(t)) continue;
       const tourStatus = t.tourId ? (tourStatusById.get(t.tourId) ?? "Sem estado") : "Sem estado";
       if (tourStatus === "Cancelled") continue;
       const y = new Date(t.date).getFullYear();
@@ -613,7 +632,7 @@ export function AnalyticsDashboard({
     );
     const revenueByStatus: Record<string, number> = {};
     for (const t of txns) {
-      if (!(t.supplier.startsWith("IN -") || t.txType === "Earning")) continue;
+      if (!isEarningTx(t)) continue;
       const s = t.tourId ? (tourStatusById.get(t.tourId) ?? "Sem estado") : "Sem estado";
       revenueByStatus[s] = (revenueByStatus[s] ?? 0) + t.totalCost;
     }
@@ -683,10 +702,10 @@ export function AnalyticsDashboard({
 
     // Revenue by client
     const tourClientMap: Record<string, string> = {};
-    for (const t of allTours) { if (t.id && t.client) tourClientMap[t.id] = t.client; }
+    for (const t of allTours) { if (t.id && t.client && !isCancelled(t)) tourClientMap[t.id] = t.client; }
     const revenueByClient: Record<string, number> = {};
     for (const tx of txns) {
-      if (!(tx.supplier.startsWith("IN -") || tx.txType === "Earning") || !tx.tourId) continue;
+      if (!isEarningTx(tx) || !tx.tourId) continue;
       const cid = tourClientMap[tx.tourId];
       if (!cid) continue;
       revenueByClient[cid] = (revenueByClient[cid] ?? 0) + tx.totalCost;
@@ -700,7 +719,7 @@ export function AnalyticsDashboard({
     const cancelledTourIds = new Set(
       allTours.filter(isCancelled).map((t) => t.id).filter((id): id is string => !!id)
     );
-    const isEarning = (t: typeof txns[0]) => t.supplier.startsWith("IN -") || t.txType === "Earning";
+    const isEarning = isEarningTx;
     // Earnings from cancelled tours are excluded from revenue (costs still count)
     const isBillableEarning = (t: typeof txns[0]) =>
       isEarning(t) && (!t.tourId || !cancelledTourIds.has(t.tourId));
@@ -965,7 +984,7 @@ export function AnalyticsDashboard({
     const pyStart = `${CURRENT_YEAR - 1}-01-01`;
     const pyEnd   = `${CURRENT_YEAR - 1}${todayStr.slice(4)}`;
     const cancelledIds = new Set(allTours.filter(isCancelled).map((t) => t.id).filter(Boolean));
-    const isEarning = (t: Transaction) => t.supplier.startsWith("IN -") || t.txType === "Earning";
+    const isEarning = isEarningTx;
     const acc = { cy: { rev: 0, cost: 0 }, py: { rev: 0, cost: 0 } };
     for (const t of allTransactions) {
       if (!t.date) continue;
