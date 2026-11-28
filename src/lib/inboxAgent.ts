@@ -1,5 +1,5 @@
 import { put } from "@vercel/blob";
-import { supabase, getFornecedores } from "@/lib/notion";
+import { supabase, getFornecedores, createSaleTask, updateTaskStatus } from "@/lib/notion";
 import { structured, obj, arr, str, int, bool, nullable } from "@/lib/claude";
 import { guidePrompt } from "@/lib/companyGuide";
 import { getAvailability, type DayAvailability } from "@/lib/availability";
@@ -280,7 +280,11 @@ type Extraction = {
   };
   invoice_attachments: string[];
   open_questions: string[];
+  tasks: AgentTask[];
 };
+
+export type AgentTask = { key: string; name: string; description: string; due_date: string; owner: string; done: boolean };
+const TASK_OWNERS = ["Bernardo", "António", "Manel"] as const;
 
 const EXTRACTION_SCHEMA = obj({
   category: { type: "string", enum: ["booking_request", "booking_change", "question", "invoice", "supplier", "internal", "other"] },
@@ -289,7 +293,7 @@ const EXTRACTION_SCHEMA = obj({
   needs_reply: bool,
   linked_sale_id: nullable(str),
   new_booking: bool,
-  client: obj({ name: nullable(str), email: nullable(str), phone: nullable(str) }),
+  client: obj({ name: str, email: str, phone: str }),
   requests: arr(obj({
     service_id: nullable(str),
     service_hint: str,
@@ -308,17 +312,30 @@ const EXTRACTION_SCHEMA = obj({
     reason: str,
   })),
   booking_info: obj({
-    names: nullable(str),
-    phone_number: nullable(str),
-    dietary_restrictions: nullable(str),
-    mobility_restrictions: nullable(str),
-    emergency_contact: nullable(str),
-    meeting_point: nullable(str),
-    notes: nullable(str),
+    names: str,
+    phone_number: str,
+    dietary_restrictions: str,
+    mobility_restrictions: str,
+    emergency_contact: str,
+    meeting_point: str,
+    notes: str,
   }),
   invoice_attachments: arr(str),
   open_questions: arr(str),
+  tasks: arr(obj({
+    key: str,
+    name: str,
+    description: str,
+    due_date: str,
+    owner: { type: "string", enum: [...TASK_OWNERS] },
+    done: bool,
+  })),
 });
+
+/** "" from the model means unknown. */
+function blankToNull<T extends Record<string, string | null>>(o: T): T {
+  return Object.fromEntries(Object.entries(o).map(([k, v]) => [k, typeof v === "string" && v.trim() ? v.trim() : null])) as T;
+}
 
 async function extract(opts: {
   thread: GmailThread;
@@ -330,7 +347,7 @@ async function extract(opts: {
   const { cands } = opts;
   const linkedIds = new Set(cands.linked.map((s) => s.id));
   const clientSales = cands.clientSales.filter((s) => !linkedIds.has(s.id));
-  return structured<Extraction>({
+  const ex = await structured<Extraction>({
     effort: "medium",
     system: `És o assistente de gestão da caixa de entrada da COME Porto (food tours, cooking classes, chef em casa e eventos no Porto/Douro).
 Hoje é ${today()}. O nosso email é ${opts.myEmail}.
@@ -344,6 +361,8 @@ Regras:
 - booking_info: informação partilhada pelo cliente (nomes, contacto, alergias, mobilidade, contacto de emergência, ponto de encontro, notas) — útil para uma venda nova.
 - invoice_attachments: nomes exatos dos ficheiros anexos que são faturas/recibos que a COME tem de pagar ou registar como despesa (fornecedores, restaurantes, transportes, aluguer de material, software como Vercel/Anthropic, seguros, taxas como a do RNAAT…). Notas de crédito/reembolsos também contam (valor negativo). Não incluas faturas emitidas pela COME a clientes.
 - needs_reply: true se a última mensagem é de alguém externo e espera resposta nossa. Também true (resposta curta) para reconfirmações ("Chequeo", "Reconfirmation", "FINAL DETAILS"), comprovativos de pagamento que pedem para confirmar, e informações enviadas por agências (contactos, alergias). false para newsletters, questionários, notificações automáticas, respostas automáticas, spam comercial, recibos/faturas de fornecedores sem pergunta, ou se a última mensagem é nossa.
+- client e booking_info: "" quando a informação não está escrita.
+- tasks: tarefas internas que esta conversa cria para a equipa — tudo o que alguém da COME tem de FAZER além de responder ao email (a resposta já é tratada à parte). Exemplos: "Enviar fatura MFSP148054", "Pagar taxa RNAAT", "Enviar nome e contacto do guia à TLO", "Reservar transporte para 6 pax", "Registar despesa Vercel", "Preparar proposta para a Ovation (52 pax)", "Confirmar com o Barro a cooking class de 30/09". Não cries tarefas para "responder ao email". key: identificador curto e estável em minúsculas (ex.: "enviar-fatura", "nome-guia", "pagar-rnaat") — usa a MESMA key em análises seguintes da mesma conversa para a mesma tarefa. name: imperativo curto em português, com o cliente/código. description: 1-2 frases com o contexto. due_date: yyyy-mm-dd se houver prazo (ex.: prazo do email, ou 2 semanas antes da tour para o nome do guia, 7 dias após o serviço para faturas), senão "". owner: Bernardo (operação, guias, tours, chefs, fornecedores do serviço), António (faturação, pagamentos, despesas, contabilidade, administração, parcerias) ou Manel (reservas e comunicação com agências e clientes). done: true se a conversa mostra que a tarefa já foi feita (ex.: fatura enviada, pagamento confirmado). Se não houver tarefas, lista vazia.
 - summary: 1-2 frases em português.
 
 ${opts.guide}`,
@@ -363,6 +382,12 @@ ${cands.upcoming.map((s) => `${s.id} | ${s.date} | ${s.services?.name ?? ""} | $
 ${threadForPrompt(opts.thread, opts.myEmail)}`,
     schema: EXTRACTION_SCHEMA,
   });
+  return {
+    ...ex,
+    client: blankToNull(ex.client),
+    booking_info: blankToNull(ex.booking_info),
+    tasks: (ex.tasks ?? []).filter((t) => t.key && t.name),
+  };
 }
 
 // ── Pass 2: draft the reply ───────────────────────────────────────────────────
@@ -590,7 +615,46 @@ async function invoiceSuggestions(opts: {
 
 // ── Analyse one thread ────────────────────────────────────────────────────────
 
-export type AnalyzeResult = { suggestions: number; status: string };
+export type AnalyzeResult = { suggestions: number; status: string; tasks: number };
+
+/**
+ * Creates, updates or closes the team tasks a conversation calls for. Tasks are
+ * internal (nothing leaves the company), so they are applied straight away; the
+ * key ties a task to its conversation so later emails update the same task.
+ */
+async function syncAgentTasks(threadRowId: string, saleId: string | null, tasks: AgentTask[]): Promise<number> {
+  if (!tasks.length) return 0;
+  const { data: links } = await supabase.from("inbox_tasks").select("key, task_id").eq("thread_id", threadRowId);
+  const byKey = new Map((links ?? []).map((l) => [l.key as string, l.task_id as string]));
+  let n = 0;
+  for (const t of tasks.slice(0, 6)) {
+    const key = t.key.trim().toLowerCase().slice(0, 60);
+    const owner = (TASK_OWNERS as readonly string[]).includes(t.owner) ? t.owner : "Manel";
+    const due = /^\d{4}-\d{2}-\d{2}$/.test(t.due_date) ? t.due_date : null;
+    const existingId = byKey.get(key);
+    const { data: existing } = existingId
+      ? await supabase.from("tasks").select("id, sale_id, status").eq("id", existingId).maybeSingle()
+      : { data: null };
+    try {
+      if (existing) {
+        if (t.done) {
+          if (existing.status !== "Done") { await updateTaskStatus(existing.sale_id, existing.id, "Done", "Admin"); n++; }
+        } else if (existing.status !== "Done") {
+          await supabase.from("tasks").update({ name: t.name, task_description: t.description || null, due_date: due, role: owner }).eq("id", existing.id);
+          n++;
+        }
+        await supabase.from("inbox_tasks").update({ updated_at: new Date().toISOString() }).eq("thread_id", threadRowId).eq("key", key);
+      } else if (!t.done) {
+        const id = await createSaleTask(saleId, { name: t.name, description: t.description, role: owner, priority: null, dueDate: due });
+        await supabase.from("inbox_tasks").upsert({ thread_id: threadRowId, task_id: id, key, updated_at: new Date().toISOString() }, { onConflict: "thread_id,key" });
+        n++;
+      }
+    } catch (e) {
+      console.error("[inbox] task sync failed:", key, e);
+    }
+  }
+  return n;
+}
 
 export async function analyzeThread(opts: {
   token: string;
@@ -764,6 +828,9 @@ export async function analyzeThread(opts: {
     count++;
   }
 
+  // 5. Team tasks (created/updated straight away — internal only).
+  const tasks = await syncAgentTasks(opts.threadRowId, sale?.id ?? null, ex.tasks);
+
   const status = count > 0 ? "awaiting_approval" : ex.needs_reply ? "needs_reply" : "no_reply";
   await supabase.from("inbox_threads").update({
     category: ex.category,
@@ -776,15 +843,17 @@ export async function analyzeThread(opts: {
     analyzed_at: new Date().toISOString(),
     status,
     error: null,
+    error_message_id: null,
+    error_attempts: 0,
     updated_at: new Date().toISOString(),
   }).eq("id", opts.threadRowId);
 
-  return { suggestions: count, status };
+  return { suggestions: count, status, tasks };
 }
 
 // ── Sync ──────────────────────────────────────────────────────────────────────
 
-export type SyncResult = { checked: number; analyzed: number; suggestions: number; followups: number; errors: string[] };
+export type SyncResult = { checked: number; analyzed: number; suggestions: number; tasks: number; followups: number; errors: string[]; remaining: number };
 
 async function upsertThreadRow(thread: GmailThread, myEmail: string): Promise<{ id: string; analyzed_message_id: string | null; status: string }> {
   const first = thread.messages[0];
@@ -812,9 +881,16 @@ async function upsertThreadRow(thread: GmailThread, myEmail: string): Promise<{ 
   return data as { id: string; analyzed_message_id: string | null; status: string };
 }
 
+/** One readable line for an error (API errors arrive as long JSON). */
+function shortError(e: unknown): string {
+  const raw = e instanceof Error ? e.message : String(e);
+  const m = /"message"\s*:\s*"([^"]+)"/.exec(raw);
+  return (m ? m[1] : raw).slice(0, 200);
+}
+
 /** Pull recent inbox threads, analyse new messages, propose follow-ups for missing info. */
 export async function syncInbox(opts: { userId: string; maxAnalyses?: number; threadIds?: string[] }): Promise<SyncResult> {
-  const result: SyncResult = { checked: 0, analyzed: 0, suggestions: 0, followups: 0, errors: [] };
+  const result: SyncResult = { checked: 0, analyzed: 0, suggestions: 0, tasks: 0, followups: 0, errors: [], remaining: 0 };
   const tok = await getGoogleToken(opts.userId, [GMAIL_SCOPE]);
   if (tok.status !== "ok") throw new Error(tok.status === "no_scope" ? "Falta autorizar o Gmail." : "Sem ligação ao Google.");
   const cal = tok.scopes.includes(CALENDAR_SCOPE) ? tok.token : null;
@@ -828,10 +904,12 @@ export async function syncInbox(opts: { userId: string; maxAnalyses?: number; th
   for (const id of ids) {
     result.checked++;
     try {
-      const { data: row } = await supabase.from("inbox_threads").select("id, analyzed_message_id, last_message_id, status").eq("gmail_thread_id", id).maybeSingle();
+      const { data: row } = await supabase.from("inbox_threads").select("id, analyzed_message_id, last_message_id, status, error_message_id, error_attempts").eq("gmail_thread_id", id).maybeSingle();
       if (!opts.threadIds && row) {
         const meta = await getThreadMeta(tok.token, id);
         if (row.analyzed_message_id === meta.lastMessageId || (row.last_message_id === meta.lastMessageId && row.status === "done")) continue;
+        // Same message failed 3 times: wait for a new message or a manual "Reanalisar".
+        if (row.error_message_id === meta.lastMessageId && (row.error_attempts ?? 0) >= 3) continue;
       }
       const thread = await getThread(tok.token, id);
       if (!thread.messages.length) continue;
@@ -844,14 +922,21 @@ export async function syncInbox(opts: { userId: string; maxAnalyses?: number; th
         await supabase.from("inbox_threads").update({ status: pending ? "awaiting_approval" : "replied", analyzed_message_id: last.id }).eq("id", saved.id);
         continue;
       }
-      if (result.analyzed >= max) continue;
+      if (result.analyzed >= max) { result.remaining++; continue; }
       const r = await analyzeThread({ token: tok.token, calendarToken: cal, calendarId, myEmail, thread, threadRowId: saved.id });
       result.analyzed++;
       result.suggestions += r.suggestions;
+      result.tasks += r.tasks;
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
+      const msg = shortError(e);
       result.errors.push(`${id}: ${msg}`);
-      await supabase.from("inbox_threads").update({ error: msg.slice(0, 500) }).eq("gmail_thread_id", id);
+      const { data: cur } = await supabase.from("inbox_threads").select("last_message_id, error_message_id, error_attempts").eq("gmail_thread_id", id).maybeSingle();
+      const same = cur && cur.error_message_id === cur.last_message_id;
+      await supabase.from("inbox_threads").update({
+        error: msg.slice(0, 500),
+        error_message_id: cur?.last_message_id ?? null,
+        error_attempts: same ? (cur!.error_attempts ?? 0) + 1 : 1,
+      }).eq("gmail_thread_id", id);
     }
   }
 
@@ -865,7 +950,9 @@ export async function syncInbox(opts: { userId: string; maxAnalyses?: number; th
 
   await supabase.from("inbox_settings").update({
     last_synced_at: new Date().toISOString(),
-    last_sync_error: result.errors.length ? result.errors.slice(0, 5).join("\n") : null,
+    last_sync_error: result.errors.length
+      ? `${result.errors.length} conversa(s) com erro: ${[...new Set(result.errors.map((e) => e.replace(/^[^:]+: /, "")))].slice(0, 2).join(" | ")}`
+      : null,
     owner_email: myEmail,
   }).eq("id", 1);
   return result;

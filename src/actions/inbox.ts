@@ -1,6 +1,8 @@
 "use server";
 
 import { after } from "next/server";
+import { headers } from "next/headers";
+import { runInboxSync } from "@/lib/inboxSyncRunner";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { supabase, createTransaction, findOrCreateFornecedor } from "@/lib/notion";
@@ -53,11 +55,22 @@ async function gmailToken(sessionUserId: string): Promise<string> {
 
 // ── Sync ──────────────────────────────────────────────────────────────────────
 
-export async function syncInboxAction(): Promise<Result<{ result: SyncResult }>> {
+/** Remembers the app's public address so the database job can call it every 2 minutes. */
+async function rememberAppUrl() {
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host");
+  if (!host || host.startsWith("localhost") || host.startsWith("127.")) return;
+  const proto = h.get("x-forwarded-proto") ?? "https";
+  await supabase.from("inbox_settings").update({ app_url: `${proto}://${host}` }).eq("id", 1);
+}
+
+export async function syncInboxAction(): Promise<Result<{ result: SyncResult | null }>> {
   try {
     const session = await requireAdmin();
     const uid = await ownerUserId(session.user.id);
-    const result = await syncInbox({ userId: uid, maxAnalyses: 5 });
+    await rememberAppUrl();
+    // A short run so the button answers in time; the 2-minute job does the rest.
+    const result = await runInboxSync({ userId: uid, maxAnalyses: 3 });
     revalidateInbox();
     return { result };
   } catch (e) {

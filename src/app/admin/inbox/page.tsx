@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { supabase } from "@/lib/notion";
 import { getGoogleToken, GMAIL_SCOPE, CALENDAR_SCOPE, INBOX_SCOPES } from "@/lib/google-token";
 import { getThread, type GmailMessage } from "@/lib/gmail";
-import { InboxClient, type InboxThread, type InboxSuggestion, type SaleOption, type ThreadMessage } from "@/components/inbox/InboxClient";
+import { InboxClient, type InboxThread, type InboxSuggestion, type SaleOption, type ThreadMessage, type AgentTaskView } from "@/components/inbox/InboxClient";
 
 export const dynamic = "force-dynamic";
 // Syncing reads emails and asks the AI for drafts — give server actions room.
@@ -88,6 +88,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
   const list = (threads ?? []).map(mapThread);
   let selected: InboxThread | null = null;
   let suggestions: InboxSuggestion[] = [];
+  let agentTasks: AgentTaskView[] = [];
   let messages: ThreadMessage[] = [];
   let messagesError: string | null = null;
   if (t) {
@@ -100,6 +101,12 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
       selected = mapThread(row);
       const { data: sugg } = await supabase.from("inbox_suggestions").select("*").eq("thread_id", t).order("created_at", { ascending: false });
       suggestions = (sugg ?? []) as InboxSuggestion[];
+      const { data: links } = await supabase.from("inbox_tasks").select("task_id").eq("thread_id", t);
+      const taskIds = (links ?? []).map((l) => l.task_id as string);
+      if (taskIds.length) {
+        const { data: tk } = await supabase.from("tasks").select("id, name, status, due_date, role").in("id", taskIds);
+        agentTasks = (tk ?? []).map((x) => ({ id: x.id, name: x.name, status: x.status, dueDate: x.due_date, role: x.role }));
+      }
       if (tok.status === "ok") {
         try {
           const thread = await getThread(tok.token, row.gmail_thread_id);
@@ -162,6 +169,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
             filter={filter}
             selected={selected}
             suggestions={suggestions}
+            agentTasks={agentTasks}
             chatSuggestions={(chatSuggestions ?? []) as InboxSuggestion[]}
             messages={messages}
             messagesError={messagesError}

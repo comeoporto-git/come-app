@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import {
   syncInboxAction, reanalyzeThreadAction, setThreadStatusAction, linkThreadToSaleAction, saveInboxSettingsAction,
 } from "@/actions/inbox";
@@ -40,6 +40,8 @@ export type InboxSuggestion = {
   source: string;
   created_at: string;
 };
+
+export type AgentTaskView = { id: string; name: string; status: string | null; dueDate: string | null; role: string | null };
 
 export type ThreadMessage = { id: string; from: string; to: string; date: string; body: string; fromUs: boolean; attachments: string[] };
 export type SaleOption = { id: string; label: string };
@@ -104,6 +106,7 @@ export function InboxClient(props: {
   filter: string;
   selected: InboxThread | null;
   suggestions: InboxSuggestion[];
+  agentTasks: AgentTaskView[];
   chatSuggestions: InboxSuggestion[];
   messages: ThreadMessage[];
   messagesError: string | null;
@@ -121,6 +124,17 @@ export function InboxClient(props: {
   const [calendarId, setCalendarId] = useState(props.settings.calendarId);
   const [showHistory, setShowHistory] = useState(false);
   const sel = props.selected;
+
+  // New emails are read every 2 minutes in the background: refresh the list,
+  // but never while someone is typing or editing a reply.
+  useEffect(() => {
+    const id = setInterval(() => {
+      const a = document.activeElement as HTMLElement | null;
+      const busy = a && (a.isContentEditable || a.tagName === "INPUT" || a.tagName === "TEXTAREA" || a.tagName === "SELECT");
+      if (!busy && document.visibilityState === "visible") router.refresh();
+    }, 60_000);
+    return () => clearInterval(id);
+  }, [router]);
   const qs = (t?: string) => `/admin/inbox?f=${props.filter}${t ? `&t=${t}` : ""}`;
 
   function sync() {
@@ -128,9 +142,10 @@ export function InboxClient(props: {
     start(async () => {
       const r = await syncInboxAction();
       if (!("result" in r)) setMsg(`Erro: ${r.error}`);
+      else if (!r.result) setMsg("Os emails já estão a ser lidos em segundo plano — a página atualiza sozinha.");
       else {
         const x = r.result;
-        setMsg(`${x.checked} conversas verificadas · ${x.analyzed} analisadas · ${x.suggestions} sugestões · ${x.followups} pedidos de info em falta${x.errors.length ? ` · ${x.errors.length} erros` : ""}${x.analyzed >= 5 ? " — carrega outra vez para continuar" : ""}`);
+        setMsg(`${x.checked} conversas verificadas · ${x.analyzed} analisadas · ${x.suggestions} sugestões · ${x.tasks} tarefas${x.followups ? ` · ${x.followups} pedidos de info em falta` : ""}${x.errors.length ? ` · ${x.errors.length} com erro` : ""}${x.remaining ? ` — faltam ${x.remaining}, continuam a ser lidas automaticamente` : ""}`);
       }
       router.refresh();
     });
@@ -171,7 +186,7 @@ export function InboxClient(props: {
       </div>
       {overdue > 0 && (
         <p className="text-[13px] font-semibold text-white bg-red-600/90 rounded-xl px-4 py-2">
-          {overdue} {overdue === 1 ? "conversa está" : "conversas estão"} há mais de 24h sem resposta — responder hoje, nem que seja &quot;Estamos a verificar&quot;.
+          {overdue} {overdue === 1 ? "conversa está" : "conversas estão"}{" "}há mais de 24h sem resposta — responder hoje, nem que seja &quot;Estamos a verificar&quot;.
         </p>
       )}
       {msg && <p className="text-[13px] bg-white/90 rounded-xl px-4 py-2 break-words"><Linkified text={msg} /></p>}
@@ -255,7 +270,20 @@ export function InboxClient(props: {
                 </a>
               </div>
               {sel.summary && <p className="text-[13px] text-gray-600 bg-gray-50 rounded-xl px-3 py-2">{sel.summary}</p>}
-              {sel.error && <p className="text-[12px] text-red-600 bg-red-50 rounded-xl px-3 py-2">{sel.error}</p>}
+              {sel.error && <p className="text-[12px] text-red-600 bg-red-50 rounded-xl px-3 py-2 break-words">{sel.error}</p>}
+              {props.agentTasks.length > 0 && (
+                <div className="bg-gray-50 rounded-xl px-3 py-2">
+                  <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Tarefas criadas por esta conversa</p>
+                  <ul className="space-y-0.5">
+                    {props.agentTasks.map((t) => (
+                      <li key={t.id} className={`text-[13px] ${t.status === "Done" ? "line-through text-gray-400" : "text-gray-700"}`}>
+                        {t.status === "Done" ? "✓" : "○"} {t.name}
+                        <span className="text-[11px] text-gray-400">{t.role ? ` · ${t.role}` : ""}{t.dueDate ? ` · até ${fmtDay(t.dueDate)}` : ""}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
 
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-[12px] text-gray-400">Tour:</span>
