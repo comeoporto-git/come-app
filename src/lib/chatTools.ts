@@ -5,12 +5,21 @@ import { priceLines, priceLinesText } from "@/lib/priceTable";
 import { getGoogleToken, getInboxOwnerUserId, CALENDAR_SCOPE } from "@/lib/google-token";
 import { addSuggestion, saleLabel, SALE_FIELDS, type SaleChange, type SaleField, type CreateSalePayload } from "@/lib/inboxAgent";
 import { GUIDE_SECTIONS } from "@/lib/companyGuide";
+import { syncInbox } from "@/lib/inboxAgent";
+import { ENTITIES } from "@/lib/comeAi/entities";
+import { findRecords, getRecord, buildRecordChange } from "@/lib/comeAi/records";
 
 /**
- * Tools for the AI Chat. Reading tools answer straight away; every tool that
- * would change something only creates a pending suggestion in /admin/inbox,
- * which a person must accept.
+ * Tools of COME AI. Reading tools answer straight away; every tool that would
+ * change something creates a suggestion that appears in the chat as a card with
+ * a "Confirmar" button (and in /admin/inbox) — nothing is written until a
+ * person confirms.
  */
+
+/** Where the person is in the app (sent by the chat with every message). */
+export type ChatContext = { path?: string; threadRowId?: string | null; saleId?: string | null };
+
+export type ToolOutput = { content: string; suggestionIds: string[] };
 
 export const CHAT_TOOLS: Anthropic.Tool[] = [
   {
@@ -94,6 +103,53 @@ export const CHAT_TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    name: "find_records",
+    description: "Procura registos de qualquer área da app (vendas, serviços, preços, clientes, equipa, tarefas, fornecedores, despesas, guia, regras, CRM). Devolve ids e campos. Usa antes de propor alterações.",
+    input_schema: {
+      type: "object",
+      properties: {
+        entity: { type: "string", enum: Object.keys(ENTITIES) },
+        query: { type: "string", description: "Texto a procurar (pode ser vazio)" },
+        filters: { type: "object", description: "Igualdades por campo, ex. {\"service_id\": \"…\", \"date\": \"2027-05-22\"}" },
+        limit: { type: "integer" },
+      },
+      required: ["entity"],
+    },
+  },
+  {
+    name: "get_record",
+    description: "Lê um registo completo (todos os campos editáveis e os nomes das ligações).",
+    input_schema: {
+      type: "object",
+      properties: { entity: { type: "string", enum: Object.keys(ENTITIES) }, id: { type: "string" } },
+      required: ["entity", "id"],
+    },
+  },
+  {
+    name: "propose_change",
+    description: "Propõe criar, alterar ou apagar um registo de qualquer área da app. Mostra ao utilizador um cartão com o antes/depois e um botão Confirmar — só é gravado quando ele confirma. Para ligações (guia, cliente, serviço…) podes dar o id ou o nome exato.",
+    input_schema: {
+      type: "object",
+      properties: {
+        entity: { type: "string", enum: Object.keys(ENTITIES) },
+        op: { type: "string", enum: ["create", "update", "delete"] },
+        id: { type: "string", description: "Obrigatório para update/delete" },
+        values: { type: "object", description: "Campo → novo valor (só os campos a mudar)" },
+        reason: { type: "string", description: "Uma frase: porquê" },
+      },
+      required: ["entity", "op"],
+    },
+  },
+  {
+    name: "revise_email",
+    description: "Só quando o utilizador está numa conversa de email: guarda a informação/instrução dele nessa conversa e volta a preparar a resposta e as sugestões (venda, despesa, tarefas, ponto de situação) tendo-a em conta. Usa sempre que ele der informação ou pedir mudanças à resposta.",
+    input_schema: {
+      type: "object",
+      properties: { note: { type: "string", description: "A informação/instrução, numa frase clara (ex.: 'O cliente já pagou por transferência; propor 10h30 em vez das 11h00.')" } },
+      required: ["note"],
+    },
+  },
+  {
     name: "propose_guide_entry",
     description: "Propõe acrescentar uma regra ao Guia da empresa (quando o utilizador ensina como a empresa funciona). Fica por aprovar.",
     input_schema: {
@@ -117,8 +173,52 @@ async function calendarToken(): Promise<string | null> {
   return tok.status === "ok" ? tok.token : null;
 }
 
-export async function runChatTool(name: string, input: Input): Promise<string> {
+const out = (content: string, suggestionIds: string[] = []): ToolOutput => ({ content, suggestionIds });
+
+export async function runChatTool(name: string, input: Input, ctx: ChatContext = {}): Promise<ToolOutput> {
+  const r = await runTool(name, input, ctx);
+  return typeof r === "string" ? out(r) : r;
+}
+
+async function runTool(name: string, input: Input, ctx: ChatContext): Promise<string | ToolOutput> {
   switch (name) {
+    case "find_records": {
+      const rows = await findRecords(String(input.entity), String(input.query ?? ""), (input.filters as Input) ?? {}, Number(input.limit) || 10);
+      return JSON.stringify(rows);
+    }
+    case "get_record":
+      return JSON.stringify(await getRecord(String(input.entity), String(input.id)));
+    case "propose_change": {
+      const op = (String(input.op) as "create" | "update" | "delete");
+      const payload = await buildRecordChange(String(input.entity), op, (input.id as string) ?? null, (input.values as Input) ?? {});
+      const verb = op === "create" ? "Criar" : op === "delete" ? "Apagar" : "Alterar";
+      const id = await addSuggestion({
+        thread_id: ctx.threadRowId ?? null,
+        sale_id: payload.entity === "sales" ? payload.record_id : ctx.saleId ?? null,
+        kind: "record_change", source: "chat",
+        title: `${verb} ${payload.entity_label}${payload.record_label ? `: ${payload.record_label}` : ""}${op === "update" ? ` — ${payload.changes.map((c) => c.label).join(", ")}` : ""}`,
+        rationale: String(input.reason ?? ""),
+        payload,
+      });
+      return out(`Proposta criada e mostrada ao utilizador com botão Confirmar (${payload.changes.length} campo(s)). Não está gravada até ele confirmar.`, [id]);
+    }
+    case "revise_email": {
+      if (!ctx.threadRowId) return "Não há nenhuma conversa de email aberta. Pede ao utilizador para abrir o email na Caixa de Entrada.";
+      const { data: row } = await supabase.from("inbox_threads").select("gmail_thread_id, team_notes").eq("id", ctx.threadRowId).maybeSingle();
+      if (!row) return "Conversa não encontrada.";
+      const stamp = new Date().toISOString().slice(0, 16).replace("T", " ");
+      const notes = `${row.team_notes ? `${row.team_notes}\n` : ""}- (${stamp}) ${String(input.note).trim()}`;
+      await supabase.from("inbox_threads").update({ team_notes: notes, analyzed_message_id: null }).eq("id", ctx.threadRowId);
+      const uid = await getInboxOwnerUserId();
+      if (!uid) return "Nota guardada, mas o Gmail não está ligado — não foi possível refazer a resposta.";
+      const res = await syncInbox({ userId: uid, threadIds: [row.gmail_thread_id as string], maxAnalyses: 1 });
+      if (res.errors.length) return `Nota guardada, mas a reanálise falhou: ${res.errors[0]}`;
+      const { data: sugg } = await supabase.from("inbox_suggestions").select("id, kind, title").eq("thread_id", ctx.threadRowId).eq("status", "pending").order("created_at", { ascending: false });
+      return out(
+        `Nota guardada na conversa e sugestões refeitas: ${(sugg ?? []).map((x) => `${x.kind}: ${x.title}`).join(" | ") || "(nenhuma sugestão pendente)"}. Os cartões novos estão abaixo e na página do email.`,
+        (sugg ?? []).map((x) => x.id as string),
+      );
+    }
     case "check_availability": {
       const r = await getAvailability({
         dates: (input.dates as string[]) ?? [],
@@ -175,12 +275,12 @@ export async function runChatTool(name: string, input: Input): Promise<string> {
         status: String(input.status ?? "Pending"),
         gmail_thread_id: null,
       };
-      await addSuggestion({
-        thread_id: null, kind: "create_sale", source: "chat",
+      const sid = await addSuggestion({
+        thread_id: ctx.threadRowId ?? null, kind: "create_sale", source: "chat",
         title: `Nova venda: ${svc.name} · ${payload.date} · ${payload.guests} pax · ${payload.client_name}`,
         rationale: String(input.reason ?? ""), payload,
       });
-      return "Sugestão criada na Caixa de Entrada (por aprovar).";
+      return out("Proposta de venda mostrada ao utilizador com botão Confirmar.", [sid]);
     }
     case "propose_update_sale": {
       const { data: sale } = await supabase.from("sales").select("*, services(name), clients(name)").eq("id", String(input.sale_id)).maybeSingle();
@@ -189,21 +289,21 @@ export async function runChatTool(name: string, input: Input): Promise<string> {
         .filter((c) => c.field in SALE_FIELDS)
         .map((c) => ({ field: c.field, label: SALE_FIELDS[c.field], old: sale[c.field] ?? null, new: c.new_value }));
       if (!changes.length) return "Nenhuma alteração válida.";
-      await addSuggestion({
-        thread_id: null, sale_id: sale.id, kind: "update_sale", source: "chat",
+      const sid = await addSuggestion({
+        thread_id: ctx.threadRowId ?? null, sale_id: sale.id, kind: "update_sale", source: "chat",
         title: `Atualizar ${saleLabel(sale)}: ${changes.map((c) => c.label).join(", ")}`,
         rationale: String(input.reason ?? ""),
         payload: { sale_id: sale.id, sale_label: saleLabel(sale), changes, gmail_thread_id: null },
       });
-      return "Sugestão criada na Caixa de Entrada (por aprovar).";
+      return out("Proposta de alteração mostrada ao utilizador com botão Confirmar.", [sid]);
     }
     case "propose_guide_entry": {
-      await addSuggestion({
+      const sid = await addSuggestion({
         thread_id: null, kind: "guide_entry", source: "chat",
         title: `Guia: ${String(input.title)}`,
         payload: { section: input.section, title: input.title, content: input.content },
       });
-      return "Sugestão para o guia criada (por aprovar na Caixa de Entrada).";
+      return out("Regra para o guia mostrada ao utilizador com botão Confirmar.", [sid]);
     }
     default:
       return `Ferramenta desconhecida: ${name}`;

@@ -3,12 +3,59 @@ import { auth } from "@/lib/auth";
 import Anthropic from "@anthropic-ai/sdk";
 import { supabase } from "@/lib/notion";
 import { guidePrompt } from "@/lib/companyGuide";
-import { CHAT_TOOLS, runChatTool } from "@/lib/chatTools";
+import { CHAT_TOOLS, runChatTool, type ChatContext } from "@/lib/chatTools";
+import { entitiesForPrompt } from "@/lib/comeAi/records";
 import { AGENT_MODEL } from "@/lib/claude";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-export const maxDuration = 120;
+export const maxDuration = 300;
+
+/**
+ * What the person is looking at, from the page they're on: the email
+ * conversation (with its suggestions and linked sale), a sale, a service…
+ */
+async function pageContext(raw: { path?: string; search?: string } | undefined): Promise<{ ctx: ChatContext; text: string }> {
+  const path = raw?.path ?? "";
+  const params = new URLSearchParams(raw?.search ?? "");
+  const ctx: ChatContext = { path };
+  const parts: string[] = [`Página: ${path || "(desconhecida)"}${raw?.search ? raw.search : ""}`];
+  try {
+    const threadId = path.startsWith("/admin/inbox") ? params.get("t") : null;
+    if (threadId) {
+      const { data: t } = await supabase
+        .from("inbox_threads")
+        .select("id, subject, from_name, from_email, status, summary, situation, team_notes, sale_id")
+        .eq("id", threadId).maybeSingle();
+      if (t) {
+        ctx.threadRowId = t.id;
+        ctx.saleId = t.sale_id;
+        const { data: sugg } = await supabase.from("inbox_suggestions").select("id, kind, title, payload").eq("thread_id", t.id).eq("status", "pending");
+        parts.push(`Está aberta a conversa de email "${t.subject}" de ${t.from_name} <${t.from_email}> (estado ${t.status}).
+Resumo: ${t.summary ?? "—"}
+Ponto de situação: ${JSON.stringify(t.situation ?? {})}
+Notas da equipa já guardadas: ${t.team_notes ?? "(nenhuma)"}
+Sugestões por aprovar nesta conversa: ${(sugg ?? []).map((x) => `[${x.kind}] ${x.title}${x.kind === "reply" ? `\n  Rascunho: ${String((x.payload as { body_html?: string }).body_html ?? "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").slice(0, 1500)}` : ""}`).join("\n") || "(nenhuma)"}
+Se o utilizador der informação ou pedir mudanças a esta resposta/sugestões, usa revise_email.`);
+      }
+    }
+    const tourId = /^\/guide\/tours\/([0-9a-f-]{36})/.exec(path)?.[1];
+    const saleId = tourId ?? ctx.saleId;
+    if (saleId) {
+      ctx.saleId = saleId;
+      const { data: sale } = await supabase
+        .from("sales")
+        .select("id, notion_id, date, start_time, end_time, status, number_of_guests, names, meeting_point, notes, dietary_restrictions, services(name), clients(name), guide:team!sales_guide_id_fkey(name)")
+        .eq("id", saleId).maybeSingle();
+      if (sale) parts.push(`Venda em contexto (id ${sale.id}): ${JSON.stringify(sale)}`);
+    }
+    const m = /^\/admin\/(fornecedores|crm\/accounts|produtos|orcamentos|analytics\/servicos)\/([0-9a-f-]{36})/.exec(path);
+    if (m) parts.push(`Registo aberto: ${m[1]} id ${m[2]}`);
+  } catch (e) {
+    parts.push(`(não foi possível ler o contexto: ${e instanceof Error ? e.message : String(e)})`);
+  }
+  return { ctx, text: parts.join("\n") };
+}
 
 async function getBusinessSnapshot() {
   const now = new Date();
@@ -235,9 +282,11 @@ export async function POST(req: NextRequest) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
   }
 
-  const { messages } = (await req.json()) as {
+  const { messages, context } = (await req.json()) as {
     messages: { role: "user" | "assistant"; content: string }[];
+    context?: { path?: string; search?: string };
   };
+  const page = await pageContext(context);
 
   if (!messages?.length) {
     return new Response(JSON.stringify({ error: "No messages" }), { status: 400 });
@@ -262,7 +311,7 @@ export async function POST(req: NextRequest) {
         .join("\n")
     : "- No rules configured in DB yet.";
 
-  const systemPrompt = `You are the business assistant for COME Porto, a premium food tours and corporate events company based in Porto, Portugal.
+  const systemPrompt = `You are COME AI — the one assistant of COME Porto, a premium food tours and corporate events company based in Porto, Portugal. You are the same AI that reads the inbox and drafts the email replies; you follow the same company guide everywhere and you know the whole business. You also know where the person is right now in the app (see "Onde o utilizador está").
 
 You have access to complete business data: all sales from last year (snapshot.lastYear.sales), all sales from this year (snapshot.thisYear.sales), all upcoming bookings for the next 90 days (snapshot.upcoming.bookings), and financial transactions. Use this data to answer any historical or future question precisely — never say you don't have access to historical data.
 
@@ -293,11 +342,19 @@ When asked about availability for a date + service:
 ## Guia da empresa (escrito pela equipa e aprendido com as decisões na Caixa de Entrada — segue-o)
 ${guide}
 
-## Tools and actions
-- Use check_availability for any availability question about specific dates — it also reads the Google Calendar (events starting with "OUT" = Bernardo away; other guides may still be free).
-- Use quote_price for every price; never compute prices yourself.
-- You can PROPOSE actions (propose_create_sale, propose_update_sale, propose_guide_entry). They are never executed directly: they appear in /admin/inbox for the user to Aceitar / Rejeitar / Alterar. Tell the user that.
-- When the user teaches you how the company works ("from now on…", "we always…"), propose a guide entry.
+## Onde o utilizador está
+${page.text}
+When they say "this", "este email", "esta venda", "aqui" they mean what is open above.
+
+## Tools and actions — you can do anything the app can do, always with confirmation
+- Read: find_records / get_record for any area (sales, services and their price tables and task templates, clients, team, tasks, suppliers, expenses/earnings, company guide, business rules, CRM). check_availability for availability (reads Google Calendar too: events starting with "OUT" = Bernardo away). quote_price for every price — never compute prices yourself.
+- Change anything: propose_change (create / update / delete). The person sees a card with the before → after of each field and a Confirmar button; nothing is written until they press it. After proposing, say in one sentence what the card changes. Propose one card per record; several cards are fine.
+- Email open (inbox): when the person gives information or asks for changes to the reply or suggestions, call revise_email with a clear note — it saves the note on that conversation and rebuilds the reply, sale changes, tasks and "ponto de situação"; the new cards appear in the chat.
+- The company guide: when the person states how the company works in general ("a partir de agora…", "sempre que…", "nunca…"), propose a guide change too (propose_change on company_guide — create a new rule or update the existing one; find it first with find_records). One-off facts about a single booking go to that booking/email, not to the guide.
+- Never say something was changed before the person confirms the card.
+
+## Editable areas and fields
+${entitiesForPrompt()}
 
 ## General
 - Be concise and precise. Use the actual data, never guess.
@@ -335,7 +392,10 @@ ${JSON.stringify(snapshot, null, 2)}`;
           const results: Anthropic.ToolResultBlockParam[] = await Promise.all(
             uses.map(async (u) => {
               try {
-                return { type: "tool_result" as const, tool_use_id: u.id, content: await runChatTool(u.name, u.input as Record<string, unknown>) };
+                const r = await runChatTool(u.name, u.input as Record<string, unknown>, page.ctx);
+                // Cards with a Confirmar button, shown inline in the chat.
+                for (const id of r.suggestionIds) controller.enqueue(encoder.encode(`\n[[sugestao:${id}]]\n`));
+                return { type: "tool_result" as const, tool_use_id: u.id, content: r.content };
               } catch (e) {
                 return { type: "tool_result" as const, tool_use_id: u.id, content: e instanceof Error ? e.message : String(e), is_error: true };
               }

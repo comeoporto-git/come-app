@@ -190,7 +190,7 @@ function findFornecedor(fornecedores: { id: string; name: string }[], supplier: 
 
 export type GuideEntryPayload = { section: string; title: string; content: string };
 
-export type SuggestionKind = "reply" | "create_sale" | "update_sale" | "add_expense" | "guide_entry";
+export type SuggestionKind = "reply" | "create_sale" | "update_sale" | "add_expense" | "guide_entry" | "record_change";
 
 // Editable sale columns and their labels (pt).
 export const SALE_FIELDS = {
@@ -570,6 +570,7 @@ async function extract(opts: {
   services: Awaited<ReturnType<typeof servicesForPrompt>>;
   cands: Awaited<ReturnType<typeof candidateSales>>;
   related?: string;
+  teamNotes?: string;
 }): Promise<Extraction> {
   const { cands } = opts;
   const linkedIds = new Set(cands.linked.map((s) => s.id));
@@ -613,7 +614,10 @@ ${cands.upcoming.map((s) => `${s.id} | ${s.date} | ${s.services?.name ?? ""} | $
 ${threadForPrompt(opts.thread, opts.myEmail)}${opts.related ? `
 
 ## Outras conversas já associadas a esta venda (histórico da reserva)
-${opts.related}` : ""}`,
+${opts.related}` : ""}${opts.teamNotes ? `
+
+## Notas da equipa sobre esta conversa (do COME AI — têm prioridade sobre o email)
+${opts.teamNotes}` : ""}`,
     schema: EXTRACTION_SCHEMA,
   });
   return {
@@ -643,6 +647,7 @@ export async function draftReply(opts: {
   openQuestions: string[];
   purpose?: string;
   related?: string;
+  teamNotes?: string;
   /** Sales on the requested dates that are THIS booking (same id) — not a conflict. */
   sameBookingNote?: string;
 }): Promise<Draft> {
@@ -701,7 +706,10 @@ ${opts.related}` : ""}${opts.sameBookingNote ? `
 
 ## Esta reserva já existe na app
 ${opts.sameBookingNote}
-A disponibilidade acima já não conta esta venda. Não avises que a data está ocupada por causa dela.` : ""}`,
+A disponibilidade acima já não conta esta venda. Não avises que a data está ocupada por causa dela.` : ""}${opts.teamNotes ? `
+
+## Notas da equipa sobre esta conversa (do COME AI — têm prioridade; segue-as no rascunho)
+${opts.teamNotes}` : ""}`,
     schema: obj({ body_html: str, missing_info_requested: arr(str), internal_note: str, warnings: arr(str) }),
   });
 }
@@ -753,8 +761,8 @@ async function addSuggestion(s: {
   payload: unknown;
   for_message_id?: string | null;
   source?: "inbox" | "chat";
-}) {
-  const { error } = await supabase.from("inbox_suggestions").insert({
+}): Promise<string> {
+  const { data, error } = await supabase.from("inbox_suggestions").insert({
     thread_id: s.thread_id,
     sale_id: s.sale_id ?? null,
     kind: s.kind,
@@ -763,8 +771,9 @@ async function addSuggestion(s: {
     payload: s.payload,
     for_message_id: s.for_message_id ?? null,
     source: s.source ?? "inbox",
-  });
+  }).select("id").single();
   if (error) throw new Error(`addSuggestion: ${error.message}`);
+  return data.id as string;
 }
 
 export { addSuggestion };
@@ -955,7 +964,9 @@ export async function analyzeThread(opts: {
     candidateSales(thread.id, senders, agencyRefs(thread.messages.map((m) => `${m.subject}\n${m.body.slice(0, 3000)}`).join("\n"))),
   ]);
   const related = cands.linked.length ? await relatedThreadsText(opts.token, cands.linked, thread.id, myEmail) : "";
-  const extracted = await extract({ thread, myEmail, guide, services, cands, related });
+  const { data: notesRow } = await supabase.from("inbox_threads").select("team_notes").eq("id", opts.threadRowId).maybeSingle();
+  const teamNotes = (notesRow?.team_notes as string | null) ?? "";
+  const extracted = await extract({ thread, myEmail, guide, services, cands, related, teamNotes });
   const lastFromUs = last.fromEmail === myEmail || last.labelIds.includes("SENT");
   // Our own message was the last one: nothing to answer, but the situation,
   // tasks and sale info still move on.
@@ -1121,6 +1132,7 @@ export async function analyzeThread(opts: {
       missingInfo,
       openQuestions: ex.open_questions,
       related,
+      teamNotes,
       sameBookingNote: [sale, ...cands.linked].filter((x, i, a): x is SaleRow => !!x && a.findIndex((y) => y?.id === x.id) === i).map(saleIdLine).join("\n") || undefined,
     });
     const payload: ReplyPayload = {

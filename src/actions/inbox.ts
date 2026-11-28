@@ -8,6 +8,7 @@ import { supabase, createTransaction, findOrCreateFornecedor } from "@/lib/notio
 import { getGoogleToken, GMAIL_SCOPE } from "@/lib/google-token";
 import { sendReply, markThreadRead, trashThread } from "@/lib/gmail";
 import { learnFromDecision, GUIDE_SECTIONS } from "@/lib/companyGuide";
+import { applyRecordChange, type RecordChangePayload } from "@/lib/comeAi/records";
 import {
   syncInbox, toAddonThreadId, linkThreadToSale, SALE_FIELDS,
   type SyncResult, type ReplyPayload, type CreateSalePayload, type UpdateSalePayload,
@@ -355,6 +356,12 @@ export async function acceptSuggestionAction(
       case "update_sale": result = await execUpdateSale(payload); break;
       case "add_expense": result = await execAddExpense(payload, session.user.notionId || null); break;
       case "guide_entry": result = await execGuideEntry(payload, s.id); break;
+      case "record_change": {
+        result = await applyRecordChange(payload as RecordChangePayload);
+        // The change can be on any page of the app.
+        revalidatePath("/", "layout");
+        break;
+      }
       default: throw new Error(`Tipo desconhecido: ${s.kind}`);
     }
     await supabase.from("inbox_suggestions").update({
@@ -369,7 +376,7 @@ export async function acceptSuggestionAction(
 
     if (s.thread_id) {
       const { count } = await supabase.from("inbox_suggestions").select("id", { count: "exact", head: true }).eq("thread_id", s.thread_id).eq("status", "pending");
-      if (!count && s.kind !== "reply") {
+      if (!count && s.kind !== "reply" && s.kind !== "record_change") {
         await supabase.from("inbox_threads").update({ status: "done" }).eq("id", s.thread_id).eq("status", "awaiting_approval");
       }
     }
@@ -470,3 +477,19 @@ export async function saveInboxSettingsAction(s: { gmail_query: string; calendar
     return { error: e instanceof Error ? e.message : String(e) };
   }
 }
+
+
+/** Suggestions shown as cards inside the COME AI chat. */
+export async function getSuggestionsAction(ids: string[]): Promise<InboxSuggestionRow[]> {
+  await requireAdmin();
+  const clean = ids.filter((x) => /^[0-9a-f-]{36}$/i.test(x)).slice(0, 30);
+  if (!clean.length) return [];
+  const { data } = await supabase.from("inbox_suggestions").select("*").in("id", clean);
+  return (data ?? []) as InboxSuggestionRow[];
+}
+
+export type InboxSuggestionRow = {
+  id: string; thread_id: string | null; sale_id: string | null; kind: string; title: string; rationale: string | null;
+  payload: unknown; status: string; final_payload: unknown; feedback: string | null; error: string | null; source: string;
+  created_at: string;
+};

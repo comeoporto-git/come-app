@@ -247,7 +247,7 @@ export function InboxClient(props: {
       {/* AI Chat suggestions (not tied to an email) */}
       {props.chatSuggestions.length > 0 && (
         <div className="space-y-2">
-          <p className="text-[12px] font-semibold text-white/70 uppercase tracking-wide">Sugestões do AI Chat</p>
+          <p className="text-[12px] font-semibold text-white/70 uppercase tracking-wide">Sugestões do COME AI</p>
           <div className="grid gap-3 lg:grid-cols-2">
             {props.chatSuggestions.map((s) => <SuggestionCard key={s.id} s={s} saleOptions={props.saleOptions} />)}
           </div>

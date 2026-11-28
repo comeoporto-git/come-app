@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { acceptSuggestionAction, rejectSuggestionAction } from "@/actions/inbox";
 import { sanitizeHtml } from "@/lib/sanitizeHtml";
 import type { InboxSuggestion } from "./InboxClient";
@@ -13,6 +14,7 @@ const KIND_LABEL: Record<string, { label: string; color: string }> = {
   update_sale: { label: "Atualizar venda", color: "bg-amber-50 text-amber-700" },
   add_expense: { label: "Despesa", color: "bg-rose-50 text-rose-700" },
   guide_entry: { label: "Guia", color: "bg-violet-50 text-violet-700" },
+  record_change: { label: "Alteração", color: "bg-indigo-50 text-indigo-700" },
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -290,6 +292,69 @@ function GuideView({ p, editing, set }: { p: AnyPayload; editing: boolean; set: 
 
 // ── Card ──────────────────────────────────────────────────────────────────────
 
+type RecChange = { field: string; label: string; old: unknown; new: unknown; old_label?: string | null; new_label?: string | null };
+
+const show = (v: unknown, label?: string | null) =>
+  label ? label
+  : v === null || v === undefined || v === "" ? "—"
+  : typeof v === "boolean" ? (v ? "Sim" : "Não")
+  : typeof v === "string" && /^\d{2}:\d{2}:\d{2}$/.test(v) ? v.slice(0, 5)
+  : String(v);
+
+/** Before → after of a change anywhere in the app (COME AI). */
+function RecordChangeView({ p, editing, set }: { p: AnyPayload; editing: boolean; set: (k: string, v: unknown) => void }) {
+  const changes = (p.changes as RecChange[]) ?? [];
+  const op = String(p.op);
+  const update = (i: number, v: unknown) => set("changes", changes.map((c, j) => (j === i ? { ...c, new: v, new_label: null } : c)));
+  const remove = (i: number) => set("changes", changes.filter((_, j) => j !== i));
+  return (
+    <div className="space-y-1.5">
+      <p className="text-[12px] text-gray-500">
+        {op === "create" ? "Novo registo em " : op === "delete" ? "Apagar de " : ""}<span className="font-semibold">{String(p.entity_label ?? "")}</span>
+        {p.record_label ? ` · ${String(p.record_label)}` : ""}
+      </p>
+      {op === "delete" ? (
+        <p className="text-[13px] text-red-600 bg-red-50 rounded-lg px-3 py-2">Este registo vai ser apagado.</p>
+      ) : (
+        <table className="w-full text-[13px]">
+          <thead>
+            <tr className="text-left text-[11px] text-gray-400">
+              <th className="font-medium py-1 pr-2">Campo</th>
+              {op !== "create" && <th className="font-medium py-1 pr-2">Atual</th>}
+              <th className="font-medium py-1">{op === "create" ? "Valor" : "Novo"}</th>
+              {editing && <th />}
+            </tr>
+          </thead>
+          <tbody>
+            {changes.map((c, i) => (
+              <tr key={c.field} className="border-t border-gray-100 align-top">
+                <td className="py-1.5 pr-2 text-gray-500 whitespace-nowrap">{c.label}</td>
+                {op !== "create" && <td className="py-1.5 pr-2 text-gray-400 line-through decoration-gray-300 break-words whitespace-pre-line">{show(c.old, c.old_label)}</td>}
+                <td className="py-1.5 font-medium break-words whitespace-pre-line bg-emerald-50/50">
+                  {editing ? (
+                    String(c.new ?? "").length > 60 ? (
+                      <textarea className={input} rows={4} value={String(c.new ?? "")} onChange={(e) => update(i, e.target.value)} />
+                    ) : (
+                      <input className={input} value={String(c.new ?? "")} onChange={(e) => update(i, e.target.value)} />
+                    )
+                  ) : (
+                    show(c.new, c.new_label)
+                  )}
+                </td>
+                {editing && (
+                  <td className="py-1.5 pl-2">
+                    <button type="button" onClick={() => remove(i)} className="text-[12px] text-red-400 hover:text-red-600">Remover</button>
+                  </td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
 export function SuggestionCard({ s, saleOptions }: { s: InboxSuggestion; saleOptions: { id: string; label: string }[] }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<AnyPayload>(s.payload as AnyPayload);
@@ -298,6 +363,7 @@ export function SuggestionCard({ s, saleOptions }: { s: InboxSuggestion; saleOpt
   const [error, setError] = useState<string | null>(s.status === "failed" ? s.error : null);
   const [done, setDone] = useState<string | null>(null);
   const [pending, start] = useTransition();
+  const router = useRouter();
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const kind = KIND_LABEL[s.kind] ?? { label: s.kind, color: "bg-gray-100 text-gray-600" };
   const actionable = s.status === "pending" || s.status === "failed";
@@ -318,7 +384,10 @@ export function SuggestionCard({ s, saleOptions }: { s: InboxSuggestion; saleOpt
     start(async () => {
       const r = await acceptSuggestionAction(s.id, changed ? payload : undefined, feedback || undefined);
       if (r.error) setError(r.error);
-      else setDone(changed ? "Aceite com alterações — o guia vai aprender com isto." : "Aceite.");
+      else {
+        setDone(changed ? "Aceite com alterações — o guia vai aprender com isto." : s.kind === "record_change" ? "Alteração gravada." : "Aceite.");
+        router.refresh();
+      }
     });
   }
 
@@ -335,7 +404,7 @@ export function SuggestionCard({ s, saleOptions }: { s: InboxSuggestion; saleOpt
     <div className={`bg-white rounded-2xl border shadow-sm ${actionable ? "border-gray-100" : "border-gray-100 opacity-70"}`}>
       <div className="px-4 pt-3 pb-2 flex flex-wrap items-center gap-2">
         <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${kind.color}`}>{kind.label}</span>
-        {s.source === "chat" && <span className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">AI Chat</span>}
+        {s.source === "chat" && <span className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">COME AI</span>}
         <p className="text-[13px] font-semibold flex-1 min-w-0 truncate">{s.title}</p>
         {!actionable && <span className="text-[11px] text-gray-400">{STATUS_LABEL[s.status] ?? s.status}</span>}
       </div>
@@ -346,6 +415,7 @@ export function SuggestionCard({ s, saleOptions }: { s: InboxSuggestion; saleOpt
         {s.kind === "update_sale" && <UpdateSaleView p={shown} editing={editing} set={set} />}
         {s.kind === "add_expense" && <ExpenseView p={shown} editing={editing} set={set} saleOptions={saleOptions} />}
         {s.kind === "guide_entry" && <GuideView p={shown} editing={editing} set={set} />}
+        {s.kind === "record_change" && <RecordChangeView p={shown} editing={editing} set={set} />}
       </div>
 
       {s.feedback && !actionable && <p className="px-4 pb-3 text-[12px] text-gray-500">Comentário: {s.feedback}</p>}
@@ -372,7 +442,7 @@ export function SuggestionCard({ s, saleOptions }: { s: InboxSuggestion; saleOpt
             ) : (
               <>
                 <button disabled={pending} onClick={accept} className="text-[13px] font-semibold text-white bg-[#111514] hover:bg-[#32373c] px-4 py-1.5 rounded-xl disabled:opacity-40">
-                  {pending ? "A executar…" : s.kind === "reply" ? (editing ? "Enviar alterado" : "Aceitar e enviar") : editing ? "Guardar e aceitar" : "Aceitar"}
+                  {pending ? "A executar…" : s.kind === "reply" ? (editing ? "Enviar alterado" : "Aceitar e enviar") : s.kind === "record_change" ? (editing ? "Confirmar alterado" : "Confirmar") : editing ? "Guardar e aceitar" : "Aceitar"}
                 </button>
                 {!editing ? (
                   <button disabled={pending} onClick={() => setEditing(true)} className="text-[13px] font-semibold text-[#32373c] bg-gray-100 hover:bg-gray-200 px-4 py-1.5 rounded-xl">

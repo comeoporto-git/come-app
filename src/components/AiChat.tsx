@@ -11,6 +11,41 @@ import {
   type Conversation,
   type ChatMessage,
 } from "@/actions/aiChat";
+import { getSuggestionsAction } from "@/actions/inbox";
+import { SuggestionCard } from "@/components/inbox/SuggestionCard";
+import type { InboxSuggestion } from "@/components/inbox/InboxClient";
+
+// ── Confirm cards (COME AI proposals) ─────────────────────────────────────────
+
+const CARD_RE = /\[\[sugestao:([0-9a-f-]{36})\]\]/gi;
+
+/** A proposal from COME AI, shown in the chat with its Confirmar button. */
+function ChatCard({ id }: { id: string }) {
+  const [s, setS] = useState<InboxSuggestion | null | undefined>(undefined);
+  useEffect(() => {
+    let alive = true;
+    getSuggestionsAction([id]).then((r) => { if (alive) setS((r[0] as unknown as InboxSuggestion) ?? null); }).catch(() => alive && setS(null));
+    return () => { alive = false; };
+  }, [id]);
+  if (s === undefined) return <p className="text-[11px] text-[#32373c]/50 my-1">A preparar proposta…</p>;
+  if (s === null) return null;
+  return <div className="my-2 -mx-1 text-left"><SuggestionCard s={s} saleOptions={[]} /></div>;
+}
+
+/** Assistant text with its proposal cards in place. */
+function renderAssistant(text: string, isStreaming: boolean) {
+  const out: React.ReactNode[] = [];
+  let last = 0;
+  for (const m of text.matchAll(CARD_RE)) {
+    const before = text.slice(last, m.index).trim();
+    if (before) out.push(<Fragment key={`t${last}`}>{renderMarkdown(before, false)}</Fragment>);
+    out.push(<ChatCard key={m[1]} id={m[1]} />);
+    last = (m.index ?? 0) + m[0].length;
+  }
+  const rest = text.slice(last);
+  if (rest.trim() || !out.length) out.push(<Fragment key="rest">{renderMarkdown(rest, isStreaming)}</Fragment>);
+  return out;
+}
 
 // ── Markdown renderer ─────────────────────────────────────────────────────────
 
@@ -157,9 +192,9 @@ function formatDate(iso: string) {
 
 const SUGGESTED = [
   "Quantos serviços temos este mês?",
-  "Como está o nosso pipeline de CRM?",
-  "Quais foram os últimos serviços realizados?",
   "Temos disponibilidade amanhã?",
+  "Quanto custa uma Old School to New School + Chef para 6 pessoas em maio?",
+  "Muda o guia da próxima tour de sábado para o Bernardo",
 ];
 
 // ── Main component ────────────────────────────────────────────────────────────
@@ -313,7 +348,8 @@ export function AiChat() {
         const res = await fetch("/api/ai-chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messages: apiMessages }),
+          // Where the person is: COME AI uses it to know which email / sale / page "this" is.
+          body: JSON.stringify({ messages: apiMessages, context: { path: window.location.pathname, search: window.location.search } }),
           signal: abort.signal,
         });
 
@@ -380,7 +416,7 @@ export function AiChat() {
       {/* Floating button */}
       <button
         onClick={() => setOpen((v) => !v)}
-        aria-label="Ask AI"
+        aria-label="COME AI"
         className={`fixed bottom-5 right-5 z-50 w-12 h-12 rounded-full shadow-lg flex items-center justify-center transition-all active:scale-95 ${
           open ? "bg-[#32373c] text-white" : "bg-[#111514] text-white hover:bg-[#32373c]"
         }`}
@@ -428,9 +464,9 @@ export function AiChat() {
               <p className="text-[13px] font-semibold text-white leading-none">
                 {view === "chat"
                   ? (conversations.find((c) => c.id === activeId)?.title ?? "Nova conversa")
-                  : "Ask AI"}
+                  : "COME AI"}
               </p>
-              <p className="text-[11px] text-white/40 mt-0.5">Dados em tempo real da COME Porto</p>
+              <p className="text-[11px] text-white/40 mt-0.5">Sabe onde estás · altera tudo com confirmação</p>
             </div>
             {view === "list" && (
               <button
@@ -534,7 +570,7 @@ export function AiChat() {
                   messages.map((msg, i) => (
                     <div key={msg.id} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
                       <div
-                        className={`max-w-[85%] text-[13px] leading-relaxed px-3 py-2 rounded-xl break-words ${
+                        className={`${msg.role === "assistant" && msg.content.includes("[[sugestao:") ? "w-full" : "max-w-[85%]"} text-[13px] leading-relaxed px-3 py-2 rounded-xl break-words ${
                           msg.role === "user"
                             ? "bg-[#111514] text-white rounded-br-sm whitespace-pre-wrap"
                             : "bg-[#f5f5f0] text-[#32373c] rounded-bl-sm"
@@ -542,7 +578,7 @@ export function AiChat() {
                       >
                         {msg.role === "user"
                           ? msg.content
-                          : renderMarkdown(msg.content, streaming && i === messages.length - 1)}
+                          : renderAssistant(msg.content, streaming && i === messages.length - 1)}
                       </div>
                     </div>
                   ))
