@@ -35,6 +35,23 @@ export type GmailMessage = {
 
 export type GmailThread = { id: string; messages: GmailMessage[] };
 
+/**
+ * Turns a Google API error into a message a person can act on. The common case
+ * after connecting is an API that is not enabled in the Google Cloud project:
+ * say so in Portuguese and give the link that enables it.
+ */
+export function googleApiErrorMessage(label: string, service: string, status: number, text: string): string {
+  const project = /project[= ](\d+)/.exec(text)?.[1];
+  if (status === 403 && /has not been used in project|is disabled|SERVICE_DISABLED/i.test(text)) {
+    const url = `https://console.developers.google.com/apis/api/${service}/overview${project ? `?project=${project}` : ""}`;
+    return `A API do ${label} não está ativada no projeto Google Cloud da app${project ? ` (${project})` : ""}. Ative-a aqui e tente outra vez daqui a uns minutos: ${url}`;
+  }
+  if (status === 401) return `${label}: a ligação à conta Google expirou — volte a ligar o Gmail e o Calendário.`;
+  if (status === 403 && /insufficient|scope/i.test(text)) return `${label}: faltam permissões — volte a ligar o Gmail e o Calendário e aceite todas as permissões.`;
+  const msg = (() => { try { return (JSON.parse(text) as { error?: { message?: string } }).error?.message; } catch { return null; } })();
+  return `${label} ${status}: ${(msg ?? text).slice(0, 200)}`;
+}
+
 export class GmailError extends Error {
   status: number;
   constructor(status: number, message: string) {
@@ -51,7 +68,7 @@ async function gmail<T>(token: string, path: string, init?: RequestInit): Promis
   });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new GmailError(res.status, `Gmail ${res.status}: ${text.slice(0, 300)}`);
+    throw new GmailError(res.status, googleApiErrorMessage("Gmail", "gmail.googleapis.com", res.status, text));
   }
   return (await res.json()) as T;
 }

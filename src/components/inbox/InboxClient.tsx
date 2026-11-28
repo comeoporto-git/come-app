@@ -174,8 +174,8 @@ export function InboxClient(props: {
           {overdue} {overdue === 1 ? "conversa está" : "conversas estão"} há mais de 24h sem resposta — responder hoje, nem que seja &quot;Estamos a verificar&quot;.
         </p>
       )}
-      {msg && <p className="text-[13px] bg-white/90 rounded-xl px-4 py-2">{msg}</p>}
-      {props.lastSyncError && !msg && <p className="text-[12px] text-red-100 bg-red-500/30 rounded-xl px-4 py-2 whitespace-pre-line">{props.lastSyncError}</p>}
+      {msg && <p className="text-[13px] bg-white/90 rounded-xl px-4 py-2 break-words"><Linkified text={msg} /></p>}
+      {props.lastSyncError && !msg && <p className="text-[12px] text-red-100 bg-red-500/30 rounded-xl px-4 py-2 whitespace-pre-line break-words"><Linkified text={props.lastSyncError} /></p>}
 
       {showSettings && (
         <div className="bg-white rounded-2xl p-4 grid sm:grid-cols-[1fr_220px_auto] gap-3 items-end">
@@ -332,5 +332,23 @@ export function InboxClient(props: {
         )}
       </div>
     </div>
+  );
+}
+
+/** Shows text with any URL in it as a short clickable link (error messages carry setup links). */
+function Linkified({ text }: { text: string }) {
+  const parts = text.split(/(https?:\/\/\S+)/g);
+  return (
+    <>
+      {parts.map((part, i) =>
+        /^https?:\/\//.test(part) ? (
+          <a key={i} href={part} target="_blank" rel="noreferrer" className="underline font-semibold">
+            Abrir na Google Cloud
+          </a>
+        ) : (
+          <span key={i}>{part}</span>
+        ),
+      )}
+    </>
   );
 }

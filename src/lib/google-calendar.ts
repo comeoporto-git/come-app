@@ -1,3 +1,4 @@
+import { googleApiErrorMessage } from "./gmail";
 /** Read-only Google Calendar client used for availability (e.g. Bernardo's "OUT" days). */
 
 export type CalendarEvent = {
@@ -42,7 +43,7 @@ export async function listCalendarEvents(token: string, from: string, to: string
     `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?${params}`,
     { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" },
   );
-  if (!res.ok) throw new Error(`Calendar ${res.status}: ${(await res.text().catch(() => "")).slice(0, 200)}`);
+  if (!res.ok) throw new Error(googleApiErrorMessage("Google Calendar", "calendar-json.googleapis.com", res.status, await res.text().catch(() => "")));
   const data = (await res.json()) as {
     items?: { id: string; summary?: string; status?: string; start?: { date?: string; dateTime?: string }; end?: { date?: string; dateTime?: string } }[];
   };
