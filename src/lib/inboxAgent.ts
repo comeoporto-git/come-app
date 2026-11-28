@@ -35,6 +35,7 @@ export type ReplyPayload = {
   price_summary: string;
   missing_info: string[];
   internal_note: string;
+  warnings?: string[];
 };
 
 export type CreateSalePayload = {
@@ -341,8 +342,8 @@ Regras:
 - requests: cada serviço/data pedido (para orçamento, disponibilidade ou reserva). service_id tem de ser um id da lista de serviços (o mais próximo do pedido) ou null. Datas em yyyy-mm-dd (assume o próximo ano em que a data faz sentido se o ano não for dito). guests = total de pessoas incluindo crianças.
 - sale_updates: só para a venda ligada, só campos cujo valor no email é NOVO ou DIFERENTE do que está na venda. Para "notes" dá o texto completo novo (notas atuais + o que acrescentar). status só "Confirmed" ou "Cancelled" quando o cliente confirma/cancela explicitamente. number_of_guests e crianças como número em texto. date yyyy-mm-dd, horas HH:MM.
 - booking_info: informação partilhada pelo cliente (nomes, contacto, alergias, mobilidade, contacto de emergência, ponto de encontro, notas) — útil para uma venda nova.
-- invoice_attachments: nomes exatos dos ficheiros anexos que são faturas/recibos que a COME tem de pagar ou registar como despesa (de fornecedores, restaurantes, transportes…). Não incluas faturas emitidas pela COME a clientes.
-- needs_reply: true se a última mensagem é de alguém externo e espera resposta nossa. false para newsletters, notificações automáticas, faturas sem pergunta, ou se a última mensagem é nossa.
+- invoice_attachments: nomes exatos dos ficheiros anexos que são faturas/recibos que a COME tem de pagar ou registar como despesa (fornecedores, restaurantes, transportes, aluguer de material, software como Vercel/Anthropic, seguros, taxas como a do RNAAT…). Notas de crédito/reembolsos também contam (valor negativo). Não incluas faturas emitidas pela COME a clientes.
+- needs_reply: true se a última mensagem é de alguém externo e espera resposta nossa. Também true (resposta curta) para reconfirmações ("Chequeo", "Reconfirmation", "FINAL DETAILS"), comprovativos de pagamento que pedem para confirmar, e informações enviadas por agências (contactos, alergias). false para newsletters, questionários, notificações automáticas, respostas automáticas, spam comercial, recibos/faturas de fornecedores sem pergunta, ou se a última mensagem é nossa.
 - summary: 1-2 frases em português.
 
 ${opts.guide}`,
@@ -366,7 +367,7 @@ ${threadForPrompt(opts.thread, opts.myEmail)}`,
 
 // ── Pass 2: draft the reply ───────────────────────────────────────────────────
 
-type Draft = { body_html: string; missing_info_requested: string[]; internal_note: string };
+type Draft = { body_html: string; missing_info_requested: string[]; internal_note: string; warnings: string[] };
 
 export async function draftReply(opts: {
   thread: GmailThread;
@@ -400,7 +401,13 @@ Regras:
 - Informação em falta: se a reserva está confirmada ou a ser confirmada, pede de forma simpática e agrupada a informação em falta listada abaixo. Em missing_info_requested lista o que pediste.
 - Responde às perguntas em aberto do cliente com a informação dos serviços e do guia; se não souberes, diz que confirmamos em breve (não inventes).
 - Nunca incluas resumos internos da app (blocos tipo "ID: … Status: Pending Client: … Type: …"), estados internos, notas para a equipa ou nomes de campos. Para resumir uma reserva usa uma frase: data, nº de pessoas, serviço e horário.
+- Lê a última mensagem do cliente até ao fim. Responde a TODAS as perguntas e a TODAS as datas/alternativas propostas (ex.: "se não for possível, pode ser a 7 de outubro?"). Nunca recuses sem propor uma alternativa (outra data, outro serviço, o Barro em vez da casa do chef).
+- Cumprimenta pelo primeiro nome de quem assinou a última mensagem (não de outra pessoa da conversa; se a mensagem não está assinada, usa só "Olá,"/"Hello,").
+- Repete a data, o nº de pessoas, o serviço (com ou sem chef) e o horário exatamente como pedidos e confirmados — não troques a data por outra reserva.
+- Horário: as tours são de manhã (11h00). Se pedirem tarde, propõe a manhã ou ajusta a hora de manhã (ex.: 10h30–14h30) para encaixar no programa do cliente; não aceites tours à tarde sem aprovação.
+- Se o email diz "em anexo"/"attached", lembra-te de que esta app ainda não envia anexos: avisa em warnings.
 - internal_note: nota curta em português para o administrador (o que verificar antes de enviar). Pode ser "".
+- warnings: lista de alertas para o administrador (em português), por exemplo: data/nº de pessoas/serviço do rascunho diferente do pedido; variante com/sem chef ambígua ou contrária à regra da agência; pedido à tarde; pergunta do cliente que ficou sem resposta; texto refere um anexo. Lista vazia se não houver.
 
 ${opts.guide}`,
     content: `## Objetivo
@@ -426,7 +433,7 @@ ${opts.openQuestions.length ? opts.openQuestions.map((q) => `- ${q}`).join("\n")
 
 ## Conversa
 ${threadForPrompt(opts.thread, opts.myEmail)}`,
-    schema: obj({ body_html: str, missing_info_requested: arr(str), internal_note: str }),
+    schema: obj({ body_html: str, missing_info_requested: arr(str), internal_note: str, warnings: arr(str) }),
   });
 }
 
@@ -742,6 +749,7 @@ export async function analyzeThread(opts: {
       language: ex.language,
       price_summary: priceLinesText(prices),
       missing_info: draft.missing_info_requested,
+      warnings: draft.warnings,
       internal_note: [draft.internal_note, availability.days.map((d) => `${d.date}: ${d.available ? "disponível" : "indisponível"}${d.reasons.length ? ` (${d.reasons.join("; ")})` : ""}`).join(" · ")].filter(Boolean).join("\n"),
     };
     await addSuggestion({
@@ -927,6 +935,7 @@ export async function proposeMissingInfoFollowups(opts: { token: string; myEmail
       language: lang,
       price_summary: "",
       missing_info: draft.missing_info_requested.length ? draft.missing_info_requested : missing,
+      warnings: draft.warnings,
       internal_note: draft.internal_note,
     };
     await addSuggestion({

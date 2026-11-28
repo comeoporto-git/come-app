@@ -71,12 +71,30 @@ function ReplyView({ p, editing, set, bodyRef }: { p: AnyPayload; editing: boole
         className={`email-body [&_p]:mb-2 [&_p:last-child]:mb-0 text-[13px] leading-relaxed rounded-xl border p-3 overflow-x-auto ${editing ? "border-blue-300 bg-white ring-2 ring-blue-100 outline-none" : "border-gray-100 bg-gray-50/60"}`}
         dangerouslySetInnerHTML={{ __html: sanitizeHtml(String(p.body_html ?? "")) }}
       />
+      {replyWarnings(p).length > 0 && (
+        <ul className="text-[12px] text-red-700 bg-red-50 rounded-lg px-3 py-2 space-y-0.5">
+          {replyWarnings(p).map((w, i) => <li key={i}>⚠ {w}</li>)}
+        </ul>
+      )}
       {Array.isArray(p.missing_info) && p.missing_info.length > 0 && (
         <p className="text-[12px] text-amber-700">Pede informação em falta: {(p.missing_info as string[]).join(", ")}</p>
       )}
       {p.internal_note ? <p className="text-[12px] text-gray-500 whitespace-pre-line bg-amber-50/60 rounded-lg px-3 py-2">Nota: {String(p.internal_note)}</p> : null}
     </div>
   );
+}
+
+const ATTACHMENT_RE = /\b(em anexo|segue(m)? (em )?anexo|anexo|attached|attachment|adjunto)\b/i;
+
+/** Alerts for the person approving a reply: the agent's own checks, plus a
+ *  mention of an attachment (the app sends replies without attachments). */
+function replyWarnings(p: Record<string, unknown>): string[] {
+  const out = Array.isArray(p.warnings) ? (p.warnings as unknown[]).map(String).filter(Boolean) : [];
+  const text = String(p.body_html ?? "").replace(/<[^>]+>/g, " ");
+  if (ATTACHMENT_RE.test(text) && !out.some((w) => /anexo/i.test(w))) {
+    out.push("O texto refere um anexo, mas a app envia sem anexos — envie este email pelo Gmail com o ficheiro.");
+  }
+  return out;
 }
 
 const SALE_EDIT_FIELDS: { k: string; label: string; type?: string }[] = [
