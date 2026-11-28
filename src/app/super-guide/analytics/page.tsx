@@ -22,16 +22,16 @@ export default async function SuperGuideAnalyticsPage() {
 
   const clientFreq: Record<string, number> = {};
   for (const t of tours) {
-    if (t.client) clientFreq[t.client] = (clientFreq[t.client] ?? 0) + 1;
+    if (t.client && t.status !== "Cancelled") clientFreq[t.client] = (clientFreq[t.client] ?? 0) + 1;
   }
   const topByBookings = Object.entries(clientFreq)
     .sort(([, a], [, b]) => b - a).slice(0, 20).map(([id]) => id);
 
   const tourClientMap: Record<string, string> = {};
-  for (const t of tours) { if (t.id && t.client) tourClientMap[t.id] = t.client; }
+  for (const t of tours) { if (t.id && t.client && t.status !== "Cancelled") tourClientMap[t.id] = t.client; }
   const clientRevenue: Record<string, number> = {};
   for (const tx of transactions) {
-    if (!tx.supplier.startsWith("IN -") || !tx.tourId) continue;
+    if (!(tx.supplier.startsWith("IN -") || tx.txType === "Earning") || !tx.tourId) continue;
     const cid = tourClientMap[tx.tourId];
     if (!cid) continue;
     clientRevenue[cid] = (clientRevenue[cid] ?? 0) + tx.totalCost;
