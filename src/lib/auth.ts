@@ -63,7 +63,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             UPDATE accounts
             SET access_token  = ${account.access_token},
                 refresh_token = COALESCE(${account.refresh_token ?? null}, refresh_token),
-                expires_at    = ${account.expires_at ?? null}
+                expires_at    = ${account.expires_at ?? null},
+                scope         = COALESCE(${account.scope ?? null}, scope)
             WHERE provider = 'google'
               AND "providerAccountId" = ${account.providerAccountId}
           `;

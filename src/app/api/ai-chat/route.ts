@@ -2,8 +2,13 @@ import { NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
 import Anthropic from "@anthropic-ai/sdk";
 import { supabase } from "@/lib/notion";
+import { guidePrompt } from "@/lib/companyGuide";
+import { CHAT_TOOLS, runChatTool } from "@/lib/chatTools";
+import { AGENT_MODEL } from "@/lib/claude";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+export const maxDuration = 120;
 
 async function getBusinessSnapshot() {
   const now = new Date();
@@ -245,6 +250,7 @@ export async function POST(req: NextRequest) {
     snapshot = { today: new Date().toISOString().split("T")[0] } as never;
   }
 
+  const guide = await guidePrompt().catch(() => "");
   const rules = snapshot._rules as Record<string, string>;
   const maxPerDay = parseInt(rules["max_services_per_day"] ?? "2", 10);
   const staleProspectDays = rules["prospect_stale_days"] ?? "30";
@@ -284,9 +290,18 @@ When asked about availability for a date + service:
 - If revenue is null for a sale, no earnings have been registered for it yet.
 - When answering revenue questions, use projectedRevenue as the total and list per-service breakdown from sales[].revenue.
 
+## Guia da empresa (escrito pela equipa e aprendido com as decisões na Caixa de Entrada — segue-o)
+${guide}
+
+## Tools and actions
+- Use check_availability for any availability question about specific dates — it also reads the Google Calendar (events starting with "OUT" = Bernardo away; other guides may still be free).
+- Use quote_price for every price; never compute prices yourself.
+- You can PROPOSE actions (propose_create_sale, propose_update_sale, propose_guide_entry). They are never executed directly: they appear in /admin/inbox for the user to Aceitar / Rejeitar / Alterar. Tell the user that.
+- When the user teaches you how the company works ("from now on…", "we always…"), propose a guide entry.
+
 ## General
 - Be concise and precise. Use the actual data, never guess.
-- When the data doesn't cover something (e.g., external calendars, real-time guide availability), say so clearly.
+- When the data doesn't cover something, say so clearly. For calendar / guide availability use check_availability.
 - Respond in the same language the user writes in (Portuguese if they write Portuguese, English if English).
 
 Current business data (today: ${snapshot.today}, data covers: ${snapshot.lastYear.year} full year + ${snapshot.thisYear.year} full year + upcoming window until ${snapshot.upcomingWindowEnd}):
@@ -296,20 +311,38 @@ ${JSON.stringify(snapshot, null, 2)}`;
   const stream = new ReadableStream({
     async start(controller) {
       try {
-        const response = await anthropic.messages.stream({
-          model: "claude-sonnet-4-6",
-          max_tokens: 1024,
-          system: systemPrompt,
-          messages,
-        });
-
-        for await (const chunk of response) {
-          if (
-            chunk.type === "content_block_delta" &&
-            chunk.delta.type === "text_delta"
-          ) {
-            controller.enqueue(encoder.encode(chunk.delta.text));
+        const convo: Anthropic.MessageParam[] = messages.map((m) => ({ role: m.role, content: m.content }));
+        // Tool loop: read-only tools answer directly; "propose_*" tools only create
+        // pending suggestions that a person approves in the Caixa de Entrada.
+        for (let turn = 0; turn < 8; turn++) {
+          const response = anthropic.messages.stream({
+            model: AGENT_MODEL,
+            max_tokens: 16000,
+            output_config: { effort: "medium" },
+            system: systemPrompt,
+            tools: CHAT_TOOLS,
+            messages: convo,
+          });
+          response.on("text", (t) => controller.enqueue(encoder.encode(t)));
+          const final = await response.finalMessage();
+          if (final.stop_reason === "refusal") {
+            controller.enqueue(encoder.encode("\n\nNão consigo ajudar com este pedido."));
+            break;
           }
+          if (final.stop_reason !== "tool_use") break;
+          convo.push({ role: "assistant", content: final.content });
+          const uses = final.content.filter((b): b is Anthropic.ToolUseBlock => b.type === "tool_use");
+          const results: Anthropic.ToolResultBlockParam[] = await Promise.all(
+            uses.map(async (u) => {
+              try {
+                return { type: "tool_result" as const, tool_use_id: u.id, content: await runChatTool(u.name, u.input as Record<string, unknown>) };
+              } catch (e) {
+                return { type: "tool_result" as const, tool_use_id: u.id, content: e instanceof Error ? e.message : String(e), is_error: true };
+              }
+            }),
+          );
+          convo.push({ role: "user", content: results });
+          controller.enqueue(encoder.encode("\n\n"));
         }
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Unknown error";

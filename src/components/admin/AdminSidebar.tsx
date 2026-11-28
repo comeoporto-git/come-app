@@ -19,6 +19,8 @@ const nav: { group: string | null; items: NavItem[] }[] = [
     group: null,
     items: [
       { label: "Dashboard", href: "/admin", exact: true },
+      { label: "Caixa de Entrada", href: "/admin/inbox" },
+      { label: "Guia da Empresa", href: "/admin/guia" },
       { label: "Tarefas", href: "/admin/tarefas" },
     ],
   },
