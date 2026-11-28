@@ -6,7 +6,7 @@ import { getAvailability, type DayAvailability } from "@/lib/availability";
 import { priceLines, priceTableHtml, priceLinesText, type PricedLine } from "@/lib/priceTable";
 import { analyzeInvoice } from "@/actions/invoice";
 import {
-  getMyEmail, listThreadIds, getThreadMeta, getThread, getAttachment, toApiThreadId, parseAddress,
+  getProfile, listChangedThreadIds, isRateLimit, listThreadIds, getThreadMeta, getThread, getAttachment, toApiThreadId, parseAddress,
   ensureLabel, archiveThread, highlightThread,
   type GmailThread, type GmailMessage,
 } from "@/lib/gmail";
@@ -955,19 +955,52 @@ export async function syncInbox(opts: { userId: string; maxAnalyses?: number; th
     autoArchive: settings?.auto_archive_notifications !== false,
     labelName: (settings?.notifications_label as string) || "Notificações",
   };
-  const myEmail = await getMyEmail(tok.token);
+  const profile = await getProfile(tok.token);
+  const myEmail = profile.email;
   const max = opts.maxAnalyses ?? 5;
 
-  const ids = opts.threadIds?.map(toApiThreadId) ?? (await listThreadIds(tok.token, query, 40));
+  // Which threads to look at: only what changed since the last run (Gmail
+  // history — one cheap call), plus earlier ones still waiting for analysis.
+  // A full listing only on the first run or when the history is too old.
+  let ids: string[];
+  let fullScan = false;
+  if (opts.threadIds) {
+    ids = opts.threadIds.map(toApiThreadId);
+  } else {
+    const since = settings?.last_history_id as string | null;
+    const changed = since ? await listChangedThreadIds(tok.token, since) : null;
+    if (changed === null) {
+      ids = await listThreadIds(tok.token, query, 40);
+      fullScan = true;
+    } else {
+      const { data: waiting } = await supabase
+        .from("inbox_threads")
+        .select("gmail_thread_id, analyzed_message_id, last_message_id, error_attempts, last_from_us")
+        .eq("status", "needs_reply")
+        .gte("last_message_at", new Date(Date.now() - 30 * 86400_000).toISOString())
+        .order("last_message_at", { ascending: false })
+        .limit(100);
+      const backlog = (waiting ?? [])
+        .filter((w) => !w.last_from_us && w.analyzed_message_id !== w.last_message_id && (w.error_attempts ?? 0) < 3)
+        .map((w) => w.gmail_thread_id as string);
+      ids = [...new Set([...changed, ...backlog])];
+    }
+  }
+
+  let rateLimited = false;
   for (const id of ids) {
     result.checked++;
     try {
       const { data: row } = await supabase.from("inbox_threads").select("id, analyzed_message_id, last_message_id, status, error_message_id, error_attempts").eq("gmail_thread_id", id).maybeSingle();
-      if (!opts.threadIds && row) {
+      if (!opts.threadIds) {
         const meta = await getThreadMeta(tok.token, id);
-        if (row.analyzed_message_id === meta.lastMessageId || (row.last_message_id === meta.lastMessageId && row.status === "done")) continue;
-        // Same message failed 3 times: wait for a new message or a manual "Reanalisar".
-        if (row.error_message_id === meta.lastMessageId && (row.error_attempts ?? 0) >= 3) continue;
+        // From the history: only inbox conversations, not promotions/social.
+        if (!fullScan && (!meta.labelIds.includes("INBOX") || meta.labelIds.some((l) => l === "CATEGORY_PROMOTIONS" || l === "CATEGORY_SOCIAL"))) continue;
+        if (row) {
+          if (row.analyzed_message_id === meta.lastMessageId || (row.last_message_id === meta.lastMessageId && row.status === "done")) continue;
+          // Same message failed 3 times: wait for a new message or a manual "Reanalisar".
+          if (row.error_message_id === meta.lastMessageId && (row.error_attempts ?? 0) >= 3) continue;
+        }
       }
       const thread = await getThread(tok.token, id);
       if (!thread.messages.length) continue;
@@ -994,6 +1027,12 @@ export async function syncInbox(opts: { userId: string; maxAnalyses?: number; th
       result.suggestions += r.suggestions;
       result.tasks += r.tasks;
     } catch (e) {
+      if (isRateLimit(e)) {
+        // Stop here; the next run (2 minutes) carries on from the same point.
+        rateLimited = true;
+        result.errors.push(`gmail: ${shortError(e)}`);
+        break;
+      }
       const msg = shortError(e);
       result.errors.push(`${id}: ${msg}`);
       const { data: cur } = await supabase.from("inbox_threads").select("last_message_id, error_message_id, error_attempts").eq("gmail_thread_id", id).maybeSingle();
@@ -1015,6 +1054,8 @@ export async function syncInbox(opts: { userId: string; maxAnalyses?: number; th
   }
 
   await supabase.from("inbox_settings").update({
+    // Next run reads only what changed after this point (not after a cut-short run).
+    ...(!opts.threadIds && !rateLimited ? { last_history_id: profile.historyId } : {}),
     last_synced_at: new Date().toISOString(),
     last_sync_error: result.errors.length
       ? `${result.errors.length} conversa(s) com erro: ${[...new Set(result.errors.map((e) => e.replace(/^[^:]+: /, "")))].slice(0, 2).join(" | ")}`

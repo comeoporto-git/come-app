@@ -60,17 +60,32 @@ export class GmailError extends Error {
   }
 }
 
+const RATE_LIMIT_RE = /rateLimitExceeded|userRateLimitExceeded|Quota exceeded|RESOURCE_EXHAUSTED|Too many concurrent/i;
+
+/** True when Google refused because of per-minute limits (try again later). */
+export function isRateLimit(e: unknown): boolean {
+  return e instanceof GmailError && (e.status === 429 || (e.status === 403 && RATE_LIMIT_RE.test(e.message)));
+}
+
 async function gmail<T>(token: string, path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API}${path}`, {
-    ...init,
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...(init?.headers ?? {}) },
-    cache: "no-store",
-  });
-  if (!res.ok) {
+  // Retries per-minute limits with backoff (1s, 3s) before giving up.
+  for (let attempt = 0; ; attempt++) {
+    const res = await fetch(`${API}${path}`, {
+      ...init,
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...(init?.headers ?? {}) },
+      cache: "no-store",
+    });
+    if (res.ok) return (await res.json()) as T;
     const text = await res.text().catch(() => "");
-    throw new GmailError(res.status, googleApiErrorMessage("Gmail", "gmail.googleapis.com", res.status, text));
+    const limited = res.status === 429 || (res.status === 403 && RATE_LIMIT_RE.test(text));
+    if (limited && attempt < 2) {
+      await new Promise((r) => setTimeout(r, attempt === 0 ? 1000 : 3000));
+      continue;
+    }
+    throw new GmailError(res.status, limited
+      ? `Gmail: limite de pedidos por minuto atingido — continua na próxima leitura. (${res.status})`
+      : googleApiErrorMessage("Gmail", "gmail.googleapis.com", res.status, text));
   }
-  return (await res.json()) as T;
 }
 
 /**
@@ -84,8 +99,36 @@ export function toApiThreadId(id: string): string {
 }
 
 export async function getMyEmail(token: string): Promise<string> {
-  const p = await gmail<{ emailAddress: string }>(token, "/profile");
-  return p.emailAddress.toLowerCase();
+  return (await getProfile(token)).email;
+}
+
+/** The mailbox address and its current history id (where "what changed since" starts). */
+export async function getProfile(token: string): Promise<{ email: string; historyId: string }> {
+  const p = await gmail<{ emailAddress: string; historyId: string }>(token, "/profile");
+  return { email: p.emailAddress.toLowerCase(), historyId: p.historyId };
+}
+
+/**
+ * Threads with messages added since a history id — one cheap call instead of
+ * opening every thread. Returns null when the id is too old (Gmail keeps about
+ * a week), so the caller falls back to a full listing.
+ */
+export async function listChangedThreadIds(token: string, startHistoryId: string): Promise<string[] | null> {
+  const ids = new Set<string>();
+  let pageToken = "";
+  for (let page = 0; page < 10; page++) {
+    let data: { history?: { messagesAdded?: { message: { threadId: string } }[] }[]; nextPageToken?: string };
+    try {
+      data = await gmail(token, `/history?startHistoryId=${startHistoryId}&historyTypes=messageAdded&maxResults=500${pageToken ? `&pageToken=${pageToken}` : ""}`);
+    } catch (e) {
+      if (e instanceof GmailError && e.status === 404) return null;
+      throw e;
+    }
+    for (const h of data.history ?? []) for (const m of h.messagesAdded ?? []) ids.add(m.message.threadId);
+    if (!data.nextPageToken) break;
+    pageToken = data.nextPageToken;
+  }
+  return [...ids];
 }
 
 export async function listThreadIds(token: string, q: string, max = 40): Promise<string[]> {
@@ -97,13 +140,18 @@ export async function listThreadIds(token: string, q: string, max = 40): Promise
 }
 
 /** Latest message id + count without downloading bodies. */
-export async function getThreadMeta(token: string, id: string): Promise<{ lastMessageId: string; count: number; historyId: string }> {
-  const data = await gmail<{ historyId: string; messages: { id: string }[] }>(
+export async function getThreadMeta(token: string, id: string): Promise<{ lastMessageId: string; count: number; historyId: string; labelIds: string[] }> {
+  const data = await gmail<{ historyId: string; messages: { id: string; labelIds?: string[] }[] }>(
     token,
     `/threads/${id}?format=minimal`,
   );
   const msgs = data.messages ?? [];
-  return { lastMessageId: msgs[msgs.length - 1]?.id ?? "", count: msgs.length, historyId: data.historyId };
+  return {
+    lastMessageId: msgs[msgs.length - 1]?.id ?? "",
+    count: msgs.length,
+    historyId: data.historyId,
+    labelIds: [...new Set(msgs.flatMap((m) => m.labelIds ?? []))],
+  };
 }
 
 type Part = {
