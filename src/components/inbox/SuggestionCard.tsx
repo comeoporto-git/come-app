@@ -212,7 +212,9 @@ function ExpenseView({ p, editing, set, saleOptions }: { p: AnyPayload; editing:
   const saleLabel = saleOptions.find((s) => s.id === p.sale_id)?.label ?? null;
   return (
     <div className="space-y-2">
-      {p.duplicate_of ? <p className="text-[12px] text-red-600 bg-red-50 rounded-lg px-3 py-1.5">Já existe uma despesa com este nº de fatura.</p> : null}
+      {p.attach_to_transaction_id ? <p className="text-[12px] text-blue-700 bg-blue-50 rounded-lg px-3 py-1.5">A despesa já existe (do banco/cartão) sem fatura — ao aceitar, a fatura é anexada a essa despesa.</p>
+        : p.duplicate_of ? <p className="text-[12px] text-red-600 bg-red-50 rounded-lg px-3 py-1.5">Já existe uma despesa com este nº de fatura.</p> : null}
+      {p.history_note ? <p className="text-[12px] text-gray-500 bg-gray-50 rounded-lg px-3 py-1.5">{String(p.history_note)}</p> : null}
       {editing ? (
         <div className="grid sm:grid-cols-2 gap-2">
           {EXPENSE_FIELDS.map((f) => (

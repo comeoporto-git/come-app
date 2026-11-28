@@ -46,6 +46,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
     .limit(100);
   if (filter === "pendentes") q = q.in("status", ["attention", "needs_reply", "awaiting_approval"]);
   if (filter === "tratados") q = q.in("status", ["replied", "done", "no_reply"]);
+  if (filter === "todos") q = q.neq("status", "deleted");
   const [{ data: threads }, { data: pending }, { data: chatSuggestions }, { data: sales }] = await Promise.all([
     q,
     supabase.from("inbox_suggestions").select("thread_id").eq("status", "pending"),

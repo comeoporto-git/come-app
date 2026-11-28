@@ -352,6 +352,11 @@ export async function archiveThread(token: string, threadId: string, labelId: st
   });
 }
 
+/** Moves a thread to Gmail's trash (recoverable for 30 days). */
+export async function trashThread(token: string, threadId: string): Promise<void> {
+  await gmail(token, `/threads/${threadId}/trash`, { method: "POST" });
+}
+
 /** Stars a thread and marks it important, keeping it in the inbox. */
 export async function highlightThread(token: string, threadId: string): Promise<void> {
   await gmail(token, `/threads/${threadId}/modify`, {

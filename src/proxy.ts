@@ -9,6 +9,8 @@ export default auth((req) => {
   if (
     pathname.startsWith("/login") ||
     pathname.startsWith("/api/auth") ||
+    // Scheduled jobs: each route checks its own secret (Bearer token).
+    pathname.startsWith("/api/cron/") ||
     pathname.startsWith("/preview") ||
     pathname === "/manifest.webmanifest" ||
     pathname === "/sw.js" ||

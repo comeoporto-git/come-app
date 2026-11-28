@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { supabase, createTransaction, findOrCreateFornecedor } from "@/lib/notion";
 import { getGoogleToken, GMAIL_SCOPE } from "@/lib/google-token";
-import { sendReply, markThreadRead } from "@/lib/gmail";
+import { sendReply, markThreadRead, trashThread } from "@/lib/gmail";
 import { learnFromDecision, GUIDE_SECTIONS } from "@/lib/companyGuide";
 import {
   syncInbox, toAddonThreadId, linkThreadToSale, SALE_FIELDS,
@@ -89,6 +89,49 @@ export async function setThreadStatusAction(threadRowId: string, status: "done" 
     if (status !== "needs_reply") {
       await supabase.from("inbox_suggestions").update({ status: "superseded" }).eq("thread_id", threadRowId).eq("status", "pending");
     }
+    revalidateInbox();
+    return {};
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/**
+ * Puts a conversation back in the queue: analysed again from scratch (reply,
+ * "ponto de situação", tasks), in the background.
+ */
+export async function requeueThreadAction(threadRowId: string): Promise<Result> {
+  try {
+    const session = await requireAdmin();
+    const uid = await ownerUserId(session.user.id);
+    const { data: row } = await supabase.from("inbox_threads").select("gmail_thread_id").eq("id", threadRowId).single();
+    if (!row) return { error: "Conversa não encontrada" };
+    await supabase.from("inbox_threads").update({
+      status: "needs_reply", analyzed_message_id: null, error: null, error_message_id: null, error_attempts: 0, updated_at: new Date().toISOString(),
+    }).eq("id", threadRowId);
+    after(async () => {
+      try {
+        await syncInbox({ userId: uid, threadIds: [row.gmail_thread_id], maxAnalyses: 1 });
+      } catch (e) {
+        console.error("[inbox] requeue analysis failed:", e);
+      }
+    });
+    revalidateInbox();
+    return {};
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/** Moves the conversation to Gmail's trash and takes it off the app's lists. */
+export async function trashThreadAction(threadRowId: string): Promise<Result> {
+  try {
+    const session = await requireAdmin();
+    const { data: row } = await supabase.from("inbox_threads").select("gmail_thread_id").eq("id", threadRowId).single();
+    if (!row) return { error: "Conversa não encontrada" };
+    await trashThread(await gmailToken(session.user.id), row.gmail_thread_id);
+    await supabase.from("inbox_suggestions").update({ status: "superseded" }).eq("thread_id", threadRowId).eq("status", "pending");
+    await supabase.from("inbox_threads").update({ status: "deleted", updated_at: new Date().toISOString() }).eq("id", threadRowId);
     revalidateInbox();
     return {};
   } catch (e) {
@@ -211,6 +254,19 @@ async function execUpdateSale(p: UpdateSalePayload) {
 }
 
 async function execAddExpense(p: AddExpensePayload, createdBy: string | null) {
+  if (p.attach_to_transaction_id) {
+    // The expense already exists (from the bank or card): just add the invoice.
+    const { data: tx } = await supabase.from("transactions").select("id, fatura_url, id_fatura").eq("id", p.attach_to_transaction_id).maybeSingle();
+    if (!tx) throw new Error("A despesa existente já não foi encontrada");
+    const { error } = await supabase.from("transactions").update({
+      fatura_url: p.file_url,
+      ...(tx.id_fatura ? {} : { id_fatura: p.invoice_id || null }),
+      ...(p.tax_free ? { valor_sem_iva: p.tax_free, iva_6: p.iva6, iva_13: p.iva13, iva_23: p.iva23 } : {}),
+    }).eq("id", tx.id);
+    if (error) throw new Error(error.message);
+    revalidatePath("/admin/transacoes");
+    return { transaction_id: tx.id, attached: true };
+  }
   if (!p.total) throw new Error("Falta o valor total");
   let fornecedorId = p.fornecedor_id;
   if (!fornecedorId && p.supplier.trim()) fornecedorId = (await findOrCreateFornecedor(p.supplier)).fornecedor.id;
@@ -224,13 +280,13 @@ async function execAddExpense(p: AddExpensePayload, createdBy: string | null) {
     iva13: p.iva13,
     iva23: p.iva23,
     totalCost: p.total,
-    whoPaid: "Company",
+    whoPaid: p.who_paid || "Company",
     paymentMethod: p.payment_method,
     status: p.status,
     tourId: p.sale_id,
     bankReference: "",
     invoiceImageUrl: p.file_url,
-    contaPagamento: "COME",
+    contaPagamento: p.conta_pagamento || "COME",
   }, createdBy);
   revalidatePath("/admin/transacoes");
   revalidatePath("/admin/transferencias");

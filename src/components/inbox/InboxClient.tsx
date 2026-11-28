@@ -5,8 +5,10 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import {
   syncInboxAction, reanalyzeThreadAction, setThreadStatusAction, linkThreadToSaleAction, saveInboxSettingsAction,
+  requeueThreadAction, trashThreadAction,
 } from "@/actions/inbox";
 import { SuggestionCard } from "./SuggestionCard";
+import { SwipeRow } from "./SwipeRow";
 
 export type InboxThread = {
   id: string;
@@ -128,6 +130,25 @@ export function InboxClient(props: {
   const [notifLabel, setNotifLabel] = useState(props.settings.notificationsLabel);
   const [showHistory, setShowHistory] = useState(false);
   const sel = props.selected;
+  // Rows swiped away disappear at once; the server catches up on refresh.
+  const [hidden, setHidden] = useState<Set<string>>(new Set());
+  const hide = (id: string) => setHidden((h) => new Set(h).add(id));
+  const isTreated = (status: string) => status === "done" || status === "replied" || status === "no_reply";
+
+  function swipe(t: InboxThread, kind: "done" | "requeue" | "trash") {
+    if (props.filter !== "todos" || kind === "trash") hide(t.id);
+    start(async () => {
+      const r = kind === "done" ? await setThreadStatusAction(t.id, "done")
+        : kind === "requeue" ? await requeueThreadAction(t.id)
+        : await trashThreadAction(t.id);
+      setMsg(r.error ? `Erro: ${r.error}`
+        : kind === "done" ? "Marcado como tratado."
+        : kind === "requeue" ? "De volta à fila — vai ser analisado outra vez."
+        : "Movido para o lixo do Gmail.");
+      if (r.error) setHidden((h) => { const n = new Set(h); n.delete(t.id); return n; });
+      router.refresh();
+    });
+  }
 
   // New emails are read every 2 minutes in the background: refresh the list,
   // but never while someone is typing or editing a reply.
@@ -238,11 +259,19 @@ export function InboxClient(props: {
           {props.threads.length === 0 ? (
             <p className="p-6 text-sm text-gray-400">Nada por aqui. Carrega em &quot;Ler novos emails&quot;.</p>
           ) : (
+            <>
+            <p className="px-4 pt-2 pb-1 text-[11px] text-gray-400">Arrasta para a direita: {props.filter === "tratados" ? "voltar à fila" : "tratado"} · para a esquerda: eliminar</p>
             <ul className="divide-y divide-gray-50 max-h-[75vh] overflow-y-auto">
-              {props.threads.map((t) => {
+              {props.threads.filter((t) => !hidden.has(t.id)).map((t) => {
                 const st = STATUS[t.status] ?? { label: t.status, cls: "bg-gray-100 text-gray-500" };
                 return (
                   <li key={t.id}>
+                    <SwipeRow
+                      right={isTreated(t.status)
+                        ? { label: "↺ Voltar à fila", className: "bg-blue-600", run: () => swipe(t, "requeue") }
+                        : { label: "✓ Tratado", className: "bg-emerald-600", run: () => swipe(t, "done") }}
+                      left={{ label: "Eliminar 🗑", className: "bg-red-600", run: () => swipe(t, "trash") }}
+                    >
                     <Link href={qs(t.id)} className={`block px-4 py-3 hover:bg-gray-50 ${sel?.id === t.id ? "bg-[#667470]/5" : ""}`}>
                       <div className="flex items-baseline gap-2">
                         <p className="text-[13px] font-semibold truncate flex-1">{t.fromName || t.fromEmail}</p>
@@ -263,10 +292,12 @@ export function InboxClient(props: {
                         {t.error && <span className="text-[11px] px-2 py-0.5 rounded-full bg-red-100 text-red-600">erro</span>}
                       </div>
                     </Link>
+                    </SwipeRow>
                   </li>
                 );
               })}
             </ul>
+            </>
           )}
         </div>
 
@@ -322,16 +353,23 @@ export function InboxClient(props: {
                 <button disabled={pending} onClick={() => run(() => reanalyzeThreadAction(sel.id), "Reanalisado")} className="text-[12px] font-semibold bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg disabled:opacity-40">
                   {pending ? "…" : "Reanalisar com AI"}
                 </button>
-                {sel.status !== "done" && (
+                {!isTreated(sel.status) && (
                   <button disabled={pending} onClick={() => run(() => setThreadStatusAction(sel.id, "done"), "Marcado como tratado")} className="text-[12px] font-semibold bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg">
                     Marcar como tratado
                   </button>
                 )}
-                {sel.status === "done" && (
-                  <button disabled={pending} onClick={() => run(() => setThreadStatusAction(sel.id, "needs_reply"))} className="text-[12px] font-semibold bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg">
-                    Reabrir
+                {isTreated(sel.status) && (
+                  <button disabled={pending} onClick={() => run(() => requeueThreadAction(sel.id), "De volta à fila — vai ser analisado outra vez.")} className="text-[12px] font-semibold bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg">
+                    Voltar à fila
                   </button>
                 )}
+                <button
+                  disabled={pending}
+                  onClick={() => { if (confirm("Mover esta conversa para o lixo do Gmail?")) run(() => trashThreadAction(sel.id), "Movido para o lixo do Gmail."); }}
+                  className="text-[12px] font-semibold text-red-600 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg"
+                >
+                  Eliminar
+                </button>
               </div>
             </div>
 
