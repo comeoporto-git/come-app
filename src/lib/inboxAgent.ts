@@ -390,6 +390,37 @@ function threadForPrompt(thread: GmailThread, myEmail: string): string {
     .join("\n\n");
 }
 
+/**
+ * The other email conversations already linked to the sale(s) this email is
+ * about (sales.thread_ids) — e.g. the availability request before this
+ * confirmation. Gives the agent the whole history of the booking.
+ */
+async function relatedThreadsText(token: string, sales: SaleRow[], currentId: string, myEmail: string): Promise<string> {
+  const ids = new Set<string>();
+  for (const sale of sales.slice(0, 2)) {
+    for (const raw of String(sale.thread_ids ?? "").split(",").map((x) => x.trim()).filter(Boolean)) {
+      const id = toApiThreadId(raw);
+      if (id && id !== currentId) ids.add(id);
+    }
+  }
+  const parts: string[] = [];
+  for (const id of [...ids].slice(-3)) {
+    try {
+      const t = await getThread(token, id);
+      if (!t.messages.length) continue;
+      parts.push(`### Conversa ${id} (${t.messages[0].subject})\n${threadForPrompt({ ...t, messages: t.messages.slice(-4) }, myEmail).slice(0, 4000)}`);
+    } catch (e) {
+      if (isRateLimit(e)) break;
+    }
+  }
+  return parts.join("\n\n");
+}
+
+/** One line per sale that tells the model exactly which booking is which (by id and agency code). */
+function saleIdLine(s: SaleRow): string {
+  return `id ${s.id} | código ${s.notion_id ?? "—"} | ${s.date ?? "?"} | ${s.services?.name ?? ""} | ${s.status ?? ""}`;
+}
+
 // ── Pass 1: read the thread ───────────────────────────────────────────────────
 
 type Extraction = {
@@ -502,6 +533,7 @@ async function extract(opts: {
   guide: string;
   services: Awaited<ReturnType<typeof servicesForPrompt>>;
   cands: Awaited<ReturnType<typeof candidateSales>>;
+  related?: string;
 }): Promise<Extraction> {
   const { cands } = opts;
   const linkedIds = new Set(cands.linked.map((s) => s.id));
@@ -542,7 +574,10 @@ ${clientSales.length ? JSON.stringify(clientSales.map(saleForPrompt), null, 1) :
 ${cands.upcoming.map((s) => `${s.id} | ${s.date} | ${s.services?.name ?? ""} | ${s.clients?.name ?? s.notion_id ?? ""} | ${s.number_of_guests ?? "?"} pax | ${s.status}`).join("\n") || "(nenhuma)"}
 
 ## Conversa
-${threadForPrompt(opts.thread, opts.myEmail)}`,
+${threadForPrompt(opts.thread, opts.myEmail)}${opts.related ? `
+
+## Outras conversas já associadas a esta venda (histórico da reserva)
+${opts.related}` : ""}`,
     schema: EXTRACTION_SCHEMA,
   });
   return {
@@ -571,6 +606,9 @@ export async function draftReply(opts: {
   missingInfo: string[];
   openQuestions: string[];
   purpose?: string;
+  related?: string;
+  /** Sales on the requested dates that are THIS booking (same id) — not a conflict. */
+  sameBookingNote?: string;
 }): Promise<Draft> {
   const avail = opts.availability.map((d) =>
     `${d.date} (${d.weekday}): ${d.available ? "DISPONÍVEL" : "NÃO DISPONÍVEL"}${d.reasons.length ? ` — ${d.reasons.join("; ")}` : ""} | ${d.totalBookings} serviço(s) marcados | guias livres: ${d.freeGuides.join(", ") || "nenhum"}`,
@@ -620,7 +658,14 @@ ${opts.missingInfo.length ? opts.missingInfo.join(", ") : "(nada em falta)"}
 ${opts.openQuestions.length ? opts.openQuestions.map((q) => `- ${q}`).join("\n") : "(nenhuma)"}
 
 ## Conversa
-${threadForPrompt(opts.thread, opts.myEmail)}`,
+${threadForPrompt(opts.thread, opts.myEmail)}${opts.related ? `
+
+## Outras conversas já associadas a esta venda (histórico da reserva)
+${opts.related}` : ""}${opts.sameBookingNote ? `
+
+## Esta reserva já existe na app
+${opts.sameBookingNote}
+A disponibilidade acima já não conta esta venda. Não avises que a data está ocupada por causa dela.` : ""}`,
     schema: obj({ body_html: str, missing_info_requested: arr(str), internal_note: str, warnings: arr(str) }),
   });
 }
@@ -871,7 +916,8 @@ export async function analyzeThread(opts: {
     servicesForPrompt(),
     candidateSales(thread.id, senders, agencyRefs(thread.messages.map((m) => `${m.subject}\n${m.body.slice(0, 3000)}`).join("\n"))),
   ]);
-  const extracted = await extract({ thread, myEmail, guide, services, cands });
+  const related = cands.linked.length ? await relatedThreadsText(opts.token, cands.linked, thread.id, myEmail) : "";
+  const extracted = await extract({ thread, myEmail, guide, services, cands, related });
   const lastFromUs = last.fromEmail === myEmail || last.labelIds.includes("SENT");
   // Our own message was the last one: nothing to answer, but the situation,
   // tasks and sale info still move on.
@@ -1020,6 +1066,8 @@ export async function analyzeThread(opts: {
       prices,
       missingInfo,
       openQuestions: ex.open_questions,
+      related,
+      sameBookingNote: [sale, ...cands.linked].filter((x, i, a): x is SaleRow => !!x && a.findIndex((y) => y?.id === x.id) === i).map(saleIdLine).join("\n") || undefined,
     });
     const payload: ReplyPayload = {
       gmail_thread_id: thread.id,
