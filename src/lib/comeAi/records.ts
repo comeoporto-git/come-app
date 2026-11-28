@@ -108,7 +108,7 @@ function same(a: unknown, b: unknown): boolean {
 /** Search records; returns id, label and the main fields. */
 export async function findRecords(entity: string, query: string, filters: Record<string, unknown> = {}, limit = 10) {
   const def = needDef(entity);
-  const cols = ["id", ...new Set([...def.display, ...def.fields.map((f) => f.key)])].join(", ");
+  const cols = ["id", ...new Set([...def.display, ...def.fields.map((f) => f.key), ...(def.extra ?? [])])].join(", ");
   let q = supabase.from(def.table).select(cols);
   for (const [k, v] of Object.entries(filters)) {
     const f = def.fields.find((x) => x.key === k);
@@ -139,6 +139,7 @@ export async function getRecord(entity: string, id: string) {
 /** Builds the before/after list for a change (nothing is written). */
 export async function buildRecordChange(entity: string, op: "create" | "update" | "delete", id: string | null, values: Record<string, unknown>): Promise<RecordChangePayload> {
   const def = needDef(entity);
+  if (def.readOnly) throw new Error(`${def.label} é só de leitura (vem do banco ou é calculado pela app).`);
   if (op === "create" && !def.canCreate) throw new Error(`Não é possível criar ${def.label} por aqui.`);
   if (op === "delete" && !def.canDelete) throw new Error(`Não é possível apagar ${def.label} por aqui${entity === "sales" ? " — muda o estado para Cancelled" : entity === "company_guide" ? " — põe Ativa = false" : ""}.`);
   if (op !== "create" && !id) throw new Error("Falta o id do registo (usa find_records).");
@@ -176,6 +177,7 @@ export async function buildRecordChange(entity: string, op: "create" | "update" 
 /** Writes a confirmed change. Only whitelisted fields; re-validated here. */
 export async function applyRecordChange(p: RecordChangePayload): Promise<{ id: string }> {
   const def = needDef(p.entity);
+  if (def.readOnly) throw new Error("Este registo é só de leitura.");
   if (p.op === "delete") {
     if (!def.canDelete || !p.record_id) throw new Error("Não é possível apagar este registo.");
     const { error } = await supabase.from(def.table).delete().eq("id", p.record_id);
@@ -208,6 +210,6 @@ export async function applyRecordChange(p: RecordChangePayload): Promise<{ id: s
 /** The entities and their fields, for the AI's instructions. */
 export function entitiesForPrompt(): string {
   return Object.entries(ENTITIES as Record<string, EntityDef>)
-    .map(([k, d]) => `- ${k} (${d.label}${d.canCreate ? ", criar" : ""}${d.canDelete ? ", apagar" : ""}): ${d.fields.map((f) => `${f.key}${f.type === "fk" ? `→${f.fk}` : f.type === "enum" ? `[${f.options?.join("|")}]` : f.type !== "text" ? `(${f.type})` : ""}`).join(", ")}`)
+    .map(([k, d]) => `- ${k} (${d.label}${d.readOnly ? ", só leitura" : `${d.canCreate ? ", criar" : ""}${d.canDelete ? ", apagar" : ""}`}${d.page ? `; página ${d.page}` : ""}): ${d.fields.map((f) => `${f.key}${f.type === "fk" ? `→${f.fk}` : f.type === "enum" ? `[${f.options?.join("|")}]` : f.type !== "text" ? `(${f.type})` : ""}`).join(", ")}`)
     .join("\n");
 }

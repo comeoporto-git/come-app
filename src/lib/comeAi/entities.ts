@@ -24,6 +24,10 @@ export type EntityDef = {
   fields: FieldDef[];
   canCreate: boolean;
   canDelete: boolean;
+  /** Read-only (views, bank data): find/get only. */
+  readOnly?: boolean;
+  /** Which page of the app shows it (for the AI to point the person there). */
+  page?: string;
   /** Extra columns to read (not editable) for context. */
   extra?: string[];
   order?: { column: string; ascending: boolean };
@@ -39,7 +43,7 @@ const en = (key: string, label: string, options: readonly string[]): FieldDef =>
 
 export const ENTITIES = {
   sales: {
-    table: "sales", label: "Venda / serviço marcado", display: ["notion_id", "date"], search: ["notion_id", "names", "notes"],
+    table: "sales", page: "/admin/servicos · /guide/tours/[id]", label: "Venda / serviço marcado", display: ["notion_id", "date"], search: ["notion_id", "names", "notes"],
     order: { column: "date", ascending: false },
     canCreate: true, canDelete: false,
     fields: [
@@ -55,7 +59,7 @@ export const ENTITIES = {
     ],
   },
   services: {
-    table: "services", label: "Serviço (tour / experiência)", display: ["name"], search: ["name", "description"],
+    table: "services", page: "/admin/produtos · /admin/gestao-servicos", label: "Serviço (tour / experiência)", display: ["name"], search: ["name", "description"],
     order: { column: "name", ascending: true },
     canCreate: true, canDelete: false,
     fields: [
@@ -64,7 +68,7 @@ export const ENTITIES = {
     ],
   },
   service_prices: {
-    table: "service_prices", label: "Tabela de preços (por ano)", display: ["year"], search: [],
+    table: "service_prices", page: "/admin/precos", label: "Tabela de preços (por ano)", display: ["year"], search: [],
     order: { column: "year", ascending: false },
     canCreate: true, canDelete: false,
     fields: [
@@ -75,13 +79,13 @@ export const ENTITIES = {
     ],
   },
   service_tasks: {
-    table: "service_tasks", label: "Tarefa-modelo do serviço", display: ["name"], search: ["name", "description"],
+    table: "service_tasks", page: "/admin/gestao-servicos", label: "Tarefa-modelo do serviço", display: ["name"], search: ["name", "description"],
     order: { column: "sort_order", ascending: true },
     canCreate: true, canDelete: true,
     fields: [fk("service_id", "Serviço", "services"), t("name", "Nome"), ta("description", "Descrição"), t("role", "Função")],
   },
   tasks: {
-    table: "tasks", label: "Tarefa", display: ["name"], search: ["name", "task_description"],
+    table: "tasks", page: "/admin/tarefas", label: "Tarefa", display: ["name"], search: ["name", "task_description"],
     order: { column: "created_at", ascending: false },
     canCreate: true, canDelete: true,
     fields: [
@@ -91,25 +95,25 @@ export const ENTITIES = {
     ],
   },
   clients: {
-    table: "clients", label: "Cliente", display: ["name"], search: ["name", "email"],
+    table: "clients", page: "/admin/crm", label: "Cliente", display: ["name"], search: ["name", "email"],
     order: { column: "name", ascending: true },
     canCreate: true, canDelete: false,
     fields: [t("name", "Nome"), t("email", "Email"), t("phone", "Telefone"), t("nif", "NIF"), t("nome_fiscal", "Nome fiscal"), t("morada_fiscal", "Morada fiscal"), t("source", "Origem")],
   },
   team: {
-    table: "team", label: "Equipa", display: ["name"], search: ["name", "email"],
+    table: "team", page: "/admin/equipa", label: "Equipa", display: ["name"], search: ["name", "email"],
     order: { column: "name", ascending: true },
     canCreate: true, canDelete: false,
     fields: [t("name", "Nome"), t("email", "Email"), t("contact", "Contacto"), t("role", "Função"), t("categoria", "Categoria"), t("iban", "IBAN"), t("numero_contribuinte", "NIF")],
   },
   fornecedores: {
-    table: "fornecedores", label: "Fornecedor", display: ["name"], search: ["name", "email"],
+    table: "fornecedores", page: "/admin/fornecedores", label: "Fornecedor", display: ["name"], search: ["name", "email"],
     order: { column: "name", ascending: true },
     canCreate: true, canDelete: false,
     fields: [t("name", "Nome"), t("email", "Email"), t("contact", "Contacto"), t("iban", "IBAN"), t("contribuinte", "NIF"), t("categoria", "Categoria")],
   },
   transactions: {
-    table: "transactions", label: "Despesa / receita", display: ["notion_id", "data"], search: ["notion_id", "id_fatura"],
+    table: "transactions", page: "/admin/transacoes · /admin/transferencias · /admin/socios · /admin/em-falta", label: "Despesa / receita", display: ["notion_id", "data"], search: ["notion_id", "id_fatura"],
     order: { column: "data", ascending: false },
     canCreate: true, canDelete: false,
     extra: ["fatura_url"],
@@ -118,11 +122,17 @@ export const ENTITIES = {
       n("valor", "Valor (despesa negativa)"), n("valor_sem_iva", "Base s/ IVA"), n("iva_6", "IVA 6%"), n("iva_13", "IVA 13%"), n("iva_23", "IVA 23%"),
       en("status", "Estado", ["Pending Payment", "Paid"]), t("metodo_pagamento", "Método de pagamento"), t("conta_pagamento", "Conta"),
       t("pago_por", "Pago por"), en("socio_pessoal", "Despesa de sócio", ["António", "Manel", "Bernardo"]), t("id_fatura", "Nº fatura"),
-      fk("fornecedor_id", "Fornecedor", "fornecedores"), fk("sale_id", "Venda", "sales"),
+      fk("fornecedor_id", "Fornecedor", "fornecedores"), fk("sale_id", "Venda", "sales"), fk("client_id", "Cliente", "clients"),
+      fk("team_id", "Membro da equipa", "team"), fk("paid_by_team_id", "Pago por (equipa)", "team"),
+      t("status_fatura", "Estado da fatura"), t("precisa_fatura", "Precisa de fatura"), t("pagamento_ao_fornecedor", "Pagamento ao fornecedor"),
+      t("fatura_sem_saida_direta", "Fatura sem saída direta"),
+      { key: "transferencia_feita", label: "Transferência feita", type: "bool" }, d("data_transferencia", "Data da transferência"),
+      { key: "socio_transferencia_feita", label: "Transferência ao sócio feita", type: "bool" },
+      { key: "validado_contabilidade", label: "Validado pela contabilidade", type: "bool" }, t("id_banco", "Movimento do banco (id)"),
     ],
   },
   company_guide: {
-    table: "company_guide", label: "Guia da empresa", display: ["title"], search: ["title", "content"],
+    table: "company_guide", page: "/admin/guia", label: "Guia da empresa", display: ["title"], search: ["title", "content"],
     order: { column: "section", ascending: true },
     canCreate: true, canDelete: false,
     fields: [
@@ -131,13 +141,13 @@ export const ENTITIES = {
     ],
   },
   business_rules: {
-    table: "business_rules", label: "Regra de negócio", display: ["name"], search: ["name", "value", "notes"],
+    table: "business_rules", page: "/admin/configuracoes · /admin/guia", label: "Regra de negócio", display: ["name"], search: ["name", "value", "notes"],
     order: { column: "name", ascending: true },
     canCreate: true, canDelete: false,
     fields: [t("name", "Nome"), t("value", "Valor"), ta("notes", "Notas")],
   },
   sales_pipeline: {
-    table: "sales_pipeline", label: "Conta CRM", display: ["name"], search: ["name", "pessoa", "email"],
+    table: "sales_pipeline", page: "/admin/crm", label: "Conta CRM", display: ["name"], search: ["name", "pessoa", "email"],
     order: { column: "created_at", ascending: false },
     canCreate: true, canDelete: false,
     fields: [
@@ -145,6 +155,158 @@ export const ENTITIES = {
       t("stage", "Fase"), t("country", "País"), t("industry", "Setor"), ta("notes", "Notas"), d("last_contacted_at", "Último contacto"),
       t("nif", "NIF"), t("nome_fiscal", "Nome fiscal"), t("morada_fiscal", "Morada fiscal"),
     ],
+  },
+  service_price_tiers: {
+    table: "service_price_tiers", label: "Preço por escalão de pax", display: ["year", "min_pax", "max_pax"], search: [],
+    order: { column: "year", ascending: false }, page: "/admin/precos",
+    canCreate: true, canDelete: true,
+    fields: [fk("service_id", "Serviço", "services"), n("year", "Ano"), n("min_pax", "Pax mín."), n("max_pax", "Pax máx."), n("price_per_pax", "Preço/pax"), n("min_charged_pax", "Pax mínimo cobrado")],
+  },
+  service_costs: {
+    table: "service_costs", label: "Custo do serviço", display: ["item", "year"], search: ["item"],
+    order: { column: "year", ascending: false }, page: "/admin/gestao-servicos",
+    canCreate: true, canDelete: true,
+    fields: [fk("service_id", "Serviço", "services"), n("year", "Ano"), n("tier_min", "Pax de"), n("tier_max", "Pax até"), t("item", "Item"), t("cost_type", "Tipo de custo"), n("amount", "Valor")],
+  },
+  service_team_payments: {
+    table: "service_team_payments", label: "Pagamento à equipa por serviço", display: ["role", "year"], search: ["role"],
+    order: { column: "year", ascending: false }, page: "/admin/gestao-servicos",
+    canCreate: true, canDelete: true,
+    fields: [fk("service_id", "Serviço", "services"), n("year", "Ano"), t("role", "Função"), n("tier_min", "Pax de"), n("tier_max", "Pax até"), n("amount", "Valor")],
+  },
+  transport_options: {
+    table: "transport_options", label: "Opção de transporte", display: ["vehicle", "hours"], search: ["vehicle"],
+    order: { column: "sort_order", ascending: true }, page: "/admin/precos",
+    canCreate: true, canDelete: true,
+    fields: [t("vehicle", "Veículo"), n("hours", "Horas"), n("price", "Preço")],
+  },
+  service_steps: {
+    table: "service_steps", label: "Passo do serviço (guião)", display: ["title"], search: ["title", "description"],
+    order: { column: "sort_order", ascending: true }, page: "/admin/produtos",
+    canCreate: true, canDelete: true,
+    fields: [fk("service_id", "Serviço", "services"), n("sort_order", "Ordem"), t("title", "Título"), ta("description", "Descrição")],
+  },
+  restaurants: {
+    table: "restaurants", label: "Restaurante / parceiro", display: ["name"], search: ["name", "address", "notes"],
+    order: { column: "name", ascending: true }, page: "/admin/produtos",
+    canCreate: true, canDelete: false,
+    fields: [t("name", "Nome"), t("address", "Morada"), t("phone", "Telefone"), t("google_url", "Google Maps"), ta("notes", "Notas")],
+  },
+  restaurant_hours: {
+    table: "restaurant_hours", label: "Horário de restaurante", display: ["day_of_week"], search: [],
+    order: { column: "day_of_week", ascending: true }, page: "/admin/produtos",
+    canCreate: true, canDelete: true,
+    fields: [
+      fk("restaurant_id", "Restaurante", "restaurants"), n("day_of_week", "Dia (0=domingo)"),
+      tm("open_time", "Abre"), tm("close_time", "Fecha"), tm("open_time_2", "Abre (2.º turno)"), tm("close_time_2", "Fecha (2.º turno)"),
+      { key: "closed", label: "Fechado", type: "bool" },
+    ],
+  },
+  sale_team_members: {
+    table: "sale_team_members", label: "Equipa de uma venda", display: ["role"], search: ["role"],
+    order: { column: "created_at", ascending: false }, page: "/guide/tours/[id]",
+    canCreate: true, canDelete: true,
+    fields: [fk("sale_id", "Venda", "sales"), fk("team_id", "Pessoa", "team"), t("role", "Função")],
+  },
+  sale_registrations: {
+    table: "sale_registrations", label: "Inscrição num evento", display: ["name"], search: ["name", "email"],
+    order: { column: "sort_order", ascending: true }, page: "/guide/tours/[id]",
+    canCreate: true, canDelete: true,
+    fields: [
+      fk("sale_id", "Venda / evento", "sales"), t("name", "Nome"), t("email", "Email"), t("phone", "Telefone"), t("ticket_type", "Bilhete"),
+      t("payment_status", "Pagamento"), t("payment_method", "Método"), d("payment_date", "Data de pagamento"), t("invoice_status", "Fatura"),
+      t("dietary_restrictions", "Restrições"), ta("notes", "Notas"),
+    ],
+  },
+  event_quotes: {
+    table: "event_quotes", label: "Orçamento de evento", display: ["name", "event_date"], search: ["name", "location", "notes"],
+    order: { column: "updated_at", ascending: false }, page: "/admin/orcamentos",
+    canCreate: true, canDelete: false,
+    fields: [
+      t("name", "Nome"), t("status", "Estado"), fk("service_id", "Serviço", "services"), fk("client_id", "Cliente", "clients"), fk("sale_id", "Venda", "sales"),
+      d("event_date", "Data do evento"), n("guests", "Pax"), t("location", "Local"), n("markup_pct", "Margem %"),
+      n("price_per_pax_override", "Preço/pax (forçado)"), n("vat_rate", "IVA %"), ta("notes", "Notas"), { key: "is_template", label: "É modelo", type: "bool" },
+    ],
+  },
+  event_quote_lines: {
+    table: "event_quote_lines", label: "Linha de orçamento", display: ["description"], search: ["description", "category"],
+    order: { column: "sort_order", ascending: true }, page: "/admin/orcamentos",
+    canCreate: true, canDelete: true,
+    fields: [
+      fk("quote_id", "Orçamento", "event_quotes"), t("category", "Categoria"), t("course", "Prato / momento"), t("description", "Descrição"),
+      fk("fornecedor_id", "Fornecedor", "fornecedores"), t("qty_mode", "Modo de quantidade"), n("quantity", "Quantidade"),
+      n("unit_cost", "Custo unitário"), n("vat_rate", "IVA %"), ta("notes", "Notas"),
+    ],
+  },
+  supplier_items: {
+    table: "supplier_items", label: "Artigo de fornecedor (catálogo de preços)", display: ["name"], search: ["name", "category", "notes"],
+    order: { column: "name", ascending: true }, page: "/admin/orcamentos",
+    canCreate: true, canDelete: false,
+    fields: [
+      fk("fornecedor_id", "Fornecedor", "fornecedores"), t("name", "Artigo"), t("category", "Categoria"), t("unit", "Unidade"),
+      n("unit_price", "Preço unitário"), n("vat_rate", "IVA %"), d("price_date", "Data do preço"), t("url", "Link"), ta("notes", "Notas"),
+      { key: "active", label: "Ativo", type: "bool" },
+    ],
+  },
+  crm_contacts: {
+    table: "crm_contacts", label: "Contacto CRM", display: ["name"], search: ["name", "email"],
+    order: { column: "created_at", ascending: false }, page: "/admin/crm",
+    canCreate: true, canDelete: true,
+    fields: [fk("account_id", "Conta", "sales_pipeline"), t("name", "Nome"), t("email", "Email"), t("phone", "Telefone"), t("role", "Cargo"), t("country", "País"), t("linkedin_url", "LinkedIn"), { key: "is_primary", label: "Principal", type: "bool" }],
+  },
+  sales_activities: {
+    table: "sales_activities", label: "Atividade CRM", display: ["activitie", "date"], search: ["activitie", "description"],
+    order: { column: "date", ascending: false }, page: "/admin/crm",
+    canCreate: true, canDelete: true,
+    fields: [
+      fk("sales_pipeline_id", "Conta", "sales_pipeline"), fk("contact_id", "Contacto", "crm_contacts"), t("activitie", "Atividade"), ta("description", "Descrição"),
+      t("type", "Tipo"), t("status", "Estado"), d("date", "Data"), fk("assigned_to", "Responsável", "team"), t("thread_link", "Link do email"),
+    ],
+  },
+  crm_weekly_actions: {
+    table: "crm_weekly_actions", label: "Ação semanal CRM", display: ["subject", "week_of"], search: ["subject"],
+    order: { column: "week_of", ascending: false }, page: "/admin/crm",
+    canCreate: true, canDelete: true,
+    fields: [d("week_of", "Semana"), fk("account_id", "Conta", "sales_pipeline"), fk("contact_id", "Contacto", "crm_contacts"), t("action_type", "Tipo"), t("subject", "Assunto"), ta("suggested_script", "Guião"), n("priority", "Prioridade"), t("status", "Estado")],
+  },
+  social_posts: {
+    table: "social_posts", label: "Publicação (Instagram)", display: ["category", "scheduled_for"], search: ["caption"],
+    order: { column: "created_at", ascending: false }, page: "/admin/social",
+    canCreate: false, canDelete: false,
+    fields: [ta("caption", "Legenda"), t("status", "Estado"), t("scheduled_for", "Agendada para (data e hora ISO)"), t("category", "Categoria"), t("platform", "Plataforma")],
+  },
+  social_photos: {
+    table: "social_photos", label: "Foto (Social)", display: ["filename"], search: ["filename", "parent_folder_name"],
+    order: { column: "created_at", ascending: false }, page: "/admin/social",
+    canCreate: false, canDelete: false,
+    extra: ["blob_url", "ai_score", "ai_score_reason"],
+    fields: [t("review_status", "Revisão"), t("category", "Categoria")],
+  },
+  social_media_planner: {
+    table: "social_media_planner", label: "Plano de redes sociais", display: ["post_name", "post_date"], search: ["post_name", "copy"],
+    order: { column: "post_date", ascending: false }, page: "/admin/social",
+    canCreate: true, canDelete: true,
+    fields: [t("post_name", "Publicação"), ta("copy", "Texto"), d("post_date", "Data"), t("status", "Estado"), t("post_url", "Link")],
+  },
+  clothing: {
+    table: "clothing", label: "Fardas / roupa (stock)", display: ["name", "tamanho"], search: ["name", "categoria", "cor"],
+    order: { column: "name", ascending: true },
+    canCreate: true, canDelete: true,
+    fields: [t("name", "Nome"), t("categoria", "Categoria"), n("quantidade", "Quantidade"), t("cor", "Cor"), t("desenho", "Desenho"), t("tamanho", "Tamanho")],
+  },
+  bank_transactions: {
+    table: "bank_transactions", label: "Movimento bancário", display: ["transaction_date", "merchant_name", "amount"], search: ["merchant_name", "remittance_info"],
+    order: { column: "transaction_date", ascending: false }, page: "/admin/reconciliation",
+    canCreate: false, canDelete: false, readOnly: true,
+    extra: ["transaction_id", "institution_name"],
+    fields: [d("transaction_date", "Data"), n("amount", "Valor"), t("credit_debit", "Débito/Crédito"), t("merchant_name", "Entidade"), t("remittance_info", "Descritivo")],
+  },
+  sales_computed: {
+    table: "sales_computed", label: "Rentabilidade das vendas (só leitura)", display: ["notion_id", "date"], search: ["notion_id", "names"],
+    order: { column: "date", ascending: false }, page: "/admin/analytics",
+    canCreate: false, canDelete: false, readOnly: true,
+    extra: ["preco_servico", "preco_servico_iva", "faturacao", "custo", "lucro_tour", "pct_lucro", "custo_por_pax", "lucro_por_pax"],
+    fields: [d("date", "Data"), t("status", "Estado"), n("number_of_guests", "Pax"), fk("service_id", "Serviço", "services"), fk("client_id", "Cliente", "clients")],
   },
 } satisfies Record<string, EntityDef>;
 

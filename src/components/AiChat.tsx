@@ -1,6 +1,17 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback, Fragment } from "react";
+import { usePathname } from "next/navigation";
+
+/** The email or sale open on this page, which gets its own ongoing conversation. */
+function currentContextKey(): string | null {
+  if (typeof window === "undefined") return null;
+  const { pathname, search } = window.location;
+  const t = pathname.startsWith("/admin/inbox") ? new URLSearchParams(search).get("t") : null;
+  if (t) return `thread:${t}`;
+  const sale = /^\/guide\/tours\/([0-9a-f-]{36})/i.exec(pathname)?.[1];
+  return sale ? `sale:${sale}` : null;
+}
 import {
   listConversations,
   createConversation,
@@ -8,6 +19,7 @@ import {
   saveMessage,
   setConversationTitle,
   deleteConversation,
+  openContextConversation,
   type Conversation,
   type ChatMessage,
 } from "@/actions/aiChat";
@@ -222,6 +234,36 @@ export function AiChat() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
+  // With an email or sale open, continue that one's conversation.
+  const pathname = usePathname();
+  // Picking another email in the inbox only changes "?t=": watch for it while open.
+  const [locKey, setLocKey] = useState<string | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    const tick = () => setLocKey(currentContextKey());
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [open, pathname]);
+  useEffect(() => {
+    if (!open) return;
+    const key = locKey;
+    if (!key) return;
+    if (conversations.find((c) => c.id === activeId)?.context_key === key) return;
+    let alive = true;
+    openContextConversation(key)
+      .then((r) => {
+        if (!alive || !r) return;
+        setActiveId(r.conversation.id);
+        setMessages(r.messages);
+        setView("chat");
+        setConversations((prev) => [r.conversation, ...prev.filter((c) => c.id !== r.conversation.id)]);
+      })
+      .catch(() => null);
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, locKey]);
+
   // Load conversation list when panel opens
   useEffect(() => {
     if (!open) return;
@@ -322,7 +364,7 @@ export function AiChat() {
           c.id === activeId && !c.title ? { ...c, title: content.slice(0, 60) } : c
         )
       );
-      setConversationTitle(activeId, content.slice(0, 60)).catch(() => null);
+      if (!conversations.find((c) => c.id === activeId)?.title) setConversationTitle(activeId, content.slice(0, 60)).catch(() => null);
 
       // Placeholder for assistant
       const assistantMsg: ChatMessage = {
@@ -466,7 +508,11 @@ export function AiChat() {
                   ? (conversations.find((c) => c.id === activeId)?.title ?? "Nova conversa")
                   : "COME AI"}
               </p>
-              <p className="text-[11px] text-white/40 mt-0.5">Sabe onde estás · altera tudo com confirmação</p>
+              <p className="text-[11px] text-white/40 mt-0.5 truncate">
+                {view === "chat" && conversations.find((c) => c.id === activeId)?.context_label
+                  ? "Conversa deste " + (conversations.find((c) => c.id === activeId)?.context_key?.startsWith("thread") ? "email" : "serviço") + " · continua da última vez"
+                  : "Sabe onde estás · altera tudo com confirmação"}
+              </p>
             </div>
             {view === "list" && (
               <button

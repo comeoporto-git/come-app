@@ -5,6 +5,7 @@ import { supabase } from "@/lib/notion";
 import { guidePrompt } from "@/lib/companyGuide";
 import { CHAT_TOOLS, runChatTool, type ChatContext } from "@/lib/chatTools";
 import { entitiesForPrompt } from "@/lib/comeAi/records";
+import { getSocialSnapshot } from "@/lib/social-snapshot";
 import { AGENT_MODEL } from "@/lib/claude";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -49,8 +50,17 @@ Se o utilizador der informação ou pedir mudanças a esta resposta/sugestões, 
         .eq("id", saleId).maybeSingle();
       if (sale) parts.push(`Venda em contexto (id ${sale.id}): ${JSON.stringify(sale)}`);
     }
-    const m = /^\/admin\/(fornecedores|crm\/accounts|produtos|orcamentos|analytics\/servicos)\/([0-9a-f-]{36})/.exec(path);
-    if (m) parts.push(`Registo aberto: ${m[1]} id ${m[2]}`);
+    const m = /^\/admin\/(fornecedores|crm\/accounts|produtos|orcamentos|analytics\/servicos|social\/posts)\/([0-9a-f-]{36})/.exec(path);
+    if (m) {
+      const entity = { fornecedores: "fornecedores", "crm/accounts": "sales_pipeline", produtos: "services", orcamentos: "event_quotes", "analytics/servicos": "services", "social/posts": "social_posts" }[m[1]];
+      parts.push(`Registo aberto: ${entity} id ${m[2]} (usa get_record("${entity}", "${m[2]}") para o ler).`);
+    }
+    if (path.startsWith("/admin/social")) {
+      // On the Social pages COME AI is also the senior social media manager.
+      const social = await getSocialSnapshot();
+      parts.push(`Estás nas Redes Sociais. Aqui fazes também de gestor de redes sociais sénior (10+ anos em Instagram de turismo/hotelaria): proativo, específico e estratégico, sempre com base nos dados abaixo — o que publicar a seguir (postNextSuggestion), equilíbrio de categorias, agendado, publicado, fotos por rever. Podes alterar legendas, agendamentos, categorias e revisão de fotos com propose_change (social_posts, social_photos, social_media_planner). Publicar no Instagram faz-se na app.
+Estado das redes sociais: ${JSON.stringify(social)}`);
+    }
   } catch (e) {
     parts.push(`(não foi possível ler o contexto: ${e instanceof Error ? e.message : String(e)})`);
   }
@@ -347,7 +357,7 @@ ${page.text}
 When they say "this", "este email", "esta venda", "aqui" they mean what is open above.
 
 ## Tools and actions — you can do anything the app can do, always with confirmation
-- Read: find_records / get_record for any area (sales, services and their price tables and task templates, clients, team, tasks, suppliers, expenses/earnings, company guide, business rules, CRM). check_availability for availability (reads Google Calendar too: events starting with "OUT" = Bernardo away). quote_price for every price — never compute prices yourself.
+- Read: find_records / get_record for any area of the app — see "Editable areas" below (sales and their team/registrations, services with price tiers, costs, team payments, steps, task templates and restaurants with hours, transport options, tasks, clients, team, suppliers and their price catalogue, expenses/earnings incl. invoices, transfers, partner expenses and accounting checks, event quotes and their lines, company guide, business rules, CRM accounts/contacts/activities/weekly actions, social posts/photos/planner, uniforms stock; bank movements and sale profitability are read-only). User accounts and role permissions are not changed by AI — point to Utilizadores / Permissões. check_availability for availability (reads Google Calendar too: events starting with "OUT" = Bernardo away). quote_price for every price — never compute prices yourself.
 - Change anything: propose_change (create / update / delete). The person sees a card with the before → after of each field and a Confirmar button; nothing is written until they press it. After proposing, say in one sentence what the card changes. Propose one card per record; several cards are fine.
 - Email open (inbox): when the person gives information or asks for changes to the reply or suggestions, call revise_email with a clear note — it saves the note on that conversation and rebuilds the reply, sale changes, tasks and "ponto de situação"; the new cards appear in the chat.
 - The company guide: when the person states how the company works in general ("a partir de agora…", "sempre que…", "nunca…"), propose a guide change too (propose_change on company_guide — create a new rule or update the existing one; find it first with find_records). One-off facts about a single booking go to that booking/email, not to the guide.
