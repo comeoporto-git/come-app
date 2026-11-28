@@ -61,6 +61,8 @@ export type CreateSalePayload = {
   notes: string;
   status: string;
   gmail_thread_id: string | null;
+  /** Sale ID (sales.notion_id): the agency reference; several services from one request get _1, _2, _3… */
+  sale_code?: string;
 };
 
 export type UpdateSalePayload = { sale_id: string; sale_label: string; changes: SaleChange[]; gmail_thread_id: string | null };
@@ -343,7 +345,7 @@ function refFilterFor(refs: string[]): string {
     // TLO numbers are short digits: match them exactly or next to "TLO", never inside other codes.
     if (/^P?\d{3,5}$/.test(r)) {
       const n = r.replace(/^P/, "");
-      return `notion_id.eq.${n},notion_id.eq.P${n},notion_id.ilike.%TLO%${n}%`;
+      return `notion_id.eq.${n},notion_id.eq.P${n},notion_id.ilike.${n}_%,notion_id.ilike.P${n}_%,notion_id.ilike.%TLO%${n}%`;
     }
     return `notion_id.ilike.%${r}%`;
   }).join(",");
@@ -357,12 +359,15 @@ function refFilterFor(refs: string[]): string {
 export async function autoLinkBySaleRef(threadRowId: string, apiThreadId: string, text: string): Promise<string | null> {
   const refs = agencyRefs(text);
   if (!refs.length) return null;
-  const { data } = await supabase.from("sales").select("id").or(refFilterFor(refs)).neq("status", "Cancelled").limit(3);
-  if (!data || data.length !== 1) return null; // none, or ambiguous: leave it to the person
-  const saleId = data[0].id as string;
-  await supabase.from("inbox_threads").update({ sale_id: saleId }).eq("id", threadRowId).is("sale_id", null);
-  await linkThreadToSale(saleId, apiThreadId);
-  return saleId;
+  const { data } = await supabase.from("sales").select("id, notion_id").or(refFilterFor(refs)).neq("status", "Cancelled").limit(10);
+  if (!data?.length) return null;
+  // One booking = one base ID; its services are REF, REF_1, REF_2…
+  const bases = new Set(data.map((s) => String(s.notion_id ?? "").trim().replace(/_\d+$/, "").toUpperCase()));
+  if (bases.size !== 1) return null; // different bookings: leave it to the person
+  const sorted = [...data].sort((a, b) => String(a.notion_id).localeCompare(String(b.notion_id), undefined, { numeric: true }));
+  await supabase.from("inbox_threads").update({ sale_id: sorted[0].id }).eq("id", threadRowId).is("sale_id", null);
+  for (const s of sorted) await linkThreadToSale(s.id as string, apiThreadId);
+  return sorted[0].id as string;
 }
 
 async function candidateSales(apiThreadId: string, senderEmails: string[], refs: string[] = []) {
@@ -1006,8 +1011,15 @@ export async function analyzeThread(opts: {
   let newBooking: CreateSalePayload | null = null;
   if (!sale && ex.new_booking) {
     const client = cands.clients[0] ?? null;
-    for (const r of requests.filter((r) => r.service_id && r.date).slice(0, 3)) {
+    const toCreate = requests.filter((r) => r.service_id && r.date).slice(0, 8);
+    // The booking's ID is the agency reference; one request with several
+    // services becomes REF_1, REF_2, REF_3…
+    const baseRef = agencyRefs(thread.messages.map((m) => `${m.subject}\n${m.body.slice(0, 3000)}`).join("\n"))[0] ?? "";
+    for (const [i, r] of toCreate.entries()) {
       const svc = services.find((s) => s.id === r.service_id)!;
+      const fallbackName = [svc.name, client?.name ?? ex.client.name ?? ""].filter(Boolean).join(" - ");
+      const base = baseRef || fallbackName;
+      const saleCode = toCreate.length > 1 ? `${base}_${i + 1}` : base;
       const payload: CreateSalePayload = {
         service_id: svc.id,
         service_name: svc.name,
@@ -1030,12 +1042,13 @@ export async function analyzeThread(opts: {
         notes: ex.booking_info.notes ?? "",
         status: "Pending",
         gmail_thread_id: thread.id,
+        sale_code: saleCode,
       };
       newBooking ??= payload;
       await addSuggestion({
         thread_id: opts.threadRowId,
         kind: "create_sale",
-        title: `Nova venda: ${svc.name} · ${r.date} · ${r.guests ?? "?"} pax · ${payload.client_name}`,
+        title: `Nova venda ${saleCode}: ${svc.name} · ${r.date} · ${r.guests ?? "?"} pax · ${payload.client_name}`,
         rationale: ex.summary,
         payload,
         for_message_id: last.id,

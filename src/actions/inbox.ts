@@ -214,7 +214,7 @@ async function execCreateSale(p: CreateSalePayload, threadRowId: string | null) 
     date: p.date,
     status: p.status || "Pending",
     type: svc?.type ?? null,
-    notion_id: [svc?.name, p.client_name].filter(Boolean).join(" - ") || null,
+    notion_id: p.sale_code?.trim() || [svc?.name, p.client_name].filter(Boolean).join(" - ") || null,
     number_of_guests: p.guests || null,
     children_10_18: p.children_10_18 || 0,
     children_3_9: p.children_3_9 || 0,

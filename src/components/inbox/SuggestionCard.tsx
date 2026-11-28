@@ -98,6 +98,7 @@ function replyWarnings(p: Record<string, unknown>): string[] {
 }
 
 const SALE_EDIT_FIELDS: { k: string; label: string; type?: string }[] = [
+  { k: "sale_code", label: "ID da venda" },
   { k: "date", label: "Data", type: "date" },
   { k: "start_time", label: "Hora", type: "time" },
   { k: "guests", label: "Nº Pax", type: "number" },
