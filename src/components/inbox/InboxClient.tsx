@@ -76,6 +76,20 @@ function fmtDay(d: string | null): string {
   return new Date(`${d}T12:00:00Z`).toLocaleDateString("pt-PT", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
 }
 
+const WAITING = new Set(["needs_reply", "awaiting_approval"]);
+
+/** Hours the client has been waiting for us, or null when we were the last to write. */
+function waitingHours(t: InboxThread): number | null {
+  if (!WAITING.has(t.status) || t.lastFromUs || !t.lastMessageAt) return null;
+  return (Date.now() - new Date(t.lastMessageAt).getTime()) / 3_600_000;
+}
+
+function WaitingBadge({ hours }: { hours: number | null }) {
+  if (hours === null || hours < 24) return null;
+  const label = hours < 48 ? `${Math.floor(hours)}h sem resposta` : `${Math.floor(hours / 24)} dias sem resposta`;
+  return <span className="text-[11px] px-2 py-0.5 rounded-full bg-red-600 text-white font-semibold">{label}</span>;
+}
+
 function TourBadge({ sale }: { sale: InboxThread["sale"] }) {
   if (!sale) return <span className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-400">Sem tour</span>;
   return (
@@ -130,6 +144,7 @@ export function InboxClient(props: {
     });
   }
 
+  const overdue = props.threads.filter((t) => (waitingHours(t) ?? 0) >= 24).length;
   const pendingSugg = props.suggestions.filter((s) => s.status === "pending" || s.status === "failed");
   const pastSugg = props.suggestions.filter((s) => s.status !== "pending" && s.status !== "failed");
 
@@ -154,6 +169,11 @@ export function InboxClient(props: {
           {!props.calendarConnected && " · Calendário não autorizado"}
         </span>
       </div>
+      {overdue > 0 && (
+        <p className="text-[13px] font-semibold text-white bg-red-600/90 rounded-xl px-4 py-2">
+          {overdue} {overdue === 1 ? "conversa está" : "conversas estão"} há mais de 24h sem resposta — responder hoje, nem que seja &quot;Estamos a verificar&quot;.
+        </p>
+      )}
       {msg && <p className="text-[13px] bg-white/90 rounded-xl px-4 py-2">{msg}</p>}
       {props.lastSyncError && !msg && <p className="text-[12px] text-red-100 bg-red-500/30 rounded-xl px-4 py-2 whitespace-pre-line">{props.lastSyncError}</p>}
 
@@ -206,6 +226,7 @@ export function InboxClient(props: {
                       <p className="text-[13px] text-[#32373c] truncate">{t.subject || "(sem assunto)"}</p>
                       <p className="text-[12px] text-gray-400 truncate">{t.summary || t.snippet}</p>
                       <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                        <WaitingBadge hours={waitingHours(t)} />
                         <TourBadge sale={t.sale} />
                         <span className={`text-[11px] px-2 py-0.5 rounded-full ${st.cls}`}>{st.label}</span>
                         {t.pendingCount > 0 && <span className="text-[11px] px-2 py-0.5 rounded-full bg-blue-600 text-white font-semibold">{t.pendingCount}</span>}

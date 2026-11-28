@@ -399,6 +399,7 @@ Regras:
 - Disponibilidade: usa apenas a verificação abaixo. Se uma data não está disponível, propõe as alternativas disponíveis. Se o Bernardo está fora mas há outros guias livres, a data ESTÁ disponível (não mencionar o Bernardo ao cliente).${opts.calendarChecked ? "" : " (Atenção: o calendário Google não foi verificado — não confirmes datas de forma definitiva.)"}
 - Informação em falta: se a reserva está confirmada ou a ser confirmada, pede de forma simpática e agrupada a informação em falta listada abaixo. Em missing_info_requested lista o que pediste.
 - Responde às perguntas em aberto do cliente com a informação dos serviços e do guia; se não souberes, diz que confirmamos em breve (não inventes).
+- Nunca incluas resumos internos da app (blocos tipo "ID: … Status: Pending Client: … Type: …"), estados internos, notas para a equipa ou nomes de campos. Para resumir uma reserva usa uma frase: data, nº de pessoas, serviço e horário.
 - internal_note: nota curta em português para o administrador (o que verificar antes de enviar). Pode ser "".
 
 ${opts.guide}`,
