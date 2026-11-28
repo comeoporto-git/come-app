@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback, Fragment } from "react";
 import { usePathname } from "next/navigation";
+import { useDictation, speak, speakableText, stopSpeaking, canSpeak } from "@/components/voice";
 
 /** The email or sale open on this page, which gets its own ongoing conversation. */
 function currentContextKey(): string | null {
@@ -234,6 +235,28 @@ export function AiChat() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
+  // Voice mode: answers are read aloud and dictated messages are sent at once.
+  const [voiceMode, setVoiceMode] = useState(false);
+  const voiceModeRef = useRef(false);
+  useEffect(() => {
+    let on = false;
+    try { on = localStorage.getItem("comeai_voice") === "1"; } catch { /* private mode */ }
+    const id = setTimeout(() => { setVoiceMode(on); voiceModeRef.current = on; }, 0);
+    return () => clearTimeout(id);
+  }, []);
+  function toggleVoiceMode() {
+    const on = !voiceModeRef.current;
+    voiceModeRef.current = on;
+    setVoiceMode(on);
+    try { localStorage.setItem("comeai_voice", on ? "1" : "0"); } catch { /* ignore */ }
+    if (!on) stopSpeaking();
+  }
+  const sendRef = useRef<(text?: string) => void>(() => {});
+  const dictation = useDictation((text) => {
+    if (voiceModeRef.current) sendRef.current(text);
+    else setInput((prev) => (prev.trim() ? `${prev.trim()} ${text}` : text));
+  });
+
   // With an email or sale open, continue that one's conversation.
   const pathname = usePathname();
   // Picking another email in the inbox only changes "?t=": watch for it while open.
@@ -342,6 +365,7 @@ export function AiChat() {
       const content = (text ?? input).trim();
       if (!content || streaming || !activeId) return;
 
+      stopSpeaking();
       setInput("");
 
       // Optimistic user message
@@ -423,6 +447,7 @@ export function AiChat() {
         // Persist completed assistant message
         if (accumulated) {
           saveMessage(activeId, "assistant", accumulated).catch(() => null);
+          if (voiceModeRef.current) speak(speakableText(accumulated));
         }
       } catch (err) {
         if ((err as Error).name !== "AbortError") {
@@ -443,6 +468,8 @@ export function AiChat() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [input, messages, streaming, activeId]
   );
+
+  useEffect(() => { sendRef.current = send; }, [send]);
 
   function handleKey(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -514,6 +541,21 @@ export function AiChat() {
                   : "Sabe onde estás · altera tudo com confirmação"}
               </p>
             </div>
+            {canSpeak() && (
+              <button
+                onClick={toggleVoiceMode}
+                aria-label={voiceMode ? "Desligar respostas em voz alta" : "Ler respostas em voz alta"}
+                title={voiceMode ? "Modo voz ligado: lê as respostas e envia o que ditas" : "Ligar modo voz"}
+                className={`flex-none w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${voiceMode ? "bg-emerald-500 text-white" : "bg-white/10 text-white/60 hover:text-white"}`}
+              >
+                <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                  <path d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217z" />
+                  {voiceMode
+                    ? <path d="M14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10a7.97 7.97 0 00-2.343-5.657 1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z" />
+                    : <path d="M12.293 7.293a1 1 0 011.414 0L15 8.586l1.293-1.293a1 1 0 111.414 1.414L16.414 10l1.293 1.293a1 1 0 01-1.414 1.414L15 11.414l-1.293 1.293a1 1 0 01-1.414-1.414L13.586 10l-1.293-1.293a1 1 0 010-1.414z" />}
+                </svg>
+              </button>
+            )}
             {view === "list" && (
               <button
                 onClick={startNew}
@@ -634,6 +676,11 @@ export function AiChat() {
 
               {/* Input */}
               <div className="border-t border-black/8 p-3 flex-none">
+                {(dictation.listening || dictation.error) && (
+                  <p className={`text-[12px] mb-2 px-1 ${dictation.error ? "text-red-600" : "text-[#32373c]/70"}`}>
+                    {dictation.error ?? (dictation.interim ? `“${dictation.interim}”` : `A ouvir…${voiceMode ? " (envia quando parares de falar)" : ""}`)}
+                  </p>
+                )}
                 <div className="flex items-end gap-2">
                   <textarea
                     ref={inputRef}
@@ -646,6 +693,18 @@ export function AiChat() {
                     className="flex-1 resize-none text-[13px] bg-[#f5f5f0] text-[#32373c] placeholder-[#32373c]/35 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-[#111514]/20 transition-all disabled:opacity-50 min-h-[36px] max-h-[120px] overflow-y-auto"
                     style={{ scrollbarWidth: "none" }}
                   />
+                  {dictation.supported && (
+                    <button
+                      onClick={() => (dictation.listening ? dictation.stop() : dictation.start())}
+                      disabled={streaming}
+                      aria-label={dictation.listening ? "Parar de ouvir" : "Falar"}
+                      className={`flex-none w-9 h-9 rounded-xl flex items-center justify-center transition-colors active:scale-95 disabled:opacity-30 ${dictation.listening ? "bg-red-500 text-white animate-pulse" : "bg-[#f5f5f0] text-[#32373c] hover:bg-[#ebebea]"}`}
+                    >
+                      <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                        <path fillRule="evenodd" d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8a1 1 0 10-2 0A5 5 0 015 8a1 1 0 00-2 0 7.001 7.001 0 006 6.93V17H6a1 1 0 100 2h8a1 1 0 100-2h-3v-2.07z" clipRule="evenodd" />
+                      </svg>
+                    </button>
+                  )}
                   <button
                     onClick={() => send()}
                     disabled={!input.trim() || streaming}
