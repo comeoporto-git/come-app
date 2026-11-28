@@ -10,7 +10,7 @@ import { getGoogleToken, GMAIL_SCOPE } from "@/lib/google-token";
 import { sendReply, markThreadRead } from "@/lib/gmail";
 import { learnFromDecision, GUIDE_SECTIONS } from "@/lib/companyGuide";
 import {
-  syncInbox, toAddonThreadId, SALE_FIELDS,
+  syncInbox, toAddonThreadId, linkThreadToSale, SALE_FIELDS,
   type SyncResult, type ReplyPayload, type CreateSalePayload, type UpdateSalePayload,
   type AddExpensePayload, type GuideEntryPayload, type SuggestionKind, type SaleField,
 } from "@/lib/inboxAgent";
@@ -112,7 +112,7 @@ export async function linkThreadToSaleAction(threadRowId: string, saleId: string
     await supabase.from("inbox_threads").update({ sale_id: saleId }).eq("id", threadRowId);
     if (saleId) {
       const { data: t } = await supabase.from("inbox_threads").select("gmail_thread_id").eq("id", threadRowId).single();
-      if (t) await appendThreadToSale(saleId, t.gmail_thread_id);
+      if (t) await linkThreadToSale(saleId, t.gmail_thread_id);
     }
     revalidateInbox();
     return {};
@@ -122,15 +122,6 @@ export async function linkThreadToSaleAction(threadRowId: string, saleId: string
 }
 
 // ── Accept / reject ───────────────────────────────────────────────────────────
-
-async function appendThreadToSale(saleId: string, apiThreadId: string | null | undefined) {
-  if (!apiThreadId) return;
-  const { data } = await supabase.from("sales").select("thread_ids").eq("id", saleId).maybeSingle();
-  const ids = String(data?.thread_ids ?? "").split(",").map((s) => s.trim()).filter(Boolean);
-  const addon = toAddonThreadId(apiThreadId);
-  if (ids.includes(addon) || ids.includes(apiThreadId)) return;
-  await supabase.from("sales").update({ thread_ids: [...ids, addon].join(",") }).eq("id", saleId);
-}
 
 async function execReply(p: ReplyPayload, sessionUserId: string, threadRowId: string | null, saleId: string | null) {
   if (!p.to?.trim()) throw new Error("Falta o destinatário");
@@ -154,7 +145,7 @@ async function execReply(p: ReplyPayload, sessionUserId: string, threadRowId: st
       status: "replied", last_from_us: true, last_message_id: sent.id, updated_at: new Date().toISOString(),
     }).eq("id", threadRowId);
   }
-  if (saleId) await appendThreadToSale(saleId, p.gmail_thread_id);
+  if (saleId) await linkThreadToSale(saleId, p.gmail_thread_id);
   return { gmail_message_id: sent.id };
 }
 
@@ -223,7 +214,7 @@ async function execUpdateSale(p: UpdateSalePayload) {
   if (!Object.keys(updates).length) throw new Error("Nenhuma alteração");
   const { error } = await supabase.from("sales").update(updates).eq("id", p.sale_id);
   if (error) throw new Error(`Venda: ${error.message}`);
-  await appendThreadToSale(p.sale_id, p.gmail_thread_id);
+  await linkThreadToSale(p.sale_id, p.gmail_thread_id);
   revalidatePath(`/guide/tours/${p.sale_id}`);
   revalidatePath("/admin/em-falta");
   return { sale_id: p.sale_id, updated: Object.keys(updates) };

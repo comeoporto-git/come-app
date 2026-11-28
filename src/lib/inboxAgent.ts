@@ -130,6 +130,19 @@ export function missingClientInfo(row: Record<string, any>): string[] {
 const blank = (v: unknown) => v === null || v === undefined || String(v).trim() === "";
 
 /** "thread-f:<decimal>" — the format sales.thread_ids already uses (Gmail add-on). */
+/**
+ * Adds the conversation to the sale's emails (sales.thread_ids, in the add-on's
+ * "thread-f:" form), so it shows in the "Emails" section of the service page.
+ */
+export async function linkThreadToSale(saleId: string, apiThreadId: string | null | undefined): Promise<void> {
+  if (!apiThreadId) return;
+  const { data } = await supabase.from("sales").select("thread_ids").eq("id", saleId).maybeSingle();
+  const ids = String(data?.thread_ids ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  const addon = toAddonThreadId(apiThreadId);
+  if (ids.includes(addon) || ids.includes(apiThreadId)) return;
+  await supabase.from("sales").update({ thread_ids: [...ids, addon].join(",") }).eq("id", saleId);
+}
+
 export function toAddonThreadId(apiId: string): string {
   try {
     return `thread-f:${BigInt(`0x${apiId}`).toString(10)}`;
@@ -860,6 +873,15 @@ export async function analyzeThread(opts: {
       for_message_id: last.id,
     });
     count++;
+  }
+
+  // New emails about an existing service go to that service's "Emails" section.
+  if (sale) {
+    try {
+      await linkThreadToSale(sale.id, thread.id);
+    } catch (e) {
+      console.error("[inbox] link thread to sale failed:", e);
+    }
   }
 
   // 5. Team tasks (created/updated straight away — internal only).
