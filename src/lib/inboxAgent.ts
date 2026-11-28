@@ -1014,6 +1014,7 @@ async function upsertThreadRow(thread: GmailThread, myEmail: string): Promise<{ 
     last_message_at: new Date(last.date || Date.now()).toISOString(),
     last_from_us: lastFromUs,
     message_count: thread.messages.length,
+    unread: thread.messages.some((m) => m.labelIds.includes("UNREAD")),
     updated_at: new Date().toISOString(),
   };
   const { data, error } = await supabase
@@ -1114,6 +1115,27 @@ export async function syncInbox(opts: { userId: string; maxAnalyses?: number; th
         .filter((w) => (w.analyzed_message_id !== w.last_message_id || !w.situation) && (w.error_attempts ?? 0) < 3)
         .map((w) => w.gmail_thread_id as string);
       ids = [...new Set([...changed, ...backlog])];
+    }
+  }
+
+  // Unread in Gmail = pending in the app: one listing keeps the flag in step
+  // (also when someone reads or marks unread directly in Gmail).
+  if (!opts.threadIds) {
+    try {
+      const unreadIds = await listThreadIds(tok.token, "in:inbox is:unread -category:promotions -category:social", 100);
+      const { data: flagged } = await supabase.from("inbox_threads").select("gmail_thread_id").eq("unread", true);
+      const nowRead = (flagged ?? []).map((r) => r.gmail_thread_id as string).filter((g) => !unreadIds.includes(g));
+      if (nowRead.length) await supabase.from("inbox_threads").update({ unread: false }).in("gmail_thread_id", nowRead);
+      if (unreadIds.length) {
+        await supabase.from("inbox_threads").update({ unread: true }).in("gmail_thread_id", unreadIds);
+        // Unread conversations the app doesn't know yet are read now.
+        const { data: known } = await supabase.from("inbox_threads").select("gmail_thread_id").in("gmail_thread_id", unreadIds);
+        const knownSet = new Set((known ?? []).map((k) => k.gmail_thread_id as string));
+        ids = [...new Set([...ids, ...unreadIds.filter((u) => !knownSet.has(u))])];
+      }
+    } catch (e) {
+      if (isRateLimit(e)) throw e;
+      console.error("[inbox] unread listing failed:", e);
     }
   }
 

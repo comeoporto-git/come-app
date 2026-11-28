@@ -44,7 +44,8 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
     .select("*, sale:sales(id, date, notion_id, status, number_of_guests, services(name), clients(name))")
     .order("last_message_at", { ascending: false })
     .limit(100);
-  if (filter === "pendentes") q = q.in("status", ["attention", "needs_reply", "awaiting_approval"]);
+  // Pending = needs something from us, or still unread in Gmail.
+  if (filter === "pendentes") q = q.or("status.in.(attention,needs_reply,awaiting_approval),and(unread.eq.true,status.neq.deleted)");
   if (filter === "tratados") q = q.in("status", ["replied", "done", "no_reply"]);
   if (filter === "todos") q = q.neq("status", "deleted");
   const [{ data: threads }, { data: pending }, { data: chatSuggestions }, { data: sales }] = await Promise.all([
@@ -77,6 +78,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
     category: r.category,
     summary: r.summary,
     situation: r.situation ?? null,
+    unread: !!r.unread,
     error: r.error,
     pendingCount: pendingByThread[r.id] ?? 0,
     sale: r.sale

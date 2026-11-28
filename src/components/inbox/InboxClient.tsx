@@ -22,6 +22,7 @@ export type InboxThread = {
   status: string;
   category: string | null;
   summary: string | null;
+  unread: boolean;
   situation: { estado?: string; combinado?: string; falta?: string; proximo_passo?: string; aguarda?: string } | null;
   error: string | null;
   pendingCount: number;
@@ -276,7 +277,8 @@ export function InboxClient(props: {
                     >
                     <Link href={qs(t.id)} className={`block px-4 py-3 hover:bg-gray-50 ${sel?.id === t.id ? "bg-[#667470]/5" : ""}`}>
                       <div className="flex items-baseline gap-2">
-                        <p className="text-[13px] font-semibold truncate flex-1">{t.fromName || t.fromEmail}</p>
+                        {t.unread && <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0 self-center" title="Por ler no Gmail" />}
+                        <p className={`text-[13px] truncate flex-1 ${t.unread ? "font-bold" : "font-semibold"}`}>{t.fromName || t.fromEmail}</p>
                         <span className="text-[11px] text-gray-400 shrink-0">{fmt(t.lastMessageAt)}</span>
                       </div>
                       <p className="text-[13px] text-[#32373c] truncate">{t.subject || "(sem assunto)"}</p>

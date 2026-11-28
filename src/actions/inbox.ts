@@ -85,7 +85,9 @@ export async function reanalyzeThreadAction(threadRowId: string): Promise<Result
 export async function setThreadStatusAction(threadRowId: string, status: "done" | "needs_reply" | "no_reply"): Promise<Result> {
   try {
     const session = await requireAdmin();
-    const { data: row } = await supabase.from("inbox_threads").update({ status, updated_at: new Date().toISOString() }).eq("id", threadRowId).select("gmail_thread_id").maybeSingle();
+    const { data: row } = await supabase.from("inbox_threads")
+      .update({ status, ...(status === "done" ? { unread: false } : {}), updated_at: new Date().toISOString() })
+      .eq("id", threadRowId).select("gmail_thread_id").maybeSingle();
     // "Tratado" = read, nothing to do: also read in Gmail.
     if (status === "done" && row?.gmail_thread_id) {
       try { await markThreadRead(await gmailToken(session.user.id), row.gmail_thread_id); } catch (e) { console.error("[inbox] mark read failed:", e); }
@@ -179,7 +181,7 @@ async function execReply(p: ReplyPayload, sessionUserId: string, threadRowId: st
     await supabase.from("inbox_threads").update({
       // Not marked analysed: our reply is read like any new message, to update
       // the "ponto de situação" and the tasks.
-      status: "replied", last_from_us: true, last_message_id: sent.id, updated_at: new Date().toISOString(),
+      status: "replied", last_from_us: true, unread: false, last_message_id: sent.id, updated_at: new Date().toISOString(),
     }).eq("id", threadRowId);
   }
   if (saleId) await linkThreadToSale(saleId, p.gmail_thread_id);
