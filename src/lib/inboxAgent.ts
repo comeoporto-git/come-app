@@ -284,7 +284,11 @@ type Extraction = {
   tasks: AgentTask[];
   is_notification: boolean;
   important: boolean;
+  situation: Situation;
 };
+
+/** "Ponto de situação" of a conversation, rewritten on every new message (ours or theirs). */
+export type Situation = { estado: string; combinado: string; falta: string; proximo_passo: string; aguarda: "nós" | "cliente" | "ninguém" };
 
 export type AgentTask = { key: string; name: string; description: string; due_date: string; owner: string; done: boolean };
 const TASK_OWNERS = ["Bernardo", "António", "Manel"] as const;
@@ -327,6 +331,13 @@ const EXTRACTION_SCHEMA = obj({
   open_questions: arr(str),
   is_notification: bool,
   important: bool,
+  situation: obj({
+    estado: str,
+    combinado: str,
+    falta: str,
+    proximo_passo: str,
+    aguarda: { type: "string", enum: ["nós", "cliente", "ninguém"] },
+  }),
   tasks: arr(obj({
     key: str,
     name: str,
@@ -370,6 +381,8 @@ Regras:
 - tasks: tarefas internas que esta conversa cria para a equipa — tudo o que alguém da COME tem de FAZER além de responder ao email (a resposta já é tratada à parte). Exemplos: "Enviar fatura MFSP148054", "Pagar taxa RNAAT", "Enviar nome e contacto do guia à TLO", "Reservar transporte para 6 pax", "Registar despesa Vercel", "Preparar proposta para a Ovation (52 pax)", "Confirmar com o Barro a cooking class de 30/09". Não cries tarefas para "responder ao email". key: identificador curto e estável em minúsculas (ex.: "enviar-fatura", "nome-guia", "pagar-rnaat") — usa a MESMA key em análises seguintes da mesma conversa para a mesma tarefa. name: imperativo curto em português, com o cliente/código. description: 1-2 frases com o contexto. due_date: yyyy-mm-dd se houver prazo (ex.: prazo do email, ou 2 semanas antes da tour para o nome do guia, 7 dias após o serviço para faturas), senão "". owner: Bernardo (operação, guias, tours, chefs, fornecedores do serviço), António (faturação, pagamentos, despesas, contabilidade, administração, parcerias) ou Manel (reservas e comunicação com agências e clientes). done: true se a conversa mostra que a tarefa já foi feita (ex.: fatura enviada, pagamento confirmado). Se não houver tarefas, lista vazia.
 - is_notification: true se é um email automático sem uma pessoa à espera de resposta — notificações de sistemas (Vercel, GitHub, Supabase, deploys, merges, pushes), newsletters, marketing, questionários, apps de viagem, redes sociais, respostas automáticas. false para clientes, agências, fornecedores, parceiros, contabilista, bancos e organismos que pedem algo, e para faturas/recibos.
 - important: só para notificações — true se exige atenção da equipa (falha de deploy/build, erro, alerta de segurança, pagamento falhado, conta suspensa, limite atingido, prazo legal); false para avisos de rotina (deploy concluído, merge, push, newsletter).
+- situation: ponto de situação da conversa INTEIRA (em português, frases curtas, "" se não se aplica). estado: onde estamos (ex.: "Reserva confirmada para 25/04, 2 pax, OSNS + Chef"). combinado: o que já ficou acordado (data, hora, preço, ponto de encontro…). falta: o que ainda falta (de nós ou do cliente: contacto, alergias, fatura, nome do guia, confirmação…). proximo_passo: a próxima ação concreta e de quem. aguarda: "nós" se a bola está do nosso lado, "cliente" se esperamos pela outra parte, "ninguém" se está tudo tratado.
+- Se a última mensagem é NOSSA: needs_reply é false; usa-a para atualizar situation e tasks (ex.: enviámos a fatura → tarefa de faturar done; prometemos enviar o nome do guia → nova tarefa).
 - summary: 1-2 frases em português.
 
 ${opts.guide}`,
@@ -681,7 +694,11 @@ export async function analyzeThread(opts: {
     servicesForPrompt(),
     candidateSales(thread.id, senders),
   ]);
-  const ex = await extract({ thread, myEmail, guide, services, cands });
+  const extracted = await extract({ thread, myEmail, guide, services, cands });
+  const lastFromUs = last.fromEmail === myEmail || last.labelIds.includes("SENT");
+  // Our own message was the last one: nothing to answer, but the situation,
+  // tasks and sale info still move on.
+  const ex = lastFromUs ? { ...extracted, needs_reply: false, is_notification: false } : extracted;
 
   // Automatic notifications: archive the routine ones, highlight the important.
   if (opts.notifications?.autoArchive && ex.is_notification && !ex.invoice_attachments.length && !cands.linked.length) {
@@ -706,6 +723,8 @@ export async function analyzeThread(opts: {
   // Older pending suggestions for this thread no longer reflect the conversation.
   await supabase.from("inbox_suggestions").update({ status: "superseded" })
     .eq("thread_id", opts.threadRowId).eq("status", "pending").neq("kind", "add_expense");
+  // Sale changes and new sales are proposed again below if still needed; a
+  // reply only when the other side is waiting for us.
 
   let count = 0;
 
@@ -846,7 +865,7 @@ export async function analyzeThread(opts: {
   // 5. Team tasks (created/updated straight away — internal only).
   const tasks = await syncAgentTasks(opts.threadRowId, sale?.id ?? null, ex.tasks);
 
-  const status = count > 0 ? "awaiting_approval" : ex.needs_reply ? "needs_reply" : "no_reply";
+  const status = count > 0 ? "awaiting_approval" : ex.needs_reply ? "needs_reply" : lastFromUs ? "replied" : "no_reply";
   await supabase.from("inbox_threads").update({
     category: ex.category,
     summary: ex.summary,
@@ -854,6 +873,8 @@ export async function analyzeThread(opts: {
     sale_id: sale?.id ?? null,
     client_id: sale?.client_id ?? cands.clients[0]?.id ?? null,
     analysis: ex,
+    situation: ex.situation,
+    last_from_us: lastFromUs,
     analyzed_message_id: last.id,
     analyzed_at: new Date().toISOString(),
     status,
@@ -975,13 +996,14 @@ export async function syncInbox(opts: { userId: string; maxAnalyses?: number; th
     } else {
       const { data: waiting } = await supabase
         .from("inbox_threads")
-        .select("gmail_thread_id, analyzed_message_id, last_message_id, error_attempts, last_from_us")
-        .eq("status", "needs_reply")
+        .select("gmail_thread_id, analyzed_message_id, last_message_id, error_attempts, situation")
+        .in("status", ["needs_reply", "awaiting_approval", "replied"])
         .gte("last_message_at", new Date(Date.now() - 30 * 86400_000).toISOString())
         .order("last_message_at", { ascending: false })
         .limit(100);
       const backlog = (waiting ?? [])
-        .filter((w) => !w.last_from_us && w.analyzed_message_id !== w.last_message_id && (w.error_attempts ?? 0) < 3)
+        // Not yet analysed, or analysed before the "ponto de situação" existed.
+        .filter((w) => (w.analyzed_message_id !== w.last_message_id || !w.situation) && (w.error_attempts ?? 0) < 3)
         .map((w) => w.gmail_thread_id as string);
       ids = [...new Set([...changed, ...backlog])];
     }
@@ -991,13 +1013,13 @@ export async function syncInbox(opts: { userId: string; maxAnalyses?: number; th
   for (const id of ids) {
     result.checked++;
     try {
-      const { data: row } = await supabase.from("inbox_threads").select("id, analyzed_message_id, last_message_id, status, error_message_id, error_attempts").eq("gmail_thread_id", id).maybeSingle();
+      const { data: row } = await supabase.from("inbox_threads").select("id, analyzed_message_id, last_message_id, status, error_message_id, error_attempts, situation").eq("gmail_thread_id", id).maybeSingle();
       if (!opts.threadIds) {
         const meta = await getThreadMeta(tok.token, id);
         // From the history: only inbox conversations, not promotions/social.
         if (!fullScan && (!meta.labelIds.includes("INBOX") || meta.labelIds.some((l) => l === "CATEGORY_PROMOTIONS" || l === "CATEGORY_SOCIAL"))) continue;
         if (row) {
-          if (row.analyzed_message_id === meta.lastMessageId || (row.last_message_id === meta.lastMessageId && row.status === "done")) continue;
+          if ((row.analyzed_message_id === meta.lastMessageId && row.situation) || (row.last_message_id === meta.lastMessageId && row.status === "done")) continue;
           // Same message failed 3 times: wait for a new message or a manual "Reanalisar".
           if (row.error_message_id === meta.lastMessageId && (row.error_attempts ?? 0) >= 3) continue;
         }
@@ -1006,15 +1028,14 @@ export async function syncInbox(opts: { userId: string; maxAnalyses?: number; th
       if (!thread.messages.length) continue;
       const saved = await upsertThreadRow(thread, myEmail);
       const last = thread.messages[thread.messages.length - 1];
-      if (last.fromEmail === myEmail || last.labelIds.includes("SENT")) {
-        // We already answered (in Gmail or from the app).
+      const ourLast = last.fromEmail === myEmail || last.labelIds.includes("SENT");
+      if (ourLast) {
+        // We answered (in Gmail or from the app): the pending reply is no longer needed.
         await supabase.from("inbox_suggestions").update({ status: "superseded" }).eq("thread_id", saved.id).eq("status", "pending").eq("kind", "reply");
-        const { count: pending } = await supabase.from("inbox_suggestions").select("id", { count: "exact", head: true }).eq("thread_id", saved.id).eq("status", "pending");
-        await supabase.from("inbox_threads").update({ status: pending ? "awaiting_approval" : "replied", analyzed_message_id: last.id }).eq("id", saved.id);
-        continue;
+        await supabase.from("inbox_threads").update({ status: "replied", last_from_us: true }).eq("id", saved.id);
       }
       // Known system senders (Vercel, GitHub): no AI needed.
-      const rule = notifications.autoArchive ? ruleNotification(thread) : null;
+      const rule = notifications.autoArchive && !ourLast ? ruleNotification(thread) : null;
       if (rule) {
         await handleNotification({ token: tok.token, thread, threadRowId: saved.id, important: rule.important, summary: last.subject, labelName: notifications.labelName });
         result.archived += rule.important ? 0 : 1;

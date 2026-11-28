@@ -149,7 +149,9 @@ async function execReply(p: ReplyPayload, sessionUserId: string, threadRowId: st
   await markThreadRead(token, p.gmail_thread_id).catch(() => {});
   if (threadRowId) {
     await supabase.from("inbox_threads").update({
-      status: "replied", last_from_us: true, last_message_id: sent.id, analyzed_message_id: sent.id, updated_at: new Date().toISOString(),
+      // Not marked analysed: our reply is read like any new message, to update
+      // the "ponto de situação" and the tasks.
+      status: "replied", last_from_us: true, last_message_id: sent.id, updated_at: new Date().toISOString(),
     }).eq("id", threadRowId);
   }
   if (saleId) await appendThreadToSale(saleId, p.gmail_thread_id);
@@ -290,7 +292,19 @@ export async function acceptSuggestionAction(
   try {
     let result: unknown;
     switch (s.kind as SuggestionKind) {
-      case "reply": result = await execReply(payload, session.user.id, s.thread_id, s.sale_id); break;
+      case "reply": {
+        result = await execReply(payload, session.user.id, s.thread_id, s.sale_id);
+        const threadId = (payload as ReplyPayload).gmail_thread_id;
+        const uid = await ownerUserId(session.user.id);
+        after(async () => {
+          try {
+            await syncInbox({ userId: uid, threadIds: [threadId], maxAnalyses: 1 });
+          } catch (e) {
+            console.error("[inbox] re-analysis after reply failed:", e);
+          }
+        });
+        break;
+      }
       case "create_sale": result = await execCreateSale(payload, s.thread_id); break;
       case "update_sale": result = await execUpdateSale(payload); break;
       case "add_expense": result = await execAddExpense(payload, session.user.notionId || null); break;

@@ -20,6 +20,7 @@ export type InboxThread = {
   status: string;
   category: string | null;
   summary: string | null;
+  situation: { estado?: string; combinado?: string; falta?: string; proximo_passo?: string; aguarda?: string } | null;
   error: string | null;
   pendingCount: number;
   sale: { id: string; date: string | null; label: string; status: string | null; guests: number | null } | null;
@@ -248,9 +249,14 @@ export function InboxClient(props: {
                         <span className="text-[11px] text-gray-400 shrink-0">{fmt(t.lastMessageAt)}</span>
                       </div>
                       <p className="text-[13px] text-[#32373c] truncate">{t.subject || "(sem assunto)"}</p>
-                      <p className="text-[12px] text-gray-400 truncate">{t.summary || t.snippet}</p>
+                      <p className="text-[12px] text-gray-400 truncate">{t.situation?.estado || t.summary || t.snippet}</p>
                       <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
                         <WaitingBadge hours={waitingHours(t)} />
+                        {t.situation?.aguarda && t.situation.aguarda !== "ninguém" && (
+                          <span className={`text-[11px] px-2 py-0.5 rounded-full ${t.situation.aguarda === "nós" ? "bg-orange-100 text-orange-700" : "bg-gray-100 text-gray-500"}`}>
+                            {t.situation.aguarda === "nós" ? "Bola do nosso lado" : "À espera do cliente"}
+                          </span>
+                        )}
                         <TourBadge sale={t.sale} />
                         <span className={`text-[11px] px-2 py-0.5 rounded-full ${st.cls}`}>{st.label}</span>
                         {t.pendingCount > 0 && <span className="text-[11px] px-2 py-0.5 rounded-full bg-blue-600 text-white font-semibold">{t.pendingCount}</span>}
@@ -278,7 +284,7 @@ export function InboxClient(props: {
                   Gmail ↗
                 </a>
               </div>
-              {sel.summary && <p className="text-[13px] text-gray-600 bg-gray-50 rounded-xl px-3 py-2">{sel.summary}</p>}
+              {sel.situation ? <SituationBox s={sel.situation} /> : sel.summary && <p className="text-[13px] text-gray-600 bg-gray-50 rounded-xl px-3 py-2">{sel.summary}</p>}
               {sel.error && <p className="text-[12px] text-red-600 bg-red-50 rounded-xl px-3 py-2 break-words">{sel.error}</p>}
               {props.agentTasks.length > 0 && (
                 <div className="bg-gray-50 rounded-xl px-3 py-2">
@@ -387,5 +393,27 @@ function Linkified({ text }: { text: string }) {
         ),
       )}
     </>
+  );
+}
+
+/** "Ponto de situação" of a conversation, rewritten by the agent on every new message. */
+function SituationBox({ s }: { s: NonNullable<InboxThread["situation"]> }) {
+  const rows: [string, string | undefined][] = [
+    ["Estado", s.estado],
+    ["Combinado", s.combinado],
+    ["Falta", s.falta],
+    ["Próximo passo", s.proximo_passo],
+  ];
+  const waiting = s.aguarda === "nós" ? "Bola do nosso lado" : s.aguarda === "cliente" ? "À espera do cliente" : "Tudo tratado";
+  return (
+    <div className="bg-gray-50 rounded-xl px-3 py-2 space-y-1">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Ponto de situação</p>
+        <span className={`text-[11px] px-2 py-0.5 rounded-full ${s.aguarda === "nós" ? "bg-orange-100 text-orange-700" : s.aguarda === "cliente" ? "bg-gray-200 text-gray-600" : "bg-emerald-100 text-emerald-700"}`}>{waiting}</span>
+      </div>
+      {rows.filter(([, v]) => v && v.trim()).map(([k, v]) => (
+        <p key={k} className="text-[13px] text-gray-700"><span className="text-gray-400">{k}:</span> {v}</p>
+      ))}
+    </div>
   );
 }

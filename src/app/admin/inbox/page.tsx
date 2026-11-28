@@ -72,6 +72,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
     status: r.status,
     category: r.category,
     summary: r.summary,
+    situation: r.situation ?? null,
     error: r.error,
     pendingCount: pendingByThread[r.id] ?? 0,
     sale: r.sale
